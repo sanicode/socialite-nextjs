@@ -1,0 +1,1367 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model addresses {
+  id             BigInt    @id @default(autoincrement())
+  user_id        BigInt?
+  address_line_1 String?   @db.VarChar(255)
+  address_line_2 String?   @db.VarChar(255)
+  city           String?   @db.VarChar(255)
+  state          String?   @db.VarChar(255)
+  zip            String?   @db.VarChar(255)
+  country_code   String?   @db.VarChar(255)
+  phone          String?   @db.VarChar(255)
+  tax_number     String?   @db.VarChar(255)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+  tenant_id      BigInt?
+  province_id    Int?
+  city_id        Int?
+  users          users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "addresses_user_id_foreign")
+}
+
+model announcements {
+  id                     BigInt    @id @default(autoincrement())
+  title                  String    @db.VarChar(255)
+  content                String
+  starts_at              DateTime? @db.Timestamp(0)
+  ends_at                DateTime? @db.Timestamp(0)
+  is_active              Boolean   @default(true)
+  is_dismissible         Boolean   @default(true)
+  show_for_customers     Boolean   @default(true)
+  show_on_frontend       Boolean   @default(true)
+  show_on_user_dashboard Boolean   @default(true)
+  created_at             DateTime? @db.Timestamp(0)
+  updated_at             DateTime? @db.Timestamp(0)
+}
+
+model blog_post_categories {
+  id         BigInt       @id @default(autoincrement())
+  name       String       @db.VarChar(255)
+  slug       String       @unique(map: "blog_post_categories_slug_unique") @db.VarChar(255)
+  created_at DateTime?    @db.Timestamp(0)
+  updated_at DateTime?    @db.Timestamp(0)
+  deleted_at DateTime?    @db.Timestamp(0)
+  blog_posts blog_posts[]
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model blog_posts {
+  id                                BigInt                @id @default(autoincrement())
+  title                             String?
+  slug                              String?               @unique(map: "blog_posts_slug_unique") @db.VarChar(255)
+  body                              String?
+  is_published                      Boolean               @default(false)
+  published_at                      DateTime?             @db.Timestamp(0)
+  user_id                           BigInt
+  author_id                         BigInt?
+  blog_post_category_id             BigInt?
+  description                       String?
+  status                            String?               @default("pending") @db.VarChar(20)
+  created_at                        DateTime?             @db.Timestamp(0)
+  updated_at                        DateTime?             @db.Timestamp(0)
+  tenant_id                         BigInt?
+  deleted_at                        DateTime?             @db.Timestamp(0)
+  social_otp_id                     BigInt?
+  source_url                        String?
+  users_blog_posts_author_idTousers users?                @relation("blog_posts_author_idTousers", fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "blog_posts_author_id_foreign")
+  blog_post_categories              blog_post_categories? @relation(fields: [blog_post_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "blog_posts_blog_post_category_id_foreign")
+  social_otps                       social_otps?          @relation(fields: [social_otp_id], references: [id], map: "blog_posts_telegram_social_otp_id_foreign")
+  tenants                           tenants?              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "blog_posts_tenant_id_foreign")
+  users_blog_posts_user_idTousers   users                 @relation("blog_posts_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "blog_posts_user_id_foreign")
+}
+
+model configs {
+  id         BigInt    @id @default(autoincrement())
+  key        String    @unique(map: "configs_key_unique") @db.VarChar(255)
+  value      String?
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model currencies {
+  id                      BigInt                    @id @default(autoincrement())
+  name                    String                    @unique(map: "currencies_name_unique") @db.VarChar(255)
+  code                    String                    @unique(map: "currencies_code_unique") @db.VarChar(255)
+  symbol                  String?                   @db.VarChar(255)
+  created_at              DateTime?                 @db.Timestamp(0)
+  updated_at              DateTime?                 @db.Timestamp(0)
+  one_time_product_prices one_time_product_prices[]
+  order_items             order_items[]
+  orders                  orders[]
+  plan_prices             plan_prices[]
+  subscriptions           subscriptions[]
+  transactions            transactions[]
+}
+
+model discount_code_redemptions {
+  id               BigInt         @id @default(autoincrement())
+  discount_code_id BigInt
+  user_id          BigInt
+  subscription_id  BigInt?
+  order_id         BigInt?
+  created_at       DateTime?      @db.Timestamp(0)
+  updated_at       DateTime?      @db.Timestamp(0)
+  discount_codes   discount_codes @relation(fields: [discount_code_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_code_redemptions_discount_code_id_foreign")
+  orders           orders?        @relation(fields: [order_id], references: [id], onUpdate: NoAction, map: "discount_code_redemptions_order_id_foreign")
+  subscriptions    subscriptions? @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_code_redemptions_subscription_id_foreign")
+  users            users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_code_redemptions_user_id_foreign")
+}
+
+model discount_codes {
+  id                                                                   BigInt                      @id @default(autoincrement())
+  code                                                                 String                      @unique(map: "discount_codes_code_unique") @db.VarChar(255)
+  discount_id                                                          BigInt
+  created_at                                                           DateTime?                   @db.Timestamp(0)
+  updated_at                                                           DateTime?                   @db.Timestamp(0)
+  referral_reward_id                                                   BigInt?
+  is_referral_reward                                                   Boolean                     @default(false)
+  discount_code_redemptions                                            discount_code_redemptions[]
+  discounts                                                            discounts                   @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_codes_discount_id_foreign")
+  referral_rewards_discount_codes_referral_reward_idToreferral_rewards referral_rewards?           @relation("discount_codes_referral_reward_idToreferral_rewards", fields: [referral_reward_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_codes_referral_reward_id_foreign")
+  referral_rewards_referral_rewards_discount_code_idTodiscount_codes   referral_rewards[]          @relation("referral_rewards_discount_code_idTodiscount_codes")
+}
+
+model discount_one_time_product {
+  id                  BigInt            @id @default(autoincrement())
+  discount_id         BigInt
+  one_time_product_id BigInt
+  created_at          DateTime?         @db.Timestamp(0)
+  updated_at          DateTime?         @db.Timestamp(0)
+  discounts           discounts         @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_one_time_product_discount_id_foreign")
+  one_time_products   one_time_products @relation(fields: [one_time_product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_one_time_product_one_time_product_id_foreign")
+}
+
+model discount_payment_provider_data {
+  id                           BigInt            @id @default(autoincrement())
+  discount_id                  BigInt
+  payment_provider_id          BigInt
+  payment_provider_discount_id String            @db.VarChar(255)
+  created_at                   DateTime?         @db.Timestamp(0)
+  updated_at                   DateTime?         @db.Timestamp(0)
+  discounts                    discounts         @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_payment_provider_data_discount_id_foreign")
+  payment_providers            payment_providers @relation(fields: [payment_provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_payment_provider_data_payment_provider_id_foreign")
+}
+
+model discount_plan {
+  id          BigInt    @id @default(autoincrement())
+  discount_id BigInt
+  plan_id     BigInt
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  discounts   discounts @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_plan_discount_id_foreign")
+  plans       plans     @relation(fields: [plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "discount_plan_plan_id_foreign")
+}
+
+model discounts {
+  id                                   BigInt                           @id @default(autoincrement())
+  name                                 String                           @db.VarChar(255)
+  description                          String?                          @db.VarChar(255)
+  type                                 String                           @db.VarChar(255)
+  amount                               Float
+  valid_until                          DateTime?                        @db.Timestamp(0)
+  is_active                            Boolean                          @default(true)
+  action_type                          String?                          @db.VarChar(255)
+  max_redemptions                      Int?
+  max_redemptions_per_user             Int?
+  redemptions                          Int                              @default(0)
+  is_recurring                         Boolean                          @default(false)
+  duration_in_months                   Int?
+  maximum_recurring_intervals          Int?
+  created_at                           DateTime?                        @db.Timestamp(0)
+  updated_at                           DateTime?                        @db.Timestamp(0)
+  is_enabled_for_all_plans             Boolean                          @default(false)
+  is_enabled_for_all_one_time_products Boolean                          @default(false)
+  discount_codes                       discount_codes[]
+  discount_one_time_product            discount_one_time_product[]
+  discount_payment_provider_data       discount_payment_provider_data[]
+  discount_plan                        discount_plan[]
+  order_discounts                      order_discounts[]
+  subscription_discounts               subscription_discounts[]
+}
+
+model email_providers {
+  id         BigInt    @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  slug       String    @unique(map: "email_providers_slug_unique") @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model failed_jobs {
+  id         BigInt   @id @default(autoincrement())
+  uuid       String   @unique(map: "failed_jobs_uuid_unique") @db.VarChar(255)
+  connection String
+  queue      String
+  payload    String
+  exception  String
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model intervals {
+  id                                       BigInt          @id @default(autoincrement())
+  name                                     String          @db.VarChar(255)
+  slug                                     String          @unique(map: "intervals_slug_unique") @db.VarChar(255)
+  date_identifier                          String          @db.VarChar(255)
+  adverb                                   String?         @db.VarChar(255)
+  created_at                               DateTime?       @db.Timestamp(0)
+  updated_at                               DateTime?       @db.Timestamp(0)
+  plans_plans_interval_idTointervals       plans[]         @relation("plans_interval_idTointervals")
+  plans_plans_trial_interval_idTointervals plans[]         @relation("plans_trial_interval_idTointervals")
+  subscriptions                            subscriptions[]
+}
+
+model invoices {
+  id             BigInt       @id @default(autoincrement())
+  uuid           String       @unique(map: "invoices_uuid_unique") @db.Uuid
+  transaction_id BigInt
+  status         String       @default("unrendered") @db.VarChar(255)
+  filename       String?      @db.VarChar(255)
+  created_at     DateTime?    @db.Timestamp(0)
+  updated_at     DateTime?    @db.Timestamp(0)
+  transactions   transactions @relation(fields: [transaction_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "invoices_transaction_id_foreign")
+}
+
+model media {
+  id                    BigInt    @id @default(autoincrement())
+  model_type            String    @db.VarChar(255)
+  model_id              BigInt
+  uuid                  String?   @unique(map: "media_uuid_unique") @db.Uuid
+  collection_name       String    @db.VarChar(255)
+  name                  String    @db.VarChar(255)
+  file_name             String    @db.VarChar(255)
+  mime_type             String?   @db.VarChar(255)
+  disk                  String    @db.VarChar(255)
+  conversions_disk      String?   @db.VarChar(255)
+  size                  BigInt
+  manipulations         Json      @db.Json
+  custom_properties     Json      @db.Json
+  generated_conversions Json      @db.Json
+  responsive_images     Json      @db.Json
+  order_column          Int?
+  created_at            DateTime? @db.Timestamp(0)
+  updated_at            DateTime? @db.Timestamp(0)
+
+  @@index([model_type, model_id], map: "media_model_type_model_id_index")
+  @@index([order_column], map: "media_order_column_index")
+}
+
+model metric_data {
+  id         BigInt   @id @default(autoincrement())
+  metric_id  BigInt
+  value      Decimal  @db.Decimal(15, 2)
+  created_at DateTime @db.Timestamp(0)
+  metrics    metrics  @relation(fields: [metric_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "metric_data_metric_id_foreign")
+
+  @@index([created_at], map: "metric_data_created_at_index")
+}
+
+model metrics {
+  id          BigInt        @id @default(autoincrement())
+  name        String        @unique(map: "metrics_name_unique") @db.VarChar(255)
+  created_at  DateTime?     @db.Timestamp(0)
+  updated_at  DateTime?     @db.Timestamp(0)
+  metric_data metric_data[]
+}
+
+model migrations {
+  id          Int     @id @default(autoincrement())
+  migration   String  @db.VarChar(255)
+  batch       Int
+  filament_cd String? @db.VarChar(255)
+
+  @@index([filament_cd], map: "migrations_filament_cd_index")
+}
+
+model model_has_permissions {
+  permission_id BigInt
+  model_type    String      @db.VarChar(255)
+  model_id      BigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "model_has_permissions_permission_id_foreign")
+
+  @@id([permission_id, model_id, model_type])
+  @@index([model_id, model_type], map: "model_has_permissions_model_id_model_type_index")
+}
+
+model model_has_roles {
+  role_id    BigInt
+  model_type String @db.VarChar(255)
+  model_id   BigInt
+  roles      roles  @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "model_has_roles_role_id_foreign")
+
+  @@id([role_id, model_id, model_type])
+  @@index([model_id, model_type], map: "model_has_roles_model_id_model_type_index")
+}
+
+model oauth_login_providers {
+  id            BigInt    @id @default(autoincrement())
+  name          String    @db.VarChar(255)
+  provider_name String    @unique(map: "oauth_login_providers_provider_name_unique") @db.VarChar(255)
+  enabled       Boolean   @default(false)
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+}
+
+model one_time_passwords {
+  id                   BigInt    @id @default(autoincrement())
+  password             String    @db.VarChar(255)
+  origin_properties    Json?     @db.Json
+  expires_at           DateTime  @db.Timestamp(0)
+  authenticatable_type String    @db.VarChar(255)
+  authenticatable_id   BigInt
+  created_at           DateTime? @db.Timestamp(0)
+  updated_at           DateTime? @db.Timestamp(0)
+
+  @@index([authenticatable_type, authenticatable_id], map: "one_time_passwords_authenticatable_type_authenticatable_id_inde")
+}
+
+model one_time_product_payment_provider_data {
+  id                          BigInt            @id @default(autoincrement())
+  one_time_product_id         BigInt
+  payment_provider_id         BigInt
+  payment_provider_product_id String?           @db.VarChar(255)
+  created_at                  DateTime?         @db.Timestamp(0)
+  updated_at                  DateTime?         @db.Timestamp(0)
+  one_time_products           one_time_products @relation(fields: [one_time_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "one_time_product_payment_264vc5")
+  payment_providers           payment_providers @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "one_time_product_payment_264vc6")
+
+  @@unique([one_time_product_id, payment_provider_id], map: "pro_payment_provider_data_unq")
+}
+
+model one_time_product_price_payment_provider_data {
+  id                        BigInt                  @id @default(autoincrement())
+  one_time_product_price_id BigInt
+  payment_provider_id       BigInt
+  payment_provider_price_id String?                 @db.VarChar(255)
+  created_at                DateTime?               @db.Timestamp(0)
+  updated_at                DateTime?               @db.Timestamp(0)
+  one_time_product_prices   one_time_product_prices @relation(fields: [one_time_product_price_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "one_time_product_payment_264vc7")
+  payment_providers         payment_providers       @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "one_time_product_payment_264vc8")
+
+  @@unique([one_time_product_price_id, payment_provider_id], map: "pro_price_payment_provider_data_unq")
+}
+
+model one_time_product_prices {
+  id                                           BigInt                                         @id @default(autoincrement())
+  one_time_product_id                          BigInt
+  currency_id                                  BigInt
+  price                                        Int
+  created_at                                   DateTime?                                      @db.Timestamp(0)
+  updated_at                                   DateTime?                                      @db.Timestamp(0)
+  one_time_product_price_payment_provider_data one_time_product_price_payment_provider_data[]
+  currencies                                   currencies                                     @relation(fields: [currency_id], references: [id], onDelete: Cascade, map: "one_time_product_prices_currency_id_foreign")
+  one_time_products                            one_time_products                              @relation(fields: [one_time_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "one_time_product_prices_one_time_product_id_foreign")
+}
+
+model one_time_products {
+  id                                     BigInt                                   @id @default(autoincrement())
+  name                                   String                                   @db.VarChar(255)
+  slug                                   String                                   @unique(map: "one_time_products_slug_unique") @db.VarChar(255)
+  description                            String?                                  @db.VarChar(255)
+  max_quantity                           String                                   @default("1") @db.VarChar(255)
+  metadata                               Json?                                    @db.Json
+  features                               Json?                                    @db.Json
+  is_active                              Boolean                                  @default(true)
+  created_at                             DateTime?                                @db.Timestamp(0)
+  updated_at                             DateTime?                                @db.Timestamp(0)
+  is_visible                             Boolean                                  @default(true)
+  discount_one_time_product              discount_one_time_product[]
+  one_time_product_payment_provider_data one_time_product_payment_provider_data[]
+  one_time_product_prices                one_time_product_prices[]
+  order_items                            order_items[]
+}
+
+model order_discounts {
+  id          BigInt    @id @default(autoincrement())
+  discount_id BigInt
+  order_id    BigInt
+  type        String    @db.VarChar(255)
+  amount      Float
+  valid_until DateTime? @db.Timestamp(0)
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  discounts   discounts @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "order_discounts_discount_id_foreign")
+  orders      orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "order_discounts_order_id_foreign")
+}
+
+model order_items {
+  id                            BigInt            @id @default(autoincrement())
+  order_id                      BigInt
+  one_time_product_id           BigInt
+  quantity                      Int
+  currency_id                   BigInt?
+  price_per_unit                Int
+  price_per_unit_after_discount Int               @default(0)
+  discount_per_unit             Int               @default(0)
+  created_at                    DateTime?         @db.Timestamp(0)
+  updated_at                    DateTime?         @db.Timestamp(0)
+  currencies                    currencies?       @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "order_items_currency_id_foreign")
+  one_time_products             one_time_products @relation(fields: [one_time_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "order_items_one_time_product_id_foreign")
+  orders                        orders            @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "order_items_order_id_foreign")
+}
+
+model orders {
+  id                          BigInt                      @id @default(autoincrement())
+  uuid                        String                      @unique(map: "orders_uuid_unique") @db.Uuid
+  user_id                     BigInt?
+  status                      String                      @db.VarChar(255)
+  currency_id                 BigInt?
+  total_amount                BigInt                      @default(0)
+  total_amount_after_discount BigInt                      @default(0)
+  total_discount_amount       BigInt                      @default(0)
+  payment_provider_order_id   String?                     @db.VarChar(255)
+  payment_provider_id         BigInt?
+  created_at                  DateTime?                   @db.Timestamp(0)
+  updated_at                  DateTime?                   @db.Timestamp(0)
+  tenant_id                   BigInt
+  is_local                    Boolean                     @default(false)
+  comments                    String?
+  discount_code_redemptions   discount_code_redemptions[]
+  order_discounts             order_discounts[]
+  order_items                 order_items[]
+  currencies                  currencies?                 @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_currency_id_foreign")
+  payment_providers           payment_providers?          @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_payment_provider_id_foreign")
+  tenants                     tenants                     @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_tenant_id_foreign")
+  users                       users?                      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_user_id_foreign")
+  transactions                transactions[]
+}
+
+model password_reset_tokens {
+  email      String    @id @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model password_resets {
+  email      String    @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+
+  @@index([email], map: "password_resets_email_index")
+  @@ignore
+}
+
+model payment_providers {
+  id                                           BigInt                                         @id @default(autoincrement())
+  created_at                                   DateTime?                                      @db.Timestamp(0)
+  updated_at                                   DateTime?                                      @db.Timestamp(0)
+  type                                         String                                         @db.VarChar(255)
+  name                                         String                                         @db.VarChar(255)
+  slug                                         String                                         @unique(map: "payment_providers_slug_unique") @db.VarChar(255)
+  is_active                                    Boolean                                        @default(true)
+  sort                                         Int                                            @default(0)
+  is_enabled_for_new_payments                  Boolean                                        @default(true)
+  discount_payment_provider_data               discount_payment_provider_data[]
+  one_time_product_payment_provider_data       one_time_product_payment_provider_data[]
+  one_time_product_price_payment_provider_data one_time_product_price_payment_provider_data[]
+  orders                                       orders[]
+  plan_meter_payment_provider_data             plan_meter_payment_provider_data[]
+  plan_payment_provider_data                   plan_payment_provider_data[]
+  plan_price_payment_provider_data             plan_price_payment_provider_data[]
+  subscriptions                                subscriptions[]
+  transactions                                 transactions[]
+}
+
+model permissions {
+  id                    BigInt                  @id @default(autoincrement())
+  name                  String                  @db.VarChar(255)
+  guard_name            String                  @db.VarChar(255)
+  created_at            DateTime?               @db.Timestamp(0)
+  updated_at            DateTime?               @db.Timestamp(0)
+  is_tenant_permission  Boolean                 @default(false)
+  model_has_permissions model_has_permissions[]
+  role_has_permissions  role_has_permissions[]
+
+  @@unique([name, guard_name], map: "permissions_name_guard_name_unique")
+}
+
+model personal_access_tokens {
+  id             BigInt    @id @default(autoincrement())
+  tokenable_type String    @db.VarChar(255)
+  tokenable_id   BigInt
+  name           String    @db.VarChar(255)
+  token          String    @unique(map: "personal_access_tokens_token_unique") @db.VarChar(64)
+  abilities      String?
+  last_used_at   DateTime? @db.Timestamp(0)
+  expires_at     DateTime? @db.Timestamp(0)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+
+  @@index([tokenable_type, tokenable_id], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
+}
+
+model plan_meter_payment_provider_data {
+  id                             BigInt            @id @default(autoincrement())
+  plan_meter_id                  BigInt
+  payment_provider_id            BigInt
+  payment_provider_plan_meter_id String?           @db.VarChar(255)
+  data                           Json?             @db.Json
+  created_at                     DateTime?         @db.Timestamp(0)
+  updated_at                     DateTime?         @db.Timestamp(0)
+  payment_providers              payment_providers @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_meter_payment_provider_data_payment_provider_id_foreign")
+  plan_meters                    plan_meters       @relation(fields: [plan_meter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_meter_payment_provider_data_plan_meter_id_foreign")
+}
+
+model plan_meters {
+  id                               BigInt                             @id @default(autoincrement())
+  name                             String                             @db.VarChar(255)
+  created_at                       DateTime?                          @db.Timestamp(0)
+  updated_at                       DateTime?                          @db.Timestamp(0)
+  plan_meter_payment_provider_data plan_meter_payment_provider_data[]
+  plans                            plans[]
+}
+
+model plan_payment_provider_data {
+  plan_id                     BigInt
+  payment_provider_id         BigInt
+  payment_provider_product_id String?           @db.VarChar(255)
+  id                          BigInt            @id @default(autoincrement())
+  created_at                  DateTime?         @db.Timestamp(0)
+  updated_at                  DateTime?         @db.Timestamp(0)
+  payment_providers           payment_providers @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_payment_provider_data_payment_provider_id_foreign")
+  plans                       plans             @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_payment_provider_data_plan_id_foreign")
+
+  @@unique([plan_id, payment_provider_id], map: "plan_payment_provider_data_unq")
+}
+
+model plan_price_payment_provider_data {
+  plan_price_id             BigInt
+  payment_provider_id       BigInt
+  payment_provider_price_id String?           @db.VarChar(255)
+  id                        BigInt            @id @default(autoincrement())
+  created_at                DateTime?         @db.Timestamp(0)
+  updated_at                DateTime?         @db.Timestamp(0)
+  type                      String            @default("main_price") @db.VarChar(255)
+  payment_providers         payment_providers @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_price_payment_provider_data_payment_provider_id_foreign")
+  plan_prices               plan_prices       @relation(fields: [plan_price_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plan_price_payment_provider_data_plan_price_id_foreign")
+
+  @@unique([plan_price_id, payment_provider_id, type], map: "plan_price_payment_provider_type_data_unq")
+}
+
+model plan_prices {
+  id                               BigInt                             @id @default(autoincrement())
+  plan_id                          BigInt
+  currency_id                      BigInt
+  price                            Int
+  created_at                       DateTime?                          @db.Timestamp(0)
+  updated_at                       DateTime?                          @db.Timestamp(0)
+  price_per_unit                   Int?
+  type                             String                             @default("flat_rate") @db.VarChar(255)
+  tiers                            Json?                              @db.Json
+  setup_fee                        Int?
+  included_seats                   Int                                @default(0)
+  extra_seat_price                 Int                                @default(0)
+  plan_price_payment_provider_data plan_price_payment_provider_data[]
+  currencies                       currencies                         @relation(fields: [currency_id], references: [id], onDelete: Cascade, map: "plan_prices_currency_id_foreign")
+  plans                            plans                              @relation(fields: [plan_id], references: [id], onDelete: Cascade, map: "plan_prices_plan_id_foreign")
+}
+
+model plans {
+  id                                           BigInt                       @id @default(autoincrement())
+  name                                         String                       @db.VarChar(255)
+  slug                                         String                       @unique(map: "plans_slug_unique") @db.VarChar(255)
+  interval_id                                  BigInt
+  product_id                                   BigInt
+  is_active                                    Boolean                      @default(true)
+  has_trial                                    Boolean                      @default(false)
+  trial_interval_id                            BigInt?
+  interval_count                               Int
+  trial_interval_count                         Int?
+  description                                  String?
+  created_at                                   DateTime?                    @db.Timestamp(0)
+  updated_at                                   DateTime?                    @db.Timestamp(0)
+  type                                         String                       @default("flat_rate") @db.VarChar(255)
+  max_users_per_tenant                         Int                          @default(0)
+  meter_id                                     BigInt?
+  is_visible                                   Boolean                      @default(true)
+  discount_plan                                discount_plan[]
+  plan_payment_provider_data                   plan_payment_provider_data[]
+  plan_prices                                  plan_prices[]
+  intervals_plans_interval_idTointervals       intervals                    @relation("plans_interval_idTointervals", fields: [interval_id], references: [id], onDelete: Cascade, map: "plans_interval_id_foreign")
+  plan_meters                                  plan_meters?                 @relation(fields: [meter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "plans_meter_id_foreign")
+  products                                     products                     @relation(fields: [product_id], references: [id], onDelete: Cascade, map: "plans_product_id_foreign")
+  intervals_plans_trial_interval_idTointervals intervals?                   @relation("plans_trial_interval_idTointervals", fields: [trial_interval_id], references: [id], onDelete: Cascade, map: "plans_trial_interval_id_foreign")
+  subscriptions                                subscriptions[]
+}
+
+model products {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  slug        String    @unique(map: "products_slug_unique") @db.VarChar(255)
+  description String?
+  metadata    Json?     @db.Json
+  features    Json?     @db.Json
+  is_popular  Boolean   @default(false)
+  is_default  Boolean   @default(false)
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  plans       plans[]
+}
+
+model referral_codes {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  code       String    @unique(map: "referral_codes_code_unique") @db.VarChar(50)
+  uses_count Int       @default(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "referral_codes_user_id_foreign")
+
+  @@index([code], map: "referral_codes_code_index")
+}
+
+model referral_rewards {
+  id                                                                 BigInt           @id @default(autoincrement())
+  referral_id                                                        BigInt
+  referrer_user_id                                                   BigInt
+  reward_type                                                        String           @db.VarChar(255)
+  discount_code_id                                                   BigInt?
+  created_at                                                         DateTime?        @db.Timestamp(0)
+  updated_at                                                         DateTime?        @db.Timestamp(0)
+  discount_codes_discount_codes_referral_reward_idToreferral_rewards discount_codes[] @relation("discount_codes_referral_reward_idToreferral_rewards")
+  discount_codes_referral_rewards_discount_code_idTodiscount_codes   discount_codes?  @relation("referral_rewards_discount_code_idTodiscount_codes", fields: [discount_code_id], references: [id], onUpdate: NoAction, map: "referral_rewards_discount_code_id_foreign")
+  referrals                                                          referrals        @relation(fields: [referral_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "referral_rewards_referral_id_foreign")
+  users                                                              users            @relation(fields: [referrer_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "referral_rewards_referrer_user_id_foreign")
+
+  @@index([referrer_user_id, created_at], map: "referral_rewards_referrer_user_id_created_at_index")
+}
+
+model referrals {
+  id                                      BigInt             @id @default(autoincrement())
+  referrer_user_id                        BigInt
+  referred_user_id                        BigInt
+  referral_code                           String             @db.VarChar(255)
+  status                                  String             @default("pending") @db.VarChar(255)
+  verified_at                             DateTime?          @db.Timestamp(0)
+  paid_at                                 DateTime?          @db.Timestamp(0)
+  rewarded_at                             DateTime?          @db.Timestamp(0)
+  created_at                              DateTime?          @db.Timestamp(0)
+  updated_at                              DateTime?          @db.Timestamp(0)
+  referral_rewards                        referral_rewards[]
+  users_referrals_referred_user_idTousers users              @relation("referrals_referred_user_idTousers", fields: [referred_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "referrals_referred_user_id_foreign")
+  users_referrals_referrer_user_idTousers users              @relation("referrals_referrer_user_idTousers", fields: [referrer_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "referrals_referrer_user_id_foreign")
+
+  @@unique([referrer_user_id, referred_user_id], map: "referrals_referrer_user_id_referred_user_id_unique")
+  @@index([referral_code], map: "referrals_referral_code_index")
+  @@index([referrer_user_id, status], map: "referrals_referrer_user_id_status_index")
+}
+
+model roadmap_item_user_upvotes {
+  id              BigInt        @id @default(autoincrement())
+  roadmap_item_id BigInt
+  user_id         BigInt
+  ip_address      String?       @db.VarChar(255)
+  created_at      DateTime?     @db.Timestamp(0)
+  updated_at      DateTime?     @db.Timestamp(0)
+  roadmap_items   roadmap_items @relation(fields: [roadmap_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "roadmap_item_user_upvotes_roadmap_item_id_foreign")
+  users           users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "roadmap_item_user_upvotes_user_id_foreign")
+}
+
+model roadmap_items {
+  id                        BigInt                      @id @default(autoincrement())
+  slug                      String                      @unique(map: "roadmap_items_slug_unique") @db.VarChar(255)
+  title                     String                      @db.VarChar(255)
+  description               String?
+  status                    String                      @default("pending_approval") @db.VarChar(255)
+  type                      String                      @default("feature") @db.VarChar(255)
+  upvotes                   Int                         @default(0)
+  user_id                   BigInt
+  created_at                DateTime?                   @db.Timestamp(0)
+  updated_at                DateTime?                   @db.Timestamp(0)
+  roadmap_item_user_upvotes roadmap_item_user_upvotes[]
+  users                     users                       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "roadmap_items_user_id_foreign")
+}
+
+model role_has_permissions {
+  permission_id BigInt
+  role_id       BigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "role_has_permissions_permission_id_foreign")
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "role_has_permissions_role_id_foreign")
+
+  @@id([permission_id, role_id])
+}
+
+model roles {
+  id                   BigInt                 @id @default(autoincrement())
+  name                 String                 @db.VarChar(255)
+  guard_name           String                 @db.VarChar(255)
+  created_at           DateTime?              @db.Timestamp(0)
+  updated_at           DateTime?              @db.Timestamp(0)
+  is_tenant_role       Boolean                @default(false)
+  tenant_id            BigInt?
+  model_has_roles      model_has_roles[]
+  role_has_permissions role_has_permissions[]
+  tenants              tenants?               @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "roles_tenant_id_foreign")
+
+  @@unique([tenant_id, name, guard_name], map: "roles_tenant_name_guard_name_unique")
+}
+
+model subscription_discounts {
+  id              BigInt        @id @default(autoincrement())
+  subscription_id BigInt
+  discount_id     BigInt
+  type            String        @db.VarChar(255)
+  amount          Float
+  valid_until     DateTime?     @db.Timestamp(0)
+  is_recurring    Boolean       @default(false)
+  created_at      DateTime?     @db.Timestamp(0)
+  updated_at      DateTime?     @db.Timestamp(0)
+  discounts       discounts     @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "subscription_discounts_discount_id_foreign")
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "subscription_discounts_subscription_id_foreign")
+}
+
+model subscription_usages {
+  id              BigInt        @id @default(autoincrement())
+  subscription_id BigInt
+  unit_count      Int
+  created_at      DateTime?     @db.Timestamp(0)
+  updated_at      DateTime?     @db.Timestamp(0)
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "subscription_usages_subscription_id_foreign")
+}
+
+model subscription_versions {
+  version_id       Int       @id @default(autoincrement())
+  versionable_id   BigInt
+  versionable_type String    @db.VarChar(255)
+  user_id          String?   @db.VarChar(255)
+  model_data       String
+  reason           String?   @db.VarChar(100)
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime? @db.Timestamp(0)
+
+  @@index([versionable_id], map: "subscription_versions_versionable_id_index")
+}
+
+model subscriptions {
+  id                               BigInt                      @id @default(autoincrement())
+  uuid                             String                      @db.VarChar(255)
+  user_id                          BigInt
+  plan_id                          BigInt
+  price                            Int
+  currency_id                      BigInt
+  ends_at                          DateTime?                   @db.Timestamp(0)
+  cancelled_at                     DateTime?                   @db.Timestamp(0)
+  payment_provider_subscription_id String?                     @db.VarChar(255)
+  payment_provider_status          String?                     @db.VarChar(255)
+  payment_provider_id              BigInt?
+  trial_ends_at                    DateTime?                   @db.Timestamp(0)
+  status                           String                      @db.VarChar(255)
+  interval_id                      BigInt
+  interval_count                   Int
+  is_canceled_at_end_of_cycle      Boolean                     @default(false)
+  cancellation_reason              String?                     @db.VarChar(255)
+  cancellation_additional_info     String?
+  created_at                       DateTime?                   @db.Timestamp(0)
+  updated_at                       DateTime?                   @db.Timestamp(0)
+  quantity                         Int                         @default(1)
+  tenant_id                        BigInt
+  price_type                       String                      @default("flat_rate") @db.VarChar(255)
+  price_tiers                      Json?                       @db.Json
+  price_per_unit                   String?                     @db.VarChar(255)
+  extra_payment_provider_data      Json?                       @db.Json
+  type                             String                      @default("payment_provider_managed") @db.VarChar(255)
+  comments                         String?
+  discount_code_redemptions        discount_code_redemptions[]
+  subscription_discounts           subscription_discounts[]
+  subscription_usages              subscription_usages[]
+  currencies                       currencies                  @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_currency_id_foreign")
+  intervals                        intervals                   @relation(fields: [interval_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_interval_id_foreign")
+  payment_providers                payment_providers?          @relation(fields: [payment_provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_payment_provider_id_foreign")
+  plans                            plans                       @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_plan_id_foreign")
+  tenants                          tenants                     @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_tenant_id_foreign")
+  users                            users                       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "subscriptions_user_id_foreign")
+  transactions                     transactions[]
+  user_subscription_trials         user_subscription_trials[]
+}
+
+model telescope_entries {
+  sequence                BigInt                   @id @default(autoincrement())
+  uuid                    String                   @unique(map: "telescope_entries_uuid_unique") @db.Uuid
+  batch_id                String                   @db.Uuid
+  family_hash             String?                  @db.VarChar(255)
+  should_display_on_index Boolean                  @default(true)
+  type                    String                   @db.VarChar(20)
+  content                 String
+  created_at              DateTime?                @db.Timestamp(0)
+  telescope_entries_tags  telescope_entries_tags[]
+
+  @@index([batch_id], map: "telescope_entries_batch_id_index")
+  @@index([created_at], map: "telescope_entries_created_at_index")
+  @@index([family_hash], map: "telescope_entries_family_hash_index")
+  @@index([type, should_display_on_index], map: "telescope_entries_type_should_display_on_index_index")
+}
+
+model telescope_entries_tags {
+  entry_uuid        String            @db.Uuid
+  tag               String            @db.VarChar(255)
+  telescope_entries telescope_entries @relation(fields: [entry_uuid], references: [uuid], onDelete: Cascade, onUpdate: NoAction, map: "telescope_entries_tags_entry_uuid_foreign")
+
+  @@id([entry_uuid, tag])
+  @@index([tag], map: "telescope_entries_tags_tag_index")
+}
+
+model telescope_monitoring {
+  tag String @id @db.VarChar(255)
+}
+
+model transaction_versions {
+  version_id       Int       @id @default(autoincrement())
+  versionable_id   BigInt
+  versionable_type String    @db.VarChar(255)
+  user_id          String?   @db.VarChar(255)
+  model_data       String
+  reason           String?   @db.VarChar(100)
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime? @db.Timestamp(0)
+
+  @@index([versionable_id], map: "transaction_versions_versionable_id_index")
+}
+
+model transactions {
+  id                              BigInt             @id @default(autoincrement())
+  uuid                            String             @db.Uuid
+  user_id                         BigInt
+  currency_id                     BigInt
+  amount                          BigInt
+  subscription_id                 BigInt?
+  order_id                        BigInt?
+  status                          String             @db.VarChar(255)
+  payment_provider_id             BigInt?
+  payment_provider_status         String?            @db.VarChar(255)
+  payment_provider_transaction_id String?            @db.VarChar(255)
+  error_reason                    String?            @db.VarChar(255)
+  total_discount                  BigInt             @default(0)
+  total_tax                       BigInt             @default(0)
+  total_fees                      BigInt             @default(0)
+  created_at                      DateTime?          @db.Timestamp(0)
+  updated_at                      DateTime?          @db.Timestamp(0)
+  tenant_id                       BigInt
+  invoices                        invoices[]
+  currencies                      currencies         @relation(fields: [currency_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "transactions_currency_id_foreign")
+  orders                          orders?            @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_order_id_foreign")
+  payment_providers               payment_providers? @relation(fields: [payment_provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "transactions_payment_provider_id_foreign")
+  subscriptions                   subscriptions?     @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "transactions_subscription_id_foreign")
+  tenants                         tenants            @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_tenant_id_foreign")
+  users                           users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "transactions_user_id_foreign")
+}
+
+model two_factor_authentications {
+  id                          BigInt    @id @default(autoincrement())
+  authenticatable_type        String    @db.VarChar(255)
+  authenticatable_id          BigInt
+  shared_secret               String
+  enabled_at                  DateTime? @db.Timestamptz(0)
+  label                       String    @db.VarChar(255)
+  digits                      Int       @default(6) @db.SmallInt
+  seconds                     Int       @default(30) @db.SmallInt
+  window                      Int       @default(0) @db.SmallInt
+  algorithm                   String    @default("sha1") @db.VarChar(16)
+  recovery_codes              String?
+  recovery_codes_generated_at DateTime? @db.Timestamptz(0)
+  safe_devices                Json?     @db.Json
+  created_at                  DateTime? @db.Timestamptz(0)
+  updated_at                  DateTime? @db.Timestamptz(0)
+
+  @@index([authenticatable_type, authenticatable_id], map: "two_factor_authenticatable_index")
+}
+
+model user_parameters {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  name       String    @db.VarChar(255)
+  value      String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_parameters_user_id_foreign")
+
+  @@unique([user_id, name], map: "user_parameters_user_id_name_unique")
+}
+
+model user_stripe_data {
+  id                       BigInt    @id @default(autoincrement())
+  created_at               DateTime? @db.Timestamp(0)
+  updated_at               DateTime? @db.Timestamp(0)
+  stripe_customer_id       String?   @db.VarChar(255)
+  stripe_payment_method_id String?   @db.VarChar(255)
+  user_id                  BigInt
+  tenant_id                BigInt?
+  tenants                  tenants?  @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_stripe_data_tenant_id_foreign")
+  users                    users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_stripe_data_user_id_foreign")
+
+  @@unique([user_id, stripe_customer_id, stripe_payment_method_id], map: "user_stripe_data_unique")
+}
+
+model user_subscription_trials {
+  id              BigInt        @id @default(autoincrement())
+  user_id         BigInt
+  subscription_id BigInt
+  trial_ends_at   DateTime      @db.Timestamp(0)
+  created_at      DateTime?     @db.Timestamp(0)
+  updated_at      DateTime?     @db.Timestamp(0)
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_subscription_trials_subscription_id_foreign")
+  users           users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_subscription_trials_user_id_foreign")
+
+  @@unique([user_id, subscription_id], map: "user_subscription_trials_user_id_subscription_id_unique")
+}
+
+model users {
+  id                                          BigInt                      @id @default(autoincrement())
+  name                                        String                      @db.VarChar(255)
+  email                                       String                      @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at                           DateTime?                   @db.Timestamp(0)
+  password                                    String                      @db.VarChar(255)
+  remember_token                              String?                     @db.VarChar(100)
+  public_name                                 String?                     @db.VarChar(255)
+  is_admin                                    Boolean                     @default(false)
+  is_blocked                                  Boolean                     @default(false)
+  created_at                                  DateTime?                   @db.Timestamp(0)
+  updated_at                                  DateTime?                   @db.Timestamp(0)
+  notes                                       String?
+  phone_number                                String?                     @db.VarChar(255)
+  phone_number_verified_at                    DateTime?                   @db.Timestamp(0)
+  last_seen_at                                DateTime?                   @db.Timestamp(0)
+  addresses                                   addresses[]
+  blog_posts_blog_posts_author_idTousers      blog_posts[]                @relation("blog_posts_author_idTousers")
+  blog_posts_blog_posts_user_idTousers        blog_posts[]                @relation("blog_posts_user_idTousers")
+  discount_code_redemptions                   discount_code_redemptions[]
+  invitations                                 invitations[]
+  orders                                      orders[]
+  referral_codes                              referral_codes[]
+  referral_rewards                            referral_rewards[]
+  referrals_referrals_referred_user_idTousers referrals[]                 @relation("referrals_referred_user_idTousers")
+  referrals_referrals_referrer_user_idTousers referrals[]                 @relation("referrals_referrer_user_idTousers")
+  roadmap_item_user_upvotes                   roadmap_item_user_upvotes[]
+  roadmap_items                               roadmap_items[]
+  social_otps                                 social_otps[]
+  subscriptions                               subscriptions[]
+  tenant_user                                 tenant_user[]
+  tenants                                     tenants[]
+  transactions                                transactions[]
+  user_parameters                             user_parameters[]
+  user_stripe_data                            user_stripe_data[]
+  user_subscription_trials                    user_subscription_trials[]
+}
+
+model verification_providers {
+  id         BigInt    @id @default(autoincrement())
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  name       String    @db.VarChar(255)
+  slug       String    @unique(map: "verification_providers_slug_unique") @db.VarChar(255)
+}
+
+model filament_cd_bar_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  bar_colors              Json?
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_bar_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_bar_chart_widget_eloquent_ds_configs {
+  id                  BigInt    @id @default(autoincrement())
+  operator            String    @db.VarChar(255)
+  dimension_attribute String    @db.VarChar(255)
+  dimension_mode      String?   @db.VarChar(255)
+  measure_attribute   String?   @db.VarChar(255)
+  filters             Json?
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_dashboard_shareables {
+  id                     BigInt                 @id @default(autoincrement())
+  dashboard_id           BigInt
+  shareable_type         String                 @db.VarChar(255)
+  shareable_id           String                 @db.VarChar(255)
+  role                   String                 @db.VarChar(255)
+  created_at             DateTime?              @db.Timestamp(0)
+  updated_at             DateTime?              @db.Timestamp(0)
+  filament_cd_dashboards filament_cd_dashboards @relation(fields: [dashboard_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "filament_cd_dashboard_shareables_dashboard_id_foreign")
+
+  @@unique([dashboard_id, shareable_type, shareable_id], map: "cd_shareables_unique")
+  @@index([shareable_type, shareable_id], map: "cd_shareables_morph_index")
+}
+
+model filament_cd_dashboards {
+  id                               BigInt                             @id @default(autoincrement())
+  panel_id                         String                             @db.VarChar(255)
+  name                             String?                            @db.VarChar(255)
+  slug                             String?                            @db.VarChar(255)
+  default_role                     String?                            @db.VarChar(255)
+  embedded_component               String?                            @db.VarChar(255)
+  embedded_position                String?                            @db.VarChar(255)
+  has_navigation_item              Boolean                            @default(false)
+  navigation_icon                  String?                            @db.VarChar(255)
+  navigation_label                 String?                            @db.VarChar(255)
+  navigation_group                 String?                            @db.VarChar(255)
+  navigation_sort                  Int                                @default(999)
+  created_at                       DateTime?                          @db.Timestamp(0)
+  updated_at                       DateTime?                          @db.Timestamp(0)
+  deleted_at                       DateTime?                          @db.Timestamp(0)
+  filament_cd_dashboard_shareables filament_cd_dashboard_shareables[]
+  filament_cd_widgets              filament_cd_widgets[]
+}
+
+model filament_cd_doughnut_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  slice_colors            Json?
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_doughnut_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_doughnut_chart_widget_eloquent_ds_configs {
+  id                  BigInt    @id @default(autoincrement())
+  operator            String    @db.VarChar(255)
+  dimension_attribute String    @db.VarChar(255)
+  dimension_mode      String?   @db.VarChar(255)
+  measure_attribute   String?   @db.VarChar(255)
+  filters             Json?
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_line_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  data_color              String?   @db.VarChar(255)
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_line_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_line_chart_widget_eloquent_ds_configs {
+  id                            BigInt    @id @default(autoincrement())
+  operator                      String    @db.VarChar(255)
+  dimension_attribute           String    @db.VarChar(255)
+  min_dimension                 String?   @db.VarChar(255)
+  max_dimension                 String?   @db.VarChar(255)
+  dimension_relative_date_value Int?
+  dimension_relative_date_unit  String?   @db.VarChar(255)
+  measure_attribute             String?   @db.VarChar(255)
+  is_cumulative                 Boolean   @default(false)
+  filters                       Json?
+  created_at                    DateTime? @db.Timestamp(0)
+  updated_at                    DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_pie_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  slice_colors            Json?
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_pie_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_pie_chart_widget_eloquent_ds_configs {
+  id                  BigInt    @id @default(autoincrement())
+  operator            String    @db.VarChar(255)
+  dimension_attribute String    @db.VarChar(255)
+  dimension_mode      String?   @db.VarChar(255)
+  measure_attribute   String?   @db.VarChar(255)
+  filters             Json?
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_polar_area_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  slice_colors            Json?
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_polar_area_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_polar_area_chart_widget_eloquent_ds_configs {
+  id                  BigInt    @id @default(autoincrement())
+  operator            String    @db.VarChar(255)
+  dimension_attribute String    @db.VarChar(255)
+  dimension_mode      String?   @db.VarChar(255)
+  measure_attribute   String?   @db.VarChar(255)
+  filters             Json?
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_scatter_chart_widget_configs {
+  id                      BigInt    @id @default(autoincrement())
+  heading                 String    @db.VarChar(255)
+  data_source             String    @db.VarChar(255)
+  data_label              String    @db.VarChar(255)
+  data_color              String?   @db.VarChar(255)
+  data_source_config_type String?   @db.VarChar(255)
+  data_source_config_id   BigInt?
+  created_at              DateTime? @db.Timestamp(0)
+  updated_at              DateTime? @db.Timestamp(0)
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_scatter_chart_widgets_data_source_config_index")
+}
+
+model filament_cd_scatter_chart_widget_eloquent_ds_configs {
+  id                            BigInt    @id @default(autoincrement())
+  operator                      String?   @db.VarChar(255)
+  dimension_attribute           String    @db.VarChar(255)
+  min_dimension                 String?   @db.VarChar(255)
+  max_dimension                 String?   @db.VarChar(255)
+  dimension_relative_date_value Int?
+  dimension_relative_date_unit  String?   @db.VarChar(255)
+  measure_attribute             String?   @db.VarChar(255)
+  filters                       Json?
+  created_at                    DateTime? @db.Timestamp(0)
+  updated_at                    DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_stats_overview_widget_configs {
+  id                                             BigInt                                           @id @default(autoincrement())
+  created_at                                     DateTime?                                        @db.Timestamp(0)
+  updated_at                                     DateTime?                                        @db.Timestamp(0)
+  filament_cd_stats_overview_widget_stat_configs filament_cd_stats_overview_widget_stat_configs[]
+}
+
+model filament_cd_stats_overview_widget_stat_configs {
+  id                                        BigInt                                    @id @default(autoincrement())
+  stats_overview_widget_config_id           BigInt
+  label                                     String                                    @db.VarChar(255)
+  data_source                               String                                    @db.VarChar(255)
+  data_source_config_type                   String?                                   @db.VarChar(255)
+  data_source_config_id                     BigInt?
+  sort                                      Int
+  created_at                                DateTime?                                 @db.Timestamp(0)
+  updated_at                                DateTime?                                 @db.Timestamp(0)
+  filament_cd_stats_overview_widget_configs filament_cd_stats_overview_widget_configs @relation(fields: [stats_overview_widget_config_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "filament_cd_stats_overview_widget_config_id_foreign")
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_stats_overview_widget_stats_data_source_config_inde")
+}
+
+model filament_cd_stats_overview_widget_stat_eloquent_ds_configs {
+  id         BigInt    @id @default(autoincrement())
+  operator   String    @db.VarChar(255)
+  attribute  String?   @db.VarChar(255)
+  filters    Json?
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_table_widget_column_configs {
+  id                               BigInt                           @id @default(autoincrement())
+  table_widget_config_id           BigInt
+  data_source_config_type          String?                          @db.VarChar(255)
+  data_source_config_id            BigInt?
+  label                            String                           @db.VarChar(255)
+  is_searchable                    Boolean                          @default(false)
+  is_sortable                      Boolean                          @default(false)
+  is_toggleable                    Boolean                          @default(false)
+  sort                             Int
+  created_at                       DateTime?                        @db.Timestamp(0)
+  updated_at                       DateTime?                        @db.Timestamp(0)
+  filament_cd_table_widget_configs filament_cd_table_widget_configs @relation(fields: [table_widget_config_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "filament_cd_table_widget_config_id_foreign")
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_table_widget_columns_data_source_config_index")
+}
+
+model filament_cd_table_widget_column_eloquent_ds_configs {
+  id         BigInt    @id @default(autoincrement())
+  attribute  String    @db.VarChar(255)
+  mode       String?   @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_table_widget_configs {
+  id                                      BigInt                                    @id @default(autoincrement())
+  heading                                 String                                    @db.VarChar(255)
+  data_source                             String                                    @db.VarChar(255)
+  data_source_config_type                 String?                                   @db.VarChar(255)
+  data_source_config_id                   BigInt?
+  created_at                              DateTime?                                 @db.Timestamp(0)
+  updated_at                              DateTime?                                 @db.Timestamp(0)
+  filament_cd_table_widget_column_configs filament_cd_table_widget_column_configs[]
+
+  @@index([data_source_config_type, data_source_config_id], map: "filament_cd_table_widgets_data_source_config_index")
+}
+
+model filament_cd_table_widget_eloquent_ds_configs {
+  id         BigInt    @id @default(autoincrement())
+  filters    Json?
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model filament_cd_widgets {
+  id                        BigInt                 @id @default(autoincrement())
+  dashboard_id              BigInt
+  label                     String?                @db.VarChar(255)
+  thumbnail_image           String?
+  type                      String?                @db.VarChar(255)
+  config_type               String?                @db.VarChar(255)
+  config_id                 BigInt?
+  sort                      Int
+  column_span               Json
+  enabled_at                DateTime?              @default(now()) @db.Timestamp(0)
+  previous_version_id       BigInt?
+  created_at                DateTime?              @db.Timestamp(0)
+  updated_at                DateTime?              @db.Timestamp(0)
+  deleted_at                DateTime?              @db.Timestamp(0)
+  filament_cd_widgets       filament_cd_widgets?   @relation("filament_cd_widgetsTofilament_cd_widgets", fields: [previous_version_id], references: [id], onUpdate: NoAction, map: "filament_cd_widget_previous_version_id_foreign")
+  other_filament_cd_widgets filament_cd_widgets[]  @relation("filament_cd_widgetsTofilament_cd_widgets")
+  filament_cd_dashboards    filament_cd_dashboards @relation(fields: [dashboard_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "filament_cd_widgets_dashboard_id_foreign")
+
+  @@index([config_type, config_id], map: "filament_cd_widgets_config_index")
+}
+
+model invitations {
+  id          BigInt    @id @default(autoincrement())
+  uuid        String    @unique(map: "invitations_uuid_unique") @db.Uuid
+  email       String    @db.VarChar(255)
+  token       String    @unique(map: "invitations_token_unique") @db.VarChar(255)
+  expires_at  DateTime  @db.Timestamp(0)
+  role        String?   @db.VarChar(255)
+  accepted_at DateTime? @db.Timestamp(0)
+  status      String    @default("pending") @db.VarChar(255)
+  user_id     BigInt
+  tenant_id   BigInt
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  team_id     BigInt?
+  tenants     tenants   @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "invitations_tenant_id_foreign")
+  users       users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "invitations_user_id_foreign")
+
+  @@index([email], map: "invitations_email_index")
+}
+
+model reg_cities {
+  id          BigInt @id(map: "reg_regencies_pkey")
+  province_id Int    @db.SmallInt
+  name        String @db.VarChar(255)
+
+  @@index([province_id], map: "fk_province")
+}
+
+model reg_districts {
+  id           String         @id @db.Char(6)
+  regency_id   String         @db.Char(4)
+  name         String         @db.VarChar(255)
+  reg_villages reg_villages[]
+
+  @@index([regency_id], map: "fk_regency")
+}
+
+model reg_provinces {
+  id   Int    @id @db.SmallInt
+  name String @db.VarChar(255)
+}
+
+model reg_villages {
+  id            String        @id @db.Char(10)
+  district_id   String        @db.Char(6)
+  name          String        @db.VarChar(255)
+  reg_districts reg_districts @relation(fields: [district_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_district")
+
+  @@index([district_id], map: "idx_district")
+}
+
+model social_otps {
+  id                BigInt       @id(map: "telegram_social_otps_pkey") @default(autoincrement())
+  user_id           BigInt
+  phone_number      String       @db.VarChar(255)
+  otp_code          String       @db.VarChar(6)
+  platform_user_id  String?      @db.VarChar(255)
+  platform_username String?      @db.VarChar(255)
+  verified_at       DateTime?    @db.Timestamp(0)
+  created_at        DateTime?    @db.Timestamp(0)
+  updated_at        DateTime?    @db.Timestamp(0)
+  deleted_at        DateTime?    @db.Timestamp(0)
+  blog_posts        blog_posts[]
+  users             users        @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "telegram_social_otps_user_id_foreign")
+}
+
+model team_tenant_user {
+  id             BigInt      @id @default(autoincrement())
+  tenant_user_id BigInt
+  team_id        BigInt
+  created_at     DateTime?   @db.Timestamp(0)
+  updated_at     DateTime?   @db.Timestamp(0)
+  teams          teams       @relation(fields: [team_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "team_tenant_user_team_id_foreign")
+  tenant_user    tenant_user @relation(fields: [tenant_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "team_tenant_user_tenant_user_id_foreign")
+}
+
+model teams {
+  id               BigInt             @id @default(autoincrement())
+  uuid             String             @unique(map: "teams_uuid_unique") @db.Uuid
+  name             String             @db.VarChar(255)
+  tenant_id        BigInt
+  created_at       DateTime?          @db.Timestamp(0)
+  updated_at       DateTime?          @db.Timestamp(0)
+  team_tenant_user team_tenant_user[]
+  tenants          tenants            @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "teams_tenant_id_foreign")
+}
+
+model tenant_user {
+  id               BigInt             @id @default(autoincrement())
+  user_id          BigInt
+  tenant_id        BigInt
+  is_default       Boolean            @default(false)
+  created_at       DateTime?          @db.Timestamp(0)
+  updated_at       DateTime?          @db.Timestamp(0)
+  team_tenant_user team_tenant_user[]
+  tenants          tenants            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "tenant_user_tenant_id_foreign")
+  users            users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "tenant_user_user_id_foreign")
+}
+
+model tenants {
+  id                     BigInt             @id @default(autoincrement())
+  uuid                   String             @unique(map: "tenants_uuid_uniq") @db.VarChar(255)
+  name                   String             @db.VarChar(255)
+  is_name_auto_generated Boolean            @default(false)
+  created_by             BigInt?
+  created_at             DateTime?          @db.Timestamp(0)
+  updated_at             DateTime?          @db.Timestamp(0)
+  domain                 String?            @unique(map: "tenants_domain_unique") @db.VarChar(255)
+  blog_posts             blog_posts[]
+  invitations            invitations[]
+  orders                 orders[]
+  roles                  roles[]
+  subscriptions          subscriptions[]
+  teams                  teams[]
+  tenant_user            tenant_user[]
+  users                  users?             @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tenants_created_by_foreign")
+  transactions           transactions[]
+  user_stripe_data       user_stripe_data[]
+}
