@@ -6,10 +6,11 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/app/lib/prisma'
 import { createSession, deleteSession } from '@/app/lib/session'
 
-// Simple in-memory brute force protection (per process, not distributed)
-const LOGIN_ATTEMPTS = new Map<string, { count: number; last: number }>()
-const MAX_ATTEMPTS = 5
-const WINDOW_MS = 10 * 60 * 1000 // 10 minutes
+
+// Rate limiter dinonaktifkan sementara
+// const LOGIN_ATTEMPTS = new Map<string, { count: number; last: number }>()
+// const MAX_ATTEMPTS = 5
+// const WINDOW_MS = 10 * 60 * 1000 // 10 minutes
 
 export type LoginFormState =
   | {
@@ -42,18 +43,20 @@ export async function login(
     return { errors }
   }
 
-  // Brute force protection (per email)
-  const key = email.toLowerCase()
-  const now = Date.now()
-  const attempt = LOGIN_ATTEMPTS.get(key)
-  if (attempt && attempt.count >= MAX_ATTEMPTS && now - attempt.last < WINDOW_MS) {
-    return { message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi nanti.' }
-  }
+
+  // Rate limiter dinonaktifkan sementara
+  // const key = email.toLowerCase()
+  // const now = Date.now()
+  // const attempt = LOGIN_ATTEMPTS.get(key)
+  // if (attempt && attempt.count >= MAX_ATTEMPTS && now - attempt.last < WINDOW_MS) {
+  //   return { message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi nanti.' }
+  // }
 
   const user = await prisma.users.findUnique({
     where: { email },
     select: { id: true, email: true, name: true, password: true, is_blocked: true },
   })
+
 
   // Cek password
   let passwordMatch = false
@@ -62,20 +65,19 @@ export async function login(
   }
 
   if (!user || user.is_blocked || !passwordMatch) {
-    // Update brute force state
-    if (!attempt || now - attempt.last > WINDOW_MS) {
-      LOGIN_ATTEMPTS.set(key, { count: 1, last: now })
-    } else {
-      LOGIN_ATTEMPTS.set(key, { count: attempt.count + 1, last: now })
-    }
+    // Rate limiter dinonaktifkan sementara
+    // if (!attempt || now - attempt.last > WINDOW_MS) {
+    //   LOGIN_ATTEMPTS.set(key, { count: 1, last: now })
+    // } else {
+    //   LOGIN_ATTEMPTS.set(key, { count: attempt.count + 1, last: now })
+    // }
     if (user && user.is_blocked) {
       return { message: 'Akun Anda telah diblokir. Hubungi administrator.' }
     }
     return { message: 'Email atau password salah.' }
   }
 
-  // Reset brute force state on success
-  LOGIN_ATTEMPTS.delete(key)
+  // LOGIN_ATTEMPTS.delete(key)
 
   await createSession(user.id.toString())
   redirect('/dashboard')
