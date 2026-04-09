@@ -17,7 +17,7 @@ export default function ProvinceDonutChart({ data }: Props) {
   if (data.length === 0) {
     return (
       <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5">
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Post per Propinsi</h3>
+        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Laporan per Propinsi</h3>
         <div className="h-64 flex items-center justify-center text-neutral-400 text-sm">Belum ada data</div>
       </div>
     )
@@ -25,7 +25,7 @@ export default function ProvinceDonutChart({ data }: Props) {
 
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5">
-      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Post per Propinsi</h3>
+      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Laporan per Propinsi</h3>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

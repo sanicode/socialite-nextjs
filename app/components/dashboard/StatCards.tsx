@@ -16,7 +16,7 @@ export default function StatCards({ stats }: Props) {
       ),
     },
     {
-      label: 'Total Post',
+      label: 'Total Laporan',
       value: stats.postCount,
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -25,7 +25,7 @@ export default function StatCards({ stats }: Props) {
       ),
     },
     {
-      label: 'Post Terverifikasi',
+      label: 'Laporan Terverifikasi',
       value: stats.verifiedCount,
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
