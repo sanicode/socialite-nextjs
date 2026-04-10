@@ -60,7 +60,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     getProvinces(),
     getDashboardStats(filters),
     isAdmin ? getProvinceChartData(filters) : Promise.resolve([]),
-    isAdmin ? getTopCitiesByPosts(filters) : Promise.resolve([]),
+    isAdmin ? getTopCitiesByPosts(filters) : Promise.resolve([] as Awaited<ReturnType<typeof getTopCitiesByPosts>>),
     isAdmin ? getReportData(filters) : Promise.resolve([]),
     getPostsByDate(filters),
   ])
