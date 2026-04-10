@@ -114,7 +114,7 @@ export default function ProvinceDonutChart({ data }: Props) {
                 position: 'right',
                 fontSize: 10,
                 fill: 'currentColor',
-                formatter: (v: number) => v > 0 ? v.toLocaleString('id-ID') : '',
+                formatter: (v: unknown) => Number(v) > 0 ? Number(v).toLocaleString('id-ID') : '',
               }}
             />
           </BarChart>

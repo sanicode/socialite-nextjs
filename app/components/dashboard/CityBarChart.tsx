@@ -95,7 +95,7 @@ export default function CityBarChart({ data }: Props) {
               fill="#4E79A7"
               radius={[0, 4, 4, 0]}
               name="posts"
-              label={{ position: 'right', fontSize: 10, fill: 'currentColor', formatter: (v: number) => v > 0 ? v.toLocaleString('id-ID') : '' }}
+              label={{ position: 'right', fontSize: 10, fill: 'currentColor', formatter: (v: unknown) => Number(v) > 0 ? Number(v).toLocaleString('id-ID') : '' }}
             />
           </BarChart>
         </ResponsiveContainer>
