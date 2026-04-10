@@ -357,7 +357,9 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
     return { province, cities: items }
   })
 
-  return groups.sort((a, b) => a.province.localeCompare(b.province))
+  return groups
+    .filter((g) => g.province != null)
+    .sort((a, b) => a.province.localeCompare(b.province))
 }
 
 export async function getReportData(filters: DashboardFilters): Promise<ReportRow[]> {
