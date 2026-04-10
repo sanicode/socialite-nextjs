@@ -47,59 +47,62 @@ export async function getCities(provinceId?: string): Promise<{ id: string; name
 
 export async function getDashboardStats(filters: DashboardFilters): Promise<DashboardStats> {
   const { provinceId, cityId, dateFrom, dateTo, tenantId } = filters
-  const needsGeoFilter = provinceId || cityId
-  const needsTenantJoin = needsGeoFilter || tenantId
 
-  const postConditions: string[] = []
+  // Resolve province/city IDs → names (view stores names, not IDs)
+  let provinceName: string | undefined
+  let cityName: string | undefined
+  if (provinceId) {
+    const p = await prisma.reg_provinces.findUnique({ where: { id: parseInt(provinceId, 10) } })
+    provinceName = p?.name
+  }
+  if (cityId) {
+    const c = await prisma.reg_cities.findUnique({ where: { id: BigInt(cityId) } })
+    cityName = c?.name
+  }
+
+  const conditions: string[] = []
   const params: unknown[] = []
   let idx = 1
 
   if (dateFrom) {
-    postConditions.push(`bp.created_at >= $${idx}::timestamp`)
+    conditions.push(`v.tanggal_pelaporan >= $${idx}::date`)
     params.push(dateFrom)
     idx++
   }
   if (dateTo) {
-    postConditions.push(`bp.created_at <= $${idx}::timestamp`)
-    params.push(dateTo + 'T23:59:59')
+    conditions.push(`v.tanggal_pelaporan <= $${idx}::date`)
+    params.push(dateTo)
+    idx++
+  }
+  if (provinceName) {
+    conditions.push(`v.propinsi = $${idx}`)
+    params.push(provinceName)
+    idx++
+  }
+  if (cityName) {
+    conditions.push(`v.kabupaten_kota = $${idx}`)
+    params.push(cityName)
+    idx++
+  }
+  if (tenantId) {
+    // Scope to users belonging to this tenant via email lookup
+    conditions.push(
+      `v.email IN (SELECT u.email FROM users u JOIN tenant_user tu ON tu.user_id = u.id WHERE tu.tenant_id = $${idx})`
+    )
+    params.push(parseInt(tenantId, 10))
     idx++
   }
 
-  let joinClause = ''
-  const geoConditions: string[] = []
+  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
 
-  if (needsTenantJoin) {
-    joinClause = `INNER JOIN tenant_user tu ON tu.user_id = bp.user_id`
-    if (tenantId) {
-      geoConditions.push(`tu.tenant_id = $${idx}`)
-      params.push(parseInt(tenantId, 10))
-      idx++
-    }
-    if (needsGeoFilter) {
-      joinClause += ` INNER JOIN addresses a ON a.tenant_id = tu.tenant_id`
-      if (provinceId) {
-        geoConditions.push(`a.province_id = $${idx}`)
-        params.push(parseInt(provinceId, 10))
-        idx++
-      }
-      if (cityId) {
-        geoConditions.push(`a.city_id = $${idx}`)
-        params.push(parseInt(cityId, 10))
-        idx++
-      }
-    }
-  }
-
-  const allConditions = [...postConditions, ...geoConditions]
-  const whereClause = allConditions.length > 0 ? 'WHERE ' + allConditions.join(' AND ') : ''
-
+  // Use the view (1-row-per-post, no multiplication) and join back for status
   const result = await prisma.$queryRawUnsafe<{ user_count: bigint; post_count: bigint; verified_count: bigint }[]>(
     `SELECT
-      COUNT(DISTINCT bp.user_id) as user_count,
-      COUNT(bp.id) as post_count,
-      COUNT(CASE WHEN bp.status = 'valid' THEN 1 END) as verified_count
-    FROM blog_posts bp
-    ${joinClause}
+      COUNT(DISTINCT v.email)                                          AS user_count,
+      COUNT(*)                                                         AS post_count,
+      COUNT(CASE WHEN bp.status = 'valid' THEN 1 END)                 AS verified_count
+    FROM v_pelaporan_media_sosial v
+    LEFT JOIN blog_posts bp ON bp.slug = v.bukti_upload
     ${whereClause}`,
     ...params
   )

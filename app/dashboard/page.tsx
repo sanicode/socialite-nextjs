@@ -48,9 +48,22 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const params = await searchParams
 
+  const today = new Date().toISOString().slice(0, 10)
+
+  // Default to today if no date params supplied
+  const rawFrom = params.dateFrom ?? today
+  const rawTo = params.dateTo ?? today
+
+  // Server-side guard: clamp range to max 1 month
+  const fromDate = new Date(rawFrom)
+  const maxToDate = new Date(fromDate)
+  maxToDate.setMonth(maxToDate.getMonth() + 1)
+  const toDate = new Date(rawTo)
+  const clampedTo = toDate > maxToDate ? maxToDate.toISOString().slice(0, 10) : rawTo
+
   const filters = {
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
+    dateFrom: rawFrom,
+    dateTo: clampedTo,
     provinceId: params.provinceId,
     cityId: params.cityId,
     tenantId,
@@ -76,7 +89,12 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
 
         <Suspense fallback={null}>
-          <DashboardFilters provinces={provinces} isAdmin={isAdmin} />
+          <DashboardFilters
+            provinces={provinces}
+            isAdmin={isAdmin}
+            defaultDateFrom={rawFrom}
+            defaultDateTo={clampedTo}
+          />
         </Suspense>
 
         <StatCards stats={stats} />
