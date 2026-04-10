@@ -95,10 +95,9 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
 
   const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
 
-  // Use the view (1-row-per-post, no multiplication) and join back for status
-  const result = await prisma.$queryRawUnsafe<{ user_count: bigint; post_count: bigint; verified_count: bigint }[]>(
+  // Post count + verified count from view
+  const postResult = await prisma.$queryRawUnsafe<{ post_count: bigint; verified_count: bigint }[]>(
     `SELECT
-      COUNT(DISTINCT v.email)                                          AS user_count,
       COUNT(*)                                                         AS post_count,
       COUNT(CASE WHEN bp.status = 'valid' THEN 1 END)                 AS verified_count
     FROM v_pelaporan_media_sosial v
@@ -107,11 +106,33 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     ...params
   )
 
-  const row = result[0]
+  // User count (kuota) from v_kuota_per_kota — not filtered by date
+  const kuotaConditions: string[] = []
+  const kuotaParams: unknown[] = []
+  let ki = 1
+  if (provinceName) {
+    kuotaConditions.push(`propinsi = $${ki}`)
+    kuotaParams.push(provinceName)
+    ki++
+  }
+  if (cityName) {
+    kuotaConditions.push(`kota = $${ki}`)
+    kuotaParams.push(cityName)
+    ki++
+  }
+  const kuotaWhere = kuotaConditions.length > 0 ? 'WHERE ' + kuotaConditions.join(' AND ') : ''
+
+  const kuotaResult = await prisma.$queryRawUnsafe<{ user_count: bigint }[]>(
+    `SELECT COALESCE(SUM(jumlah), 0) AS user_count FROM v_kuota_per_kota ${kuotaWhere}`,
+    ...kuotaParams
+  )
+
+  const postRow = postResult[0]
+  const kuotaRow = kuotaResult[0]
   return {
-    userCount: Number(row?.user_count ?? 0),
-    postCount: Number(row?.post_count ?? 0),
-    verifiedCount: Number(row?.verified_count ?? 0),
+    userCount: Number(kuotaRow?.user_count ?? 0),
+    postCount: Number(postRow?.post_count ?? 0),
+    verifiedCount: Number(postRow?.verified_count ?? 0),
   }
 }
 
@@ -230,8 +251,8 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
       ...postParams
     ),
     prisma.$queryRawUnsafe<{ name: string; operators: bigint }[]>(
-      `SELECT propinsi AS name, COUNT(DISTINCT email) AS operators
-       FROM v_pelaporan_media_sosial
+      `SELECT propinsi AS name, SUM(jumlah) AS operators
+       FROM v_kuota_per_kota
        ${opWhere}
        GROUP BY propinsi`,
       ...opParams
@@ -295,7 +316,7 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
 
   const postWhere = postConditions.length > 0 ? 'WHERE ' + postConditions.join(' AND ') : ''
 
-  // Operators: no date filter — kuota is total distinct operators per city
+  // Operators: from v_kuota_per_kota — no date filter, kuota is capacity not activity
   const opConditions: string[] = []
   const opParams: unknown[] = []
   let opIdx = 1
@@ -306,7 +327,7 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
     opIdx++
   }
   if (cityName) {
-    opConditions.push(`kabupaten_kota = $${opIdx}`)
+    opConditions.push(`kota = $${opIdx}`)
     opParams.push(cityName)
     opIdx++
   }
@@ -322,10 +343,9 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
       ...postParams
     ),
     prisma.$queryRawUnsafe<{ province: string; name: string; operators: bigint }[]>(
-      `SELECT propinsi AS province, kabupaten_kota AS name, COUNT(DISTINCT email) AS operators
-       FROM v_pelaporan_media_sosial
-       ${opWhere}
-       GROUP BY propinsi, kabupaten_kota`,
+      `SELECT propinsi AS province, kota AS name, jumlah AS operators
+       FROM v_kuota_per_kota
+       ${opWhere}`,
       ...opParams
     ),
   ])

@@ -27,7 +27,7 @@ export default function ProvinceDonutChart({ data }: Props) {
 
   // Reverse so highest performer renders at top (recharts fills bottom-up)
   const chartData = [...data].reverse()
-  const maxVal = Math.max(...data.map((d) => d.posts + d.operators), 1)
+  const maxVal = Math.max(...data.map((d) => Math.max(d.posts, d.operators)), 1)
 
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5">
@@ -40,23 +40,24 @@ export default function ProvinceDonutChart({ data }: Props) {
         </div>
         <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 shrink-0">
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#EDC948' }} />
-            Kuota Operator
-          </span>
-          <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#4E79A7' }} />
             Data Masuk
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#EDC948' }} />
+            Kuota Operator
           </span>
         </div>
       </div>
 
-      <div style={{ height: Math.max(400, chartData.length * 28 + 40) }}>
+      <div style={{ height: Math.max(300, chartData.length * 44 + 40) }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
             margin={{ top: 0, right: 48, left: 8, bottom: 0 }}
-            barCategoryGap="30%"
+            barCategoryGap="25%"
+            barGap={3}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -77,7 +78,7 @@ export default function ProvinceDonutChart({ data }: Props) {
               type="category"
               dataKey="name"
               tick={{ fontSize: 10, fill: 'currentColor' }}
-              width={150}
+              width={155}
               tickLine={false}
               axisLine={false}
             />
@@ -97,26 +98,8 @@ export default function ProvinceDonutChart({ data }: Props) {
               ]}
               cursor={{ fill: 'rgba(148,163,184,0.06)' }}
             />
-            <Bar
-              dataKey="operators"
-              stackId="a"
-              fill="#EDC948"
-              radius={[0, 0, 0, 0]}
-              name="operators"
-            />
-            <Bar
-              dataKey="posts"
-              stackId="a"
-              fill="#4E79A7"
-              radius={[0, 4, 4, 0]}
-              name="posts"
-              label={{
-                position: 'right',
-                fontSize: 10,
-                fill: 'currentColor',
-                formatter: (v: unknown) => Number(v) > 0 ? Number(v).toLocaleString('id-ID') : '',
-              }}
-            />
+            <Bar dataKey="posts" fill="#4E79A7" radius={[0, 4, 4, 0]} name="posts" maxBarSize={16} />
+            <Bar dataKey="operators" fill="#EDC948" radius={[0, 4, 4, 0]} name="operators" maxBarSize={16} />
           </BarChart>
         </ResponsiveContainer>
       </div>
