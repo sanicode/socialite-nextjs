@@ -43,7 +43,7 @@ export default function DailyPostsChart({ data }: Props) {
                 fontSize: '12px',
               }}
             />
-            <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Jumlah Laporan" />
+            <Bar dataKey="value" fill="#4E79A7" radius={[4, 4, 0, 0]} name="Jumlah Laporan" />
           </BarChart>
         </ResponsiveContainer>
       </div>

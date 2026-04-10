@@ -21,6 +21,12 @@ export type ChartItem = {
   value: number
 }
 
+export type ProvinceChartItem = {
+  name: string
+  posts: number
+  operators: number
+}
+
 export type ReportRow = Record<string, unknown>
 
 export async function getProvinces(): Promise<{ id: number; name: string }[]> {
@@ -32,27 +38,6 @@ export async function getCities(provinceId?: string): Promise<{ id: string; name
   const where = provinceId ? { province_id: parseInt(provinceId, 10) } : {}
   const cities = await prisma.reg_cities.findMany({ where, orderBy: { name: 'asc' } })
   return cities.map((c) => ({ id: c.id.toString(), name: c.name }))
-}
-
-function buildUserIdFilter(filters: DashboardFilters) {
-  // Build subquery conditions to find user_ids that match province/city filters
-  // Returns user_ids from tenant_user → addresses chain
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let idx = 1
-
-  if (filters.provinceId) {
-    conditions.push(`a.province_id = $${idx}`)
-    params.push(parseInt(filters.provinceId, 10))
-    idx++
-  }
-  if (filters.cityId) {
-    conditions.push(`a.city_id = $${idx}`)
-    params.push(parseInt(filters.cityId, 10))
-    idx++
-  }
-
-  return { conditions, params, idx }
 }
 
 export async function getDashboardStats(filters: DashboardFilters): Promise<DashboardStats> {
@@ -170,53 +155,200 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
   return result.map((r) => ({ name: r.name, value: Number(r.value) }))
 }
 
-export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<ChartItem[]> {
-  const conditions: string[] = []
-  const params: unknown[] = []
+export async function getProvinceChartData(filters: DashboardFilters): Promise<ProvinceChartItem[]> {
+  const postConditions: string[] = []
+  const postParams: unknown[] = []
   let idx = 1
 
   if (filters.dateFrom) {
-    conditions.push(`bp.created_at >= $${idx}::timestamp`)
-    params.push(filters.dateFrom)
+    postConditions.push(`bp.created_at >= $${idx}::timestamp`)
+    postParams.push(filters.dateFrom)
     idx++
   }
   if (filters.dateTo) {
-    conditions.push(`bp.created_at <= $${idx}::timestamp`)
-    params.push(filters.dateTo + 'T23:59:59')
+    postConditions.push(`bp.created_at <= $${idx}::timestamp`)
+    postParams.push(filters.dateTo + 'T23:59:59')
     idx++
   }
   if (filters.tenantId) {
-    conditions.push(`tu.tenant_id = $${idx}`)
-    params.push(parseInt(filters.tenantId, 10))
+    postConditions.push(`tu.tenant_id = $${idx}`)
+    postParams.push(parseInt(filters.tenantId, 10))
     idx++
   }
   if (filters.provinceId) {
-    conditions.push(`a.province_id = $${idx}`)
-    params.push(parseInt(filters.provinceId, 10))
+    postConditions.push(`a.province_id = $${idx}`)
+    postParams.push(parseInt(filters.provinceId, 10))
     idx++
   }
   if (filters.cityId) {
-    conditions.push(`a.city_id = $${idx}`)
-    params.push(parseInt(filters.cityId, 10))
+    postConditions.push(`a.city_id = $${idx}`)
+    postParams.push(parseInt(filters.cityId, 10))
     idx++
   }
 
-  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+  const postWhere = postConditions.length > 0 ? 'WHERE ' + postConditions.join(' AND ') : ''
 
-  const result = await prisma.$queryRawUnsafe<{ name: string; value: bigint }[]>(
-    `SELECT rc.name, COUNT(bp.id) as value
-     FROM blog_posts bp
-     INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
-     INNER JOIN addresses a ON a.tenant_id = tu.tenant_id
-     INNER JOIN reg_cities rc ON rc.id = a.city_id
-     ${whereClause}
-     GROUP BY rc.id, rc.name
-     ORDER BY value DESC
-     LIMIT 10`,
-    ...params
-  )
+  // Build operator filter (no date filter — operators are people, not time-bound)
+  const opConditions: string[] = []
+  const opParams: unknown[] = []
+  let opIdx = 1
 
-  return result.map((r) => ({ name: r.name, value: Number(r.value) }))
+  if (filters.tenantId) {
+    opConditions.push(`tu2.tenant_id = $${opIdx}`)
+    opParams.push(parseInt(filters.tenantId, 10))
+    opIdx++
+  }
+  if (filters.provinceId) {
+    opConditions.push(`a2.province_id = $${opIdx}`)
+    opParams.push(parseInt(filters.provinceId, 10))
+    opIdx++
+  }
+  if (filters.cityId) {
+    opConditions.push(`a2.city_id = $${opIdx}`)
+    opParams.push(parseInt(filters.cityId, 10))
+    opIdx++
+  }
+
+  const opWhere = opConditions.length > 0 ? 'WHERE ' + opConditions.join(' AND ') : ''
+
+  const [postRows, opRows] = await Promise.all([
+    prisma.$queryRawUnsafe<{ name: string; posts: bigint }[]>(
+      `SELECT rp.name, COUNT(bp.id) as posts
+       FROM blog_posts bp
+       INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
+       INNER JOIN addresses a ON a.tenant_id = tu.tenant_id
+       INNER JOIN reg_provinces rp ON rp.id = a.province_id
+       ${postWhere}
+       GROUP BY rp.id, rp.name`,
+      ...postParams
+    ),
+    prisma.$queryRawUnsafe<{ name: string; operators: bigint }[]>(
+      `SELECT rp2.name, COUNT(DISTINCT tu2.user_id) as operators
+       FROM tenant_user tu2
+       INNER JOIN addresses a2 ON a2.tenant_id = tu2.tenant_id
+       INNER JOIN reg_provinces rp2 ON rp2.id = a2.province_id
+       INNER JOIN model_has_roles mhr ON mhr.model_id = tu2.id AND mhr.model_type = 'App\\Models\\TenantUser'
+       INNER JOIN roles r ON r.id = mhr.role_id AND r.name = 'operator'
+       ${opWhere}
+       GROUP BY rp2.id, rp2.name`,
+      ...opParams
+    ),
+  ])
+
+  // Merge by province name
+  const opMap = new Map(opRows.map((r) => [r.name, Number(r.operators)]))
+  const postMap = new Map(postRows.map((r) => [r.name, Number(r.posts)]))
+
+  const allNames = new Set([...postMap.keys(), ...opMap.keys()])
+  const merged: ProvinceChartItem[] = Array.from(allNames).map((name) => ({
+    name,
+    posts: postMap.get(name) ?? 0,
+    operators: opMap.get(name) ?? 0,
+  }))
+
+  return merged.sort((a, b) => {
+    const ratioB = b.operators > 0 ? b.posts / b.operators : b.posts
+    const ratioA = a.operators > 0 ? a.posts / a.operators : a.posts
+    return ratioB - ratioA
+  })
+}
+
+export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<ProvinceChartItem[]> {
+  const postConditions: string[] = []
+  const postParams: unknown[] = []
+  let idx = 1
+
+  if (filters.dateFrom) {
+    postConditions.push(`bp.created_at >= $${idx}::timestamp`)
+    postParams.push(filters.dateFrom)
+    idx++
+  }
+  if (filters.dateTo) {
+    postConditions.push(`bp.created_at <= $${idx}::timestamp`)
+    postParams.push(filters.dateTo + 'T23:59:59')
+    idx++
+  }
+  if (filters.tenantId) {
+    postConditions.push(`tu.tenant_id = $${idx}`)
+    postParams.push(parseInt(filters.tenantId, 10))
+    idx++
+  }
+  if (filters.provinceId) {
+    postConditions.push(`a.province_id = $${idx}`)
+    postParams.push(parseInt(filters.provinceId, 10))
+    idx++
+  }
+  if (filters.cityId) {
+    postConditions.push(`a.city_id = $${idx}`)
+    postParams.push(parseInt(filters.cityId, 10))
+    idx++
+  }
+
+  const postWhere = postConditions.length > 0 ? 'WHERE ' + postConditions.join(' AND ') : ''
+
+  const opConditions: string[] = []
+  const opParams: unknown[] = []
+  let opIdx = 1
+
+  if (filters.tenantId) {
+    opConditions.push(`tu2.tenant_id = $${opIdx}`)
+    opParams.push(parseInt(filters.tenantId, 10))
+    opIdx++
+  }
+  if (filters.provinceId) {
+    opConditions.push(`a2.province_id = $${opIdx}`)
+    opParams.push(parseInt(filters.provinceId, 10))
+    opIdx++
+  }
+  if (filters.cityId) {
+    opConditions.push(`a2.city_id = $${opIdx}`)
+    opParams.push(parseInt(filters.cityId, 10))
+    opIdx++
+  }
+
+  const opWhere = opConditions.length > 0 ? 'WHERE ' + opConditions.join(' AND ') : ''
+
+  const [postRows, opRows] = await Promise.all([
+    prisma.$queryRawUnsafe<{ name: string; posts: bigint }[]>(
+      `SELECT rc.name, COUNT(bp.id) as posts
+       FROM blog_posts bp
+       INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
+       INNER JOIN addresses a ON a.tenant_id = tu.tenant_id
+       INNER JOIN reg_cities rc ON rc.id = a.city_id
+       ${postWhere}
+       GROUP BY rc.id, rc.name`,
+      ...postParams
+    ),
+    prisma.$queryRawUnsafe<{ name: string; operators: bigint }[]>(
+      `SELECT rc2.name, COUNT(DISTINCT tu2.user_id) as operators
+       FROM tenant_user tu2
+       INNER JOIN addresses a2 ON a2.tenant_id = tu2.tenant_id
+       INNER JOIN reg_cities rc2 ON rc2.id = a2.city_id
+       INNER JOIN model_has_roles mhr ON mhr.model_id = tu2.id AND mhr.model_type = 'App\\Models\\TenantUser'
+       INNER JOIN roles r ON r.id = mhr.role_id AND r.name = 'operator'
+       ${opWhere}
+       GROUP BY rc2.id, rc2.name`,
+      ...opParams
+    ),
+  ])
+
+  const opMap = new Map(opRows.map((r) => [r.name, Number(r.operators)]))
+  const postMap = new Map(postRows.map((r) => [r.name, Number(r.posts)]))
+
+  const allNames = new Set([...postMap.keys(), ...opMap.keys()])
+  const merged: ProvinceChartItem[] = Array.from(allNames).map((name) => ({
+    name,
+    posts: postMap.get(name) ?? 0,
+    operators: opMap.get(name) ?? 0,
+  }))
+
+  merged.sort((a, b) => {
+    const ratioB = b.operators > 0 ? b.posts / b.operators : b.posts
+    const ratioA = a.operators > 0 ? a.posts / a.operators : a.posts
+    return ratioB - ratioA
+  })
+
+  return merged.slice(0, 10)
 }
 
 export async function getReportData(filters: DashboardFilters): Promise<ReportRow[]> {

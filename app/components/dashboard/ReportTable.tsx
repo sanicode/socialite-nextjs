@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { ReportRow } from '@/app/actions/dashboard'
 import * as XLSX from 'xlsx'
 
@@ -7,8 +8,14 @@ type Props = {
   data: ReportRow[]
 }
 
+const PAGE_SIZE = 25
+
 export default function ReportTable({ data }: Props) {
+  const [page, setPage] = useState(1)
+
   const columns = data.length > 0 ? Object.keys(data[0]) : []
+  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
+  const pageData = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handleExport() {
     if (data.length === 0) return
@@ -75,7 +82,7 @@ export default function ReportTable({ data }: Props) {
                 </td>
               </tr>
             )}
-            {data.map((row, i) => (
+            {pageData.map((row, i) => (
               <tr
                 key={i}
                 className="bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
@@ -94,13 +101,40 @@ export default function ReportTable({ data }: Props) {
         </table>
       </div>
 
-      {data.length > 0 && (
-        <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {data.length} data ditemukan
-          </p>
-        </div>
-      )}
+      <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          {data.length > 0
+            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, data.length)} dari ${data.length.toLocaleString('id-ID')} data`
+            : '0 data'}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Prev
+            </button>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 min-w-17.5 text-center">
+              Hal. {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Next
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

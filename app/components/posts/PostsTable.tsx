@@ -413,28 +413,40 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-neutral-500 dark:text-neutral-400">
-            {total} post total
-          </p>
-          <div className="flex gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                onClick={() => updateParam('page', p.toString())}
-                className={`w-8 h-8 rounded-lg text-sm transition ${
-                  p === page
-                    ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                    : 'border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          {total > 0
+            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} post`
+            : '0 post'}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => updateParam('page', String(Math.max(1, page - 1)))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Prev
+            </button>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400 min-w-[4.5rem] text-center">
+              Hal. {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => updateParam('page', String(Math.min(totalPages, page + 1)))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Next
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Modal */}
       {modal && (

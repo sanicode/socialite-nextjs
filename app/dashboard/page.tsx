@@ -5,7 +5,7 @@ import { prisma } from '@/app/lib/prisma'
 import {
   getProvinces,
   getDashboardStats,
-  getPostsByProvince,
+  getProvinceChartData,
   getTopCitiesByPosts,
   getReportData,
   getPostsByDate,
@@ -59,7 +59,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const [provinces, stats, provinceData, cityData, reportData, dailyData] = await Promise.all([
     getProvinces(),
     getDashboardStats(filters),
-    isAdmin ? getPostsByProvince(filters) : Promise.resolve([]),
+    isAdmin ? getProvinceChartData(filters) : Promise.resolve([]),
     isAdmin ? getTopCitiesByPosts(filters) : Promise.resolve([]),
     isAdmin ? getReportData(filters) : Promise.resolve([]),
     getPostsByDate(filters),
@@ -83,10 +83,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
         {isAdmin && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ProvinceDonutChart data={provinceData} />
-              <CityBarChart data={cityData} />
-            </div>
+            <ProvinceDonutChart data={provinceData} />
+
+            <CityBarChart data={cityData} />
 
             <DailyPostsChart data={dailyData} />
 
