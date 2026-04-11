@@ -79,7 +79,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   ])
 
   return (
-    <div className="p-6">
+    <div className="px-4 py-5 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Dashboard</h1>

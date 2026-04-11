@@ -41,7 +41,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
   ])
 
   return (
-    <div className="min-h-screen bg-[var(--background)] p-6">
+    <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
