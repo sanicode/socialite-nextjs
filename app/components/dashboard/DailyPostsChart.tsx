@@ -20,8 +20,8 @@ export default function DailyPostsChart({ data }: Props) {
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5">
       <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Laporan per Tanggal</h3>
-      <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-72" style={{ minHeight: 288 }}>
+        <ResponsiveContainer width="100%" height={288}>
           <BarChart data={data} margin={{ left: 0, right: 20 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-neutral-200)" />
             <XAxis

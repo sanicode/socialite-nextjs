@@ -4,6 +4,8 @@ import * as Sentry from "@sentry/nextjs";
 import Head from "next/head";
 import { useEffect, useState } from "react";
 
+Sentry.logger.info('User triggered test log', { log_source: 'sentry_test' })
+
 class SentryExampleFrontendError extends Error {
   constructor(message: string | undefined) {
     super(message);

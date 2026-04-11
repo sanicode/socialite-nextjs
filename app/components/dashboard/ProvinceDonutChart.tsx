@@ -50,8 +50,8 @@ export default function ProvinceDonutChart({ data }: Props) {
         </div>
       </div>
 
-      <div style={{ height: Math.max(300, chartData.length * 44 + 40) }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div style={{ height: Math.max(300, chartData.length * 44 + 40), minHeight: 300 }}>
+        <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 44 + 40)}>
           <BarChart
             data={chartData}
             layout="vertical"

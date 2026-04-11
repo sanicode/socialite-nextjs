@@ -31,8 +31,8 @@ function ProvinceChart({ province, cities }: { province: string; cities: Provinc
           {cities.length} kota/kab
         </p>
       </div>
-      <div style={{ height: chartHeight }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div style={{ height: chartHeight, minHeight: 160 }}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={chartData}
             layout="vertical"
