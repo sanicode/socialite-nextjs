@@ -188,7 +188,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   </button>
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-16">
-                  Gambar
+                  Screenshot
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
                   Link Upload

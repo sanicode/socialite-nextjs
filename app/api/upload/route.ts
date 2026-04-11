@@ -4,7 +4,7 @@ import { uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_SIZE = 1 * 1024 * 1024 // 1MB
 const COLLECTION_NAME = 'blog-images'
 
 export async function POST(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: 'Ukuran file terlalu besar (maks 10MB)' },
+        { error: 'Ukuran file terlalu besar (maks 1MB)' },
         { status: 400 }
       )
     }
