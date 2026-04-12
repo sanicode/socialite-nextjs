@@ -9,6 +9,7 @@ import { prisma } from '@/app/lib/prisma'
 const LOGS_ENABLED_KEY = 'access_logs_enabled'
 
 export async function isAccessLoggingEnabled(): Promise<boolean> {
+  await requireAdmin()
   const value = await getConfigValue(LOGS_ENABLED_KEY)
   if (value === null) return true // default: aktif
   return value === '1'

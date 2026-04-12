@@ -34,6 +34,7 @@ function parseList(value: FormDataEntryValue | null): string[] {
 }
 
 export async function getSecuritySettingsFormState(): Promise<NonNullable<SecuritySettingsState>> {
+  await requireAdmin()
   const settings = await getSecuritySettings()
 
   return {
