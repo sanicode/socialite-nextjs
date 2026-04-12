@@ -6,12 +6,13 @@ import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3, getMediaUrl } from '@/app/lib/s3'
 import { getSessionUser } from '@/app/lib/session'
 
-export type PostErrors = { title?: string[]; body?: string[] }
+export type PostErrors = { title?: string[]; body?: string[]; category_id?: string[]; screenshot?: string[] }
 
 export type PostFormState =
   | {
       errors?: PostErrors
       message?: string
+      duplicate?: boolean
     }
   | undefined
 
@@ -291,6 +292,57 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
   }
 }
 
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const MAX_IMAGE_SIZE = 1 * 1024 * 1024 // 1MB
+
+async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
+  const { randomBytes, randomUUID } = await import('crypto')
+  const { uploadToS3 } = await import('@/app/lib/s3')
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const uuid = randomUUID()
+  const hash = randomBytes(16).toString('hex')
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const fileName = `blog-images-${hash}.${ext}`
+
+  const media = await prisma.media.create({
+    data: {
+      model_type: 'App\\Models\\BlogPost',
+      model_id: postId,
+      uuid,
+      collection_name: 'blog-images',
+      name: file.name,
+      file_name: 'pending',
+      mime_type: file.type,
+      disk: 's3',
+      conversions_disk: 's3',
+      size: BigInt(file.size),
+      manipulations: {},
+      custom_properties: {},
+      generated_conversions: {},
+      responsive_images: {},
+    },
+  })
+
+  const objectKey = `${media.id}/${fileName}`
+  const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
+
+  try {
+    await uploadToS3(buffer, objectKey, file.type)
+  } catch (err) {
+    await prisma.media.delete({ where: { id: media.id } })
+    throw err
+  }
+
+  await prisma.media.update({
+    where: { id: media.id },
+    data: {
+      file_name: fileName,
+      custom_properties: { source_url: publicUrl, object_key: objectKey },
+    },
+  })
+}
+
 export async function createPost(
   state: PostFormState,
   formData: FormData
@@ -306,11 +358,19 @@ export async function createPost(
   const description = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
-  const mediaId = formData.get('media_id') as string | null
+  const screenshot = formData.get('screenshot') as File | null
 
   const errors: PostErrors = {}
 
+  if (!categoryId) errors.category_id = ['Kategori wajib dipilih.']
   if (!title) errors.title = ['Link upload tidak boleh kosong.']
+  if (!screenshot || screenshot.size === 0) {
+    errors.screenshot = ['Bukti screenshot wajib diupload.']
+  } else if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
+    errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+  } else if (screenshot.size > MAX_IMAGE_SIZE) {
+    errors.screenshot = ['Ukuran file terlalu besar (maks 1MB).']
+  }
 
   if (Object.keys(errors).length > 0) return { errors }
 
@@ -326,12 +386,36 @@ export async function createPost(
     }
   }
 
-  // Get current logged-in user and their tenant
   const userId = BigInt(sessionUser.id)
   const tenantUser = await prisma.tenant_user.findFirst({
     where: { user_id: userId },
     select: { tenant_id: true },
   })
+
+  // Duplicate check: same user + same category + same calendar date
+  if (categoryId) {
+    const now = new Date()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+    const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    const existing = await prisma.blog_posts.findFirst({
+      where: {
+        user_id: userId,
+        blog_post_category_id: BigInt(categoryId),
+        created_at: { gte: startOfDay, lte: endOfDay },
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      const category = await prisma.blog_post_categories.findUnique({
+        where: { id: BigInt(categoryId) },
+        select: { name: true },
+      })
+      return {
+        message: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${category?.name ?? 'ini'}" hari ini. Setiap operator hanya diizinkan satu laporan per kategori per hari.`,
+        duplicate: true,
+      }
+    }
+  }
 
   const post = await prisma.blog_posts.create({
     data: {
@@ -349,13 +433,8 @@ export async function createPost(
     },
   })
 
-  // Link media to this post
-  if (mediaId) {
-    await prisma.media.updateMany({
-      where: { id: BigInt(mediaId), model_type: 'App\\Models\\BlogPost', model_id: BigInt(0) },
-      data: { model_id: post.id },
-    })
-  }
+  // Upload screenshot to S3 now that we have the post ID
+  await uploadScreenshot(screenshot!, post.id)
 
   revalidatePath('/posts')
   redirect('/posts')
@@ -377,12 +456,24 @@ export async function updatePost(
   const description = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
-  const mediaId = formData.get('media_id') as string | null
   const oldMediaId = formData.get('old_media_id') as string | null
+  const screenshot = formData.get('screenshot') as File | null
+  const hasNewScreenshot = screenshot && screenshot.size > 0
 
   const errors: PostErrors = {}
 
+  if (!categoryId) errors.category_id = ['Kategori wajib dipilih.']
   if (!title) errors.title = ['Link upload tidak boleh kosong.']
+  // Screenshot required only if no existing media
+  if (!oldMediaId && (!screenshot || screenshot.size === 0)) {
+    errors.screenshot = ['Bukti screenshot wajib diupload.']
+  } else if (hasNewScreenshot) {
+    if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
+      errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+    } else if (screenshot.size > MAX_IMAGE_SIZE) {
+      errors.screenshot = ['Ukuran file terlalu besar (maks 1MB).']
+    }
+  }
 
   if (Object.keys(errors).length > 0) return { errors }
 
@@ -422,9 +513,8 @@ export async function updatePost(
     },
   })
 
-  // Handle media change
-  if (mediaId && mediaId !== oldMediaId) {
-    // Delete old media
+  // If new screenshot selected: delete old from S3, upload new
+  if (hasNewScreenshot) {
     if (oldMediaId) {
       const oldMedia = await prisma.media.findUnique({ where: { id: BigInt(oldMediaId) } })
       if (oldMedia) {
@@ -432,11 +522,7 @@ export async function updatePost(
         await prisma.media.delete({ where: { id: BigInt(oldMediaId) } })
       }
     }
-    // Link new media
-    await prisma.media.updateMany({
-      where: { id: BigInt(mediaId), model_type: 'App\\Models\\BlogPost', model_id: BigInt(0) },
-      data: { model_id: BigInt(id) },
-    })
+    await uploadScreenshot(screenshot, BigInt(id))
   }
 
   revalidatePath('/posts')

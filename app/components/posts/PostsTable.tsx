@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
 import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
+import { useToast } from '@/app/components/ToastContext'
 
 type Props = {
   posts: SerializedPost[]
@@ -21,6 +22,7 @@ const PAGE_SIZE = 10
 export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showToast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -63,9 +65,15 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
   function handleBulkDelete() {
     if (selectedIds.size === 0) return
     if (!confirm(`Hapus ${selectedIds.size} post? Tindakan tidak bisa dibatalkan.`)) return
+    const count = selectedIds.size
     startTransition(async () => {
-      await bulkDeletePosts(Array.from(selectedIds))
-      setSelectedIds(new Set())
+      try {
+        await bulkDeletePosts(Array.from(selectedIds))
+        setSelectedIds(new Set())
+        showToast('success', 'Berhasil Dihapus', `${count} post telah dihapus.`)
+      } catch {
+        showToast('error', 'Gagal Menghapus', 'Terjadi kesalahan saat menghapus post.')
+      }
     })
   }
 
@@ -84,8 +92,14 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     if (!confirm('Hapus post ini? Tindakan tidak bisa dibatalkan.')) return
     setDeletingId(id)
     startTransition(async () => {
-      await deletePost(id)
-      setDeletingId(null)
+      try {
+        await deletePost(id)
+        showToast('success', 'Post Dihapus', 'Post berhasil dihapus.')
+      } catch {
+        showToast('error', 'Gagal Menghapus', 'Terjadi kesalahan saat menghapus post.')
+      } finally {
+        setDeletingId(null)
+      }
     })
   }
 
@@ -355,8 +369,14 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       <select
                         value={post.status}
                         onChange={(e) => {
+                          const newStatus = e.target.value as 'pending' | 'valid' | 'invalid'
                           startTransition(async () => {
-                            await updateStatus(post.id, e.target.value as 'pending' | 'valid' | 'invalid')
+                            try {
+                              await updateStatus(post.id, newStatus)
+                              showToast('success', 'Status Diperbarui', `Post ditandai sebagai ${newStatus}.`)
+                            } catch {
+                              showToast('error', 'Gagal Memperbarui', 'Terjadi kesalahan saat mengubah status.')
+                            }
                           })
                         }}
                         disabled={isPending}

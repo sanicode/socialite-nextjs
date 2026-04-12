@@ -1,9 +1,10 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PostFormState, SerializedCategory, SerializedPost } from '@/app/actions/posts'
 import ImageUpload from './ImageUpload'
+import { useToast } from '@/app/components/ToastContext'
 
 type Props = {
   action: (state: PostFormState, formData: FormData) => Promise<PostFormState>
@@ -12,23 +13,67 @@ type Props = {
 }
 
 const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; label: string }> = {
-  tiktok:    { pattern: /tiktok\.com/i,                       placeholder: 'https://www.tiktok.com/@username/video/...', label: 'TikTok' },
-  instagram: { pattern: /instagram\.com/i,                    placeholder: 'https://www.instagram.com/p/...',            label: 'Instagram' },
-  facebook:  { pattern: /(facebook\.com|fb\.com|fb\.watch)/i, placeholder: 'https://www.facebook.com/...',               label: 'Facebook' },
-  youtube:   { pattern: /(youtube\.com|youtu\.be)/i,          placeholder: 'https://www.youtube.com/watch?v=...',        label: 'YouTube' },
+  tiktok: {
+    pattern: /tiktok\.com/i,
+    placeholder: 'https://www.tiktok.com/@username/video/...',
+    label: 'TikTok',
+  },
+  instagram: {
+    pattern: /instagram\.com/i,
+    placeholder: 'https://www.instagram.com/p/...',
+    label: 'Instagram',
+  },
+  facebook: {
+    pattern: /(facebook\.com|fb\.com|fb\.watch)/i,
+    placeholder: 'https://www.facebook.com/...',
+    label: 'Facebook',
+  },
+  youtube: {
+    pattern: /(youtube\.com|youtu\.be)/i,
+    placeholder: 'https://www.youtube.com/watch?v=...',
+    label: 'YouTube',
+  },
 }
 
 export default function PostForm({ action, post, categories }: Props) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [state, formAction, pending] = useActionState(action, undefined)
 
   const [title, setTitle] = useState(post?.title ?? '')
   const [categoryId, setCategoryId] = useState(post?.blog_post_category_id ?? '')
-  const [isPublished, setIsPublished] = useState(post?.is_published ?? false)
-  const [mediaId, setMediaId] = useState<string | null>(post?.thumbnail?.id ?? null)
-  const [mediaUrl, setMediaUrl] = useState<string | null>(post?.thumbnail?.url ?? null)
+  const [hasScreenshot, setHasScreenshot] = useState<boolean>(!!post?.thumbnail)
+
+  useEffect(() => {
+    if (!state) return
+
+    if (state.duplicate) {
+      showToast('error', 'Double Entry Terdeteksi', state.message)
+      return
+    }
+
+    if (state.message) {
+      showToast('error', 'Gagal Menyimpan', state.message)
+      return
+    }
+
+    const errs = state.errors
+    if (errs) {
+      const messages = [
+        ...(errs.category_id ?? []),
+        ...(errs.title ?? []),
+        ...(errs.screenshot ?? []),
+        ...(errs.body ?? []),
+      ]
+
+      if (messages.length > 0) {
+        showToast('warning', 'Periksa Kembali Form', messages.join(' · '))
+      }
+    }
+  }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedCategory = categories.find((c) => c.id === categoryId)
+
   const platformHint = selectedCategory
     ? Object.entries(PLATFORM_HINTS).find(([key]) =>
         selectedCategory.name.toLowerCase().includes(key)
@@ -41,57 +86,74 @@ export default function PostForm({ action, post, categories }: Props) {
       : null
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} className="space-y-6" encType="multipart/form-data">
+
       {post && <input type="hidden" name="id" value={post.id} />}
+
       {post?.thumbnail?.id && (
         <input type="hidden" name="old_media_id" value={post.thumbnail.id} />
       )}
-      <input type="hidden" name="media_id" value={mediaId ?? ''} />
-      <input type="hidden" name="is_published" value={isPublished ? '1' : '0'} />
+
+      <input type="hidden" name="is_published" value="0" />
       <input type="hidden" name="body" value="-" />
 
-      {state?.message && (
-        <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
-          {state.message}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         {/* Main */}
         <div className="lg:col-span-2 space-y-5">
+
           {/* Kategori */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Kategori
+              Kategori {!categoryId && <span className="text-red-500">*</span>}
             </label>
+
             <select
               name="category_id"
               value={categoryId}
+              required
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white focus:border-transparent transition"
+              className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${
+                state?.errors?.category_id
+                  ? 'border-red-400 dark:border-red-500'
+                  : 'border-neutral-300 dark:border-neutral-700'
+              }`}
             >
-              <option value="">— Tanpa kategori —</option>
+              <option value="">— Pilih kategori —</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
               ))}
             </select>
+
+            {state?.errors?.category_id && (
+              <p className="mt-1.5 text-xs text-red-500">
+                {state.errors.category_id[0]}
+              </p>
+            )}
           </div>
 
           {/* Link Upload */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Link Upload <span className="text-red-500">*</span>
+              Link Upload {!title && <span className="text-red-500">*</span>}
             </label>
+
             <input
               name="title"
-              type="text"
+              type="url"
               value={title}
+              required
               onChange={(e) => setTitle(e.target.value)}
               placeholder={platformHint?.placeholder ?? 'https://...'}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white focus:border-transparent transition"
+              className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${
+                state?.errors?.title || urlClientError
+                  ? 'border-red-400 dark:border-red-500'
+                  : 'border-neutral-300 dark:border-neutral-700'
+              }`}
             />
+
             {(state?.errors?.title || urlClientError) && (
               <p className="mt-1.5 text-xs text-red-500">
                 {state?.errors?.title?.[0] ?? urlClientError}
@@ -99,36 +161,49 @@ export default function PostForm({ action, post, categories }: Props) {
             )}
           </div>
 
-          {/* Bukti Screenshot */}
+          {/* Screenshot */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Bukti Screenshot
+              Bukti Screenshot {!hasScreenshot && <span className="text-red-500">*</span>}
+
+              {post?.thumbnail && (
+                <span className="ml-2 text-xs text-neutral-400">
+                  (kosongkan untuk tetap menggunakan screenshot lama)
+                </span>
+              )}
             </label>
+
             <ImageUpload
-              currentUrl={mediaUrl}
-              onUpload={(id, url) => {
-                setMediaId(id)
-                setMediaUrl(url)
-              }}
-              onClear={() => {
-                setMediaId(null)
-                setMediaUrl(null)
-              }}
+              currentUrl={post?.thumbnail?.url ?? null}
+              error={state?.errors?.screenshot?.[0]}
+              onFileChange={setHasScreenshot}
             />
           </div>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-5">
-          {/* Actions */}
+
           <div className="flex flex-col gap-2 pt-2">
+
             <button
               type="submit"
-              disabled={pending}
+              disabled={
+                pending ||
+                !title ||
+                !categoryId ||
+                !hasScreenshot ||
+                !!urlClientError
+              }
               className="w-full py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {pending ? 'Menyimpan...' : post ? 'Simpan Perubahan' : 'Buat Post'}
+              {pending
+                ? 'Memproses...'
+                : post
+                ? 'Simpan Perubahan'
+                : 'Submit'}
             </button>
+
             <button
               type="button"
               onClick={() => router.push('/posts')}
@@ -136,7 +211,9 @@ export default function PostForm({ action, post, categories }: Props) {
             >
               Batal
             </button>
+
           </div>
+
         </div>
       </div>
     </form>

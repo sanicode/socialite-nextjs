@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import UserMenu from './UserMenu'
+import { ToastProvider } from './ToastContext'
+import ToastContainer from './ToastContainer'
 
 type Props = {
   user: { name: string; email: string; role: string; tenantName: string | null }
@@ -15,6 +17,8 @@ export default function ShellClient({ user, appName, showDashboard, children }: 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
+    <ToastProvider>
+    <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} />
@@ -55,5 +59,6 @@ export default function ShellClient({ user, appName, showDashboard, children }: 
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
+    </ToastProvider>
   )
 }
