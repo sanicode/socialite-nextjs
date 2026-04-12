@@ -1,70 +1,18 @@
 'use server'
 
-
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/app/lib/prisma'
 import { createSession, deleteSession } from '@/app/lib/session'
 import { logEvent } from '@/app/lib/logger'
 import { getRequestSecurityDecision } from '@/app/lib/request-security'
 import { writeAccessLog } from '@/app/lib/access-logs'
-
-
-const LOGIN_ATTEMPTS = new Map<string, { count: number; firstAttemptAt: number; blockedUntil?: number }>()
-const MAX_ATTEMPTS = 5
-const WINDOW_MS = 10 * 60 * 1000
-
-async function getRateLimitKey(email: string): Promise<string> {
-  const headerStore = await headers()
-  const forwardedFor = headerStore.get('x-forwarded-for')?.split(',')[0]?.trim()
-  const realIp = headerStore.get('x-real-ip')?.trim()
-  const ip = forwardedFor || realIp || 'unknown'
-  return `${email.toLowerCase()}|${ip}`
-}
-
-function isRateLimited(key: string): boolean {
-  const now = Date.now()
-  const attempt = LOGIN_ATTEMPTS.get(key)
-  if (!attempt) return false
-
-  if (attempt.blockedUntil && attempt.blockedUntil > now) {
-    return true
-  }
-
-  if (attempt.blockedUntil && attempt.blockedUntil <= now) {
-    LOGIN_ATTEMPTS.delete(key)
-    return false
-  }
-
-  if (now - attempt.firstAttemptAt > WINDOW_MS) {
-    LOGIN_ATTEMPTS.delete(key)
-    return false
-  }
-
-  return false
-}
-
-function recordLoginFailure(key: string): void {
-  const now = Date.now()
-  const current = LOGIN_ATTEMPTS.get(key)
-
-  if (!current || now - current.firstAttemptAt > WINDOW_MS) {
-    LOGIN_ATTEMPTS.set(key, { count: 1, firstAttemptAt: now })
-    return
-  }
-
-  const nextCount = current.count + 1
-  LOGIN_ATTEMPTS.set(key, {
-    count: nextCount,
-    firstAttemptAt: current.firstAttemptAt,
-    blockedUntil: nextCount >= MAX_ATTEMPTS ? now + WINDOW_MS : undefined,
-  })
-}
-
-function clearLoginFailures(key: string): void {
-  LOGIN_ATTEMPTS.delete(key)
-}
+import {
+  getLoginIp,
+  checkRateLimit,
+  recordLoginFailure,
+  clearLoginFailures,
+} from '@/app/lib/login-rate-limit'
 
 export type LoginFormState =
   | {
@@ -73,6 +21,7 @@ export type LoginFormState =
         password?: string[]
       }
       message?: string
+      retryAfter?: number // detik tersisa sebelum boleh mencoba lagi
     }
   | undefined
 
@@ -98,7 +47,7 @@ export async function login(
     return { message: decision.message ?? 'Akses login ditolak oleh kebijakan keamanan.' }
   }
 
-  const email = formData.get('email') as string
+  const email    = formData.get('email') as string
   const password = formData.get('password') as string
 
   const errors: { email?: string[]; password?: string[] } = {}
@@ -115,23 +64,27 @@ export async function login(
     return { errors }
   }
 
-  const key = await getRateLimitKey(email)
-  if (isRateLimited(key)) {
-    logEvent('warn', 'auth.login.rate_limited', { email })
+  const ip        = await getLoginIp()
+  const rateLimit = await checkRateLimit(email, ip)
+
+  if (rateLimit.blocked) {
+    logEvent('warn', 'auth.login.rate_limited', { email, ip })
     await writeAccessLog({
       eventType: 'login_rate_limited',
       status: 'blocked',
       userEmail: email,
-      details: { reason: 'rate_limited' },
+      details: { reason: 'rate_limited', retryAfterSeconds: rateLimit.retryAfterSeconds },
     })
-    return { message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi dalam 10 menit.' }
+    return {
+      message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi setelah beberapa saat.',
+      retryAfter: rateLimit.retryAfterSeconds,
+    }
   }
 
   const user = await prisma.users.findUnique({
     where: { email },
     select: { id: true, email: true, name: true, password: true, is_blocked: true },
   })
-
 
   // Cek password
   let passwordMatch = false
@@ -140,7 +93,8 @@ export async function login(
   }
 
   if (!user || user.is_blocked || !passwordMatch) {
-    recordLoginFailure(key)
+    await recordLoginFailure(email, ip)
+
     if (user && user.is_blocked) {
       logEvent('warn', 'auth.login.blocked_user', { email, userId: user.id.toString() })
       await writeAccessLog({
@@ -152,7 +106,8 @@ export async function login(
       })
       return { message: 'Akun Anda telah diblokir. Hubungi administrator.' }
     }
-    logEvent('warn', 'auth.login.failed', { email })
+
+    logEvent('warn', 'auth.login.failed', { email, ip })
     await writeAccessLog({
       eventType: 'login_failed',
       status: 'failed',
@@ -162,7 +117,7 @@ export async function login(
     return { message: 'Email atau password salah.' }
   }
 
-  clearLoginFailures(key)
+  await clearLoginFailures(email, ip)
   await createSession(user.id.toString())
   logEvent('info', 'auth.login.succeeded', { email, userId: user.id.toString() })
   await writeAccessLog({
