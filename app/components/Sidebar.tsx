@@ -35,11 +35,49 @@ const navItems = [
   },
 ]
 
+const settingsItems = [
+  {
+    label: 'Security',
+    href: '/settings/security',
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.75}
+          d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.75}
+          d="M9.5 12.5l1.5 1.5 3.5-4"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Logs',
+    href: '/settings/logs',
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.75}
+          d="M9 12h6m-6 4h6m-6-8h6m2 11H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+      </svg>
+    ),
+  },
+]
+
 type Props = {
   open: boolean
   onClose: () => void
   appName: string
   showDashboard: boolean
+  showSettings: boolean
 }
 
 function LinkPendingHint() {
@@ -55,7 +93,7 @@ function LinkPendingHint() {
   )
 }
 
-export default function Sidebar({ open, onClose, appName, showDashboard }: Props) {
+export default function Sidebar({ open, onClose, appName, showDashboard, showSettings }: Props) {
   const pathname = usePathname()
 
   const visibleItems = showDashboard ? navItems : navItems.filter((item) => item.href !== '/dashboard')
@@ -129,6 +167,34 @@ export default function Sidebar({ open, onClose, appName, showDashboard }: Props
               </Link>
             )
           })}
+
+          {showSettings && (
+            <>
+              <div className="px-3 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400 dark:text-neutral-500">
+                Settings
+              </div>
+              {settingsItems.map((item) => {
+                const isActive = pathname.startsWith(item.href)
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {item.icon}
+                    {item.label}
+                    <LinkPendingHint />
+                  </Link>
+                )
+              })}
+            </>
+          )}
         </nav>
       </aside>
     </>

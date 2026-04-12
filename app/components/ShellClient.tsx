@@ -10,10 +10,11 @@ type Props = {
   user: { name: string; email: string; role: string; tenantName: string | null }
   appName: string
   showDashboard: boolean
+  showSettings: boolean
   children: React.ReactNode
 }
 
-export default function ShellClient({ user, appName, showDashboard, children }: Props) {
+export default function ShellClient({ user, appName, showDashboard, showSettings, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -21,7 +22,7 @@ export default function ShellClient({ user, appName, showDashboard, children }: 
     <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">

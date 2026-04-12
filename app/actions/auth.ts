@@ -7,6 +7,8 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/app/lib/prisma'
 import { createSession, deleteSession } from '@/app/lib/session'
 import { logEvent } from '@/app/lib/logger'
+import { getRequestSecurityDecision } from '@/app/lib/request-security'
+import { writeAccessLog } from '@/app/lib/access-logs'
 
 
 const LOGIN_ATTEMPTS = new Map<string, { count: number; firstAttemptAt: number; blockedUntil?: number }>()
@@ -78,6 +80,24 @@ export async function login(
   state: LoginFormState,
   formData: FormData
 ): Promise<LoginFormState> {
+  const decision = await getRequestSecurityDecision()
+  if (!decision.allowed) {
+    logEvent('warn', 'auth.login.blocked_by_security_policy', {
+      ip: decision.ip,
+      country: decision.country,
+      reason: decision.reason,
+    })
+    await writeAccessLog({
+      eventType: 'login_blocked',
+      status: 'blocked',
+      ip: decision.ip,
+      country: decision.country,
+      userEmail: typeof formData.get('email') === 'string' ? String(formData.get('email')) : null,
+      details: { reason: decision.reason },
+    })
+    return { message: decision.message ?? 'Akses login ditolak oleh kebijakan keamanan.' }
+  }
+
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
@@ -98,6 +118,12 @@ export async function login(
   const key = await getRateLimitKey(email)
   if (isRateLimited(key)) {
     logEvent('warn', 'auth.login.rate_limited', { email })
+    await writeAccessLog({
+      eventType: 'login_rate_limited',
+      status: 'blocked',
+      userEmail: email,
+      details: { reason: 'rate_limited' },
+    })
     return { message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi dalam 10 menit.' }
   }
 
@@ -117,20 +143,43 @@ export async function login(
     recordLoginFailure(key)
     if (user && user.is_blocked) {
       logEvent('warn', 'auth.login.blocked_user', { email, userId: user.id.toString() })
+      await writeAccessLog({
+        eventType: 'login_failed',
+        status: 'blocked',
+        userId: user.id.toString(),
+        userEmail: email,
+        details: { reason: 'user_blocked' },
+      })
       return { message: 'Akun Anda telah diblokir. Hubungi administrator.' }
     }
     logEvent('warn', 'auth.login.failed', { email })
+    await writeAccessLog({
+      eventType: 'login_failed',
+      status: 'failed',
+      userEmail: email,
+      details: { reason: 'invalid_credentials' },
+    })
     return { message: 'Email atau password salah.' }
   }
 
   clearLoginFailures(key)
   await createSession(user.id.toString())
   logEvent('info', 'auth.login.succeeded', { email, userId: user.id.toString() })
+  await writeAccessLog({
+    eventType: 'login_success',
+    status: 'success',
+    userId: user.id.toString(),
+    userEmail: email,
+  })
   redirect('/dashboard')
 }
 
 export async function logout(): Promise<void> {
   await deleteSession()
   logEvent('info', 'auth.logout', {})
+  await writeAccessLog({
+    eventType: 'logout',
+    status: 'success',
+  })
   redirect('/login')
 }

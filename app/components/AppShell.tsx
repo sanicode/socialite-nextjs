@@ -3,13 +3,15 @@ import { getSessionUserId } from '@/app/lib/session'
 import { getUserRoles } from '@/app/lib/permissions'
 import { prisma } from '@/app/lib/prisma'
 import ShellClient from './ShellClient'
+import { redirectIfRequestBlocked } from '@/app/lib/request-security'
+import { getRequestMetadata, writeAccessLog } from '@/app/lib/access-logs'
 
 async function getSessionUser() {
   const userId = await getSessionUserId()
   if (!userId) return null
   const user = await prisma.users.findUnique({
     where: { id: BigInt(userId) },
-    select: { name: true, email: true },
+    select: { id: true, name: true, email: true },
   })
   if (!user) return null
   const roles = await getUserRoles(userId)
@@ -35,6 +37,7 @@ async function getSessionUser() {
 }
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
+  await redirectIfRequestBlocked()
   const user = await getSessionUser()
 
   if (!user) {
@@ -44,5 +47,15 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const appName = process.env.APP_NAME ?? 'Admin Panel'
   const showDashboard = user.isAdmin || user.isManager
 
-  return <ShellClient user={user} appName={appName} showDashboard={showDashboard}>{children}</ShellClient>
+  const requestMetadata = await getRequestMetadata()
+  await writeAccessLog({
+    eventType: 'page_view',
+    status: 'allowed',
+    requestPath: requestMetadata.requestPath,
+    method: requestMetadata.method ?? 'GET',
+    userId: user.id.toString(),
+    userEmail: user.email,
+  })
+
+  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin}>{children}</ShellClient>
 }

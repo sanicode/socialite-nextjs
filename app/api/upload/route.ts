@@ -4,6 +4,7 @@ import { uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
 import { requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
+import { writeAccessLog } from '@/app/lib/access-logs'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const MAX_SIZE = 1 * 1024 * 1024 // 1MB
@@ -86,6 +87,18 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       collection: COLLECTION_NAME,
     })
+    await writeAccessLog({
+      eventType: 'upload_success',
+      status: 'success',
+      method: request.method,
+      requestPath: request.nextUrl.pathname,
+      userId: user.id,
+      userEmail: user.email,
+      details: {
+        mediaId: media.id.toString(),
+        collection: COLLECTION_NAME,
+      },
+    })
 
     return NextResponse.json({
       id: media.id.toString(),
@@ -95,6 +108,15 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     logEvent('error', 'upload.media.failed', { error })
+    await writeAccessLog({
+      eventType: 'upload_failed',
+      status: 'failed',
+      method: request.method,
+      requestPath: request.nextUrl.pathname,
+      details: {
+        error: error instanceof Error ? error.message : 'unknown_error',
+      },
+    })
     return NextResponse.json({ error: 'Upload gagal' }, { status: 500 })
   }
 }

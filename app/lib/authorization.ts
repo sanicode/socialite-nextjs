@@ -1,6 +1,12 @@
 import { getSessionUser, type SessionUser } from '@/app/lib/session'
+import { getRequestSecurityDecision } from '@/app/lib/request-security'
 
 export async function requireUser(): Promise<SessionUser> {
+  const decision = await getRequestSecurityDecision()
+  if (!decision.allowed) {
+    throw new Error(decision.message ?? 'Access denied')
+  }
+
   const user = await getSessionUser()
   if (!user) {
     throw new Error('Unauthorized')
@@ -39,4 +45,3 @@ export function assertNotManagerOnly(user: SessionUser): SessionUser {
   }
   return user
 }
-
