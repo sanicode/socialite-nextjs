@@ -13,7 +13,7 @@ export default function LogsTruncateButton() {
     dialogRef.current?.close()
     startTransition(async () => {
       const { deleted } = await truncateAccessLogs()
-      showToast('success', 'Logs Dihapus', `${deleted.toLocaleString('id-ID')} entri berhasil dihapus.`)
+      showToast('success', 'Logs Dihapus', `${deleted.toLocaleString('id-ID')} access logs berhasil dihapus.`)
     })
   }
 
