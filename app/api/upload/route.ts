@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes, randomUUID } from 'crypto'
 import { uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
+import { requireUser } from '@/app/lib/authorization'
+import { logEvent } from '@/app/lib/logger'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const MAX_SIZE = 1 * 1024 * 1024 // 1MB
@@ -9,6 +11,7 @@ const COLLECTION_NAME = 'blog-images'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser()
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 
@@ -78,6 +81,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    logEvent('info', 'upload.media.created', {
+      mediaId: media.id.toString(),
+      userId: user.id,
+      collection: COLLECTION_NAME,
+    })
+
     return NextResponse.json({
       id: media.id.toString(),
       uuid: media.uuid,
@@ -85,7 +94,7 @@ export async function POST(request: NextRequest) {
       url: publicUrl,
     })
   } catch (error) {
-    console.error('Upload error:', error)
+    logEvent('error', 'upload.media.failed', { error })
     return NextResponse.json({ error: 'Upload gagal' }, { status: 500 })
   }
 }

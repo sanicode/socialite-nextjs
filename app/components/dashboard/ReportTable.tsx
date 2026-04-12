@@ -101,7 +101,7 @@ export default function ReportTable({ data }: Props) {
         </table>
       </div>
 
-      <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4">
+      <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {data.length > 0
             ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, data.length)} dari ${data.length.toLocaleString('id-ID')} data`
@@ -109,6 +109,13 @@ export default function ReportTable({ data }: Props) {
         </p>
         {totalPages > 1 && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              First
+            </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
@@ -131,6 +138,13 @@ export default function ReportTable({ data }: Props) {
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
+            </button>
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Last
             </button>
           </div>
         )}

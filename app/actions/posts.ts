@@ -2,9 +2,11 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { cache } from 'react'
 import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3, getMediaUrl } from '@/app/lib/s3'
-import { getSessionUser } from '@/app/lib/session'
+import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
+import { logEvent } from '@/app/lib/logger'
 
 export type PostErrors = { title?: string[]; body?: string[]; category_id?: string[]; screenshot?: string[] }
 
@@ -45,6 +47,12 @@ export type SerializedCategory = {
   name: string
 }
 
+const getCategoriesCached = cache(async () => {
+  return prisma.blog_post_categories.findMany({
+    orderBy: { name: 'asc' },
+  })
+})
+
 const PLATFORM_PATTERNS: Record<string, { pattern: RegExp; label: string }> = {
   tiktok:    { pattern: /tiktok\.com/i,                       label: 'TikTok' },
   instagram: { pattern: /instagram\.com/i,                    label: 'Instagram' },
@@ -72,6 +80,36 @@ function generateSlug(title: string): string {
     .slice(0, 80)
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   return `${base}-${suffix}`
+}
+
+async function deleteMediaAssets(mediaList: Array<{ id: bigint; file_name: string; custom_properties: unknown }>) {
+  const failedS3Deletes: string[] = []
+
+  await Promise.all(
+    mediaList.map(async (media) => {
+      try {
+        await deleteFromS3(getS3Key(media))
+      } catch (error) {
+        failedS3Deletes.push(media.id.toString())
+        logEvent('error', 'posts.media_delete.s3_failed', {
+          mediaId: media.id.toString(),
+          objectKey: getS3Key(media),
+          error,
+        })
+      }
+    })
+  )
+
+  if (mediaList.length > 0) {
+    await prisma.media.deleteMany({
+      where: { id: { in: mediaList.map((media) => media.id) } },
+    })
+  }
+
+  return {
+    deletedMediaCount: mediaList.length,
+    failedS3Deletes,
+  }
 }
 
 export async function getPosts(params: {
@@ -224,9 +262,7 @@ export async function getPosts(params: {
 }
 
 export async function getCategories(): Promise<SerializedCategory[]> {
-  const cats = await prisma.blog_post_categories.findMany({
-    orderBy: { name: 'asc' },
-  })
+  const cats = await getCategoriesCached()
   return cats.map((c) => ({ id: c.id.toString(), name: c.name }))
 }
 
@@ -347,11 +383,7 @@ export async function createPost(
   state: PostFormState,
   formData: FormData
 ): Promise<PostFormState> {
-  const sessionUser = await getSessionUser()
-  if (!sessionUser) throw new Error('Unauthorized')
-  const isAdmin = sessionUser.roles.includes('admin')
-  const isManager = sessionUser.roles.includes('manager')
-  if (isManager && !isAdmin) throw new Error('Unauthorized')
+  const sessionUser = assertNotManagerOnly(await requireUser())
 
   const title = (formData.get('title') as string)?.trim()
   const body = (formData.get('body') as string)?.trim()
@@ -436,19 +468,20 @@ export async function createPost(
   // Upload screenshot to S3 now that we have the post ID
   await uploadScreenshot(screenshot!, post.id)
 
+  logEvent('info', 'posts.create', {
+    postId: post.id.toString(),
+    userId: sessionUser.id,
+    categoryId,
+  })
   revalidatePath('/posts')
-  redirect('/posts')
+  redirect('/posts?success=created')
 }
 
 export async function updatePost(
   state: PostFormState,
   formData: FormData
 ): Promise<PostFormState> {
-  const sessionUser = await getSessionUser()
-  if (!sessionUser) throw new Error('Unauthorized')
-  const isAdmin = sessionUser.roles.includes('admin')
-  const isManager = sessionUser.roles.includes('manager')
-  if (isManager && !isAdmin) throw new Error('Unauthorized')
+  const sessionUser = assertNotManagerOnly(await requireUser())
 
   const id = formData.get('id') as string
   const title = (formData.get('title') as string)?.trim()
@@ -525,36 +558,39 @@ export async function updatePost(
     await uploadScreenshot(screenshot, BigInt(id))
   }
 
+  logEvent('info', 'posts.update', {
+    postId: id,
+    userId: sessionUser.id,
+    categoryId,
+    replacedScreenshot: hasNewScreenshot,
+  })
   revalidatePath('/posts')
-  redirect('/posts')
+  redirect('/posts?success=updated')
 }
 
 export async function deletePost(id: string): Promise<void> {
-  const sessionUser = await getSessionUser()
-  if (!sessionUser || !sessionUser.roles.includes('admin')) {
-    throw new Error('Unauthorized')
-  }
+  const sessionUser = assertAdmin(await requireUser())
 
-  const media = await prisma.media.findFirst({
+  const mediaList = await prisma.media.findMany({
     where: { model_type: 'App\\Models\\BlogPost', model_id: BigInt(id), collection_name: 'blog-images' },
   })
 
-  if (media) {
-    await deleteFromS3(getS3Key(media)).catch(() => {})
-    await prisma.media.delete({ where: { id: media.id } })
-  }
+  const { deletedMediaCount, failedS3Deletes } = await deleteMediaAssets(mediaList)
 
   await prisma.blog_posts.delete({ where: { id: BigInt(id) } })
+  logEvent('warn', 'posts.delete', {
+    postId: id,
+    userId: sessionUser.id,
+    deletedMediaCount,
+    failedS3Deletes,
+  })
   revalidatePath('/posts')
 }
 
 export async function bulkDeletePosts(ids: string[]): Promise<void> {
   if (ids.length === 0) return
 
-  const sessionUser = await getSessionUser()
-  if (!sessionUser || !sessionUser.roles.includes('admin')) {
-    throw new Error('Unauthorized')
-  }
+  const sessionUser = assertAdmin(await requireUser())
 
   const bigIds = ids.map((id) => BigInt(id))
 
@@ -562,19 +598,20 @@ export async function bulkDeletePosts(ids: string[]): Promise<void> {
     where: { model_type: 'App\\Models\\BlogPost', model_id: { in: bigIds }, collection_name: 'blog-images' },
   })
 
-  await Promise.all(mediaList.map((m) => deleteFromS3(getS3Key(m)).catch(() => {})))
-
-  if (mediaList.length > 0) {
-    await prisma.media.deleteMany({
-      where: { id: { in: mediaList.map((m) => m.id) } },
-    })
-  }
+  const { deletedMediaCount, failedS3Deletes } = await deleteMediaAssets(mediaList)
 
   await prisma.blog_posts.deleteMany({ where: { id: { in: bigIds } } })
+  logEvent('warn', 'posts.bulk_delete', {
+    postIds: ids,
+    userId: sessionUser.id,
+    deletedMediaCount,
+    failedS3Deletes,
+  })
   revalidatePath('/posts')
 }
 
 export async function togglePublish(id: string, currentStatus: boolean): Promise<void> {
+  const sessionUser = assertAdmin(await requireManagerOrAdmin())
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
@@ -583,16 +620,27 @@ export async function togglePublish(id: string, currentStatus: boolean): Promise
       updated_at: new Date(),
     },
   })
+  logEvent('info', 'posts.toggle_publish', {
+    postId: id,
+    userId: sessionUser.id,
+    nextStatus: !currentStatus,
+  })
   revalidatePath('/posts')
 }
 
 export async function updateStatus(id: string, status: 'pending' | 'valid' | 'invalid'): Promise<void> {
+  const sessionUser = await requireManagerOrAdmin()
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
       status,
       updated_at: new Date(),
     },
+  })
+  logEvent('info', 'posts.update_status', {
+    postId: id,
+    userId: sessionUser.id,
+    status,
   })
   revalidatePath('/posts')
 }

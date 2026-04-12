@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Socialite Next.js
 
-## Getting Started
+Frontend pelaporan media sosial berbasis Next.js App Router untuk operator, manager, dan admin. Aplikasi ini terhubung ke PostgreSQL melalui Prisma, menyimpan screenshot ke S3-compatible storage, dan memakai Sentry untuk monitoring error.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 16 App Router
+- React 19
+- Prisma + PostgreSQL
+- AWS S3 compatible storage
+- Tailwind CSS 4
+- Sentry
+
+## Struktur Singkat
+
+```text
+app/
+  actions/        Server Actions untuk auth, post, dan dashboard
+  api/            Route Handlers
+  components/     Komponen UI client/server
+  lib/            Session, authz, Prisma, S3, logger, helper umum
+  generated/      Prisma client hasil generate
+prisma/
+  schema.prisma   Sumber schema database
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Role
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `admin`: akses penuh, termasuk delete, edit, verifikasi, dan dashboard global
+- `manager`: akses dashboard tenant dan verifikasi laporan tenant
+- `operator/user`: membuat laporan miliknya sendiri
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Alur Utama
 
-## Learn More
+### Login
 
-To learn more about Next.js, take a look at the following resources:
+1. User mengirim email dan password lewat Server Action `app/actions/auth.ts`.
+2. Password diverifikasi dengan `bcrypt`.
+3. Session disimpan dalam cookie `sid` yang ditandatangani HMAC.
+4. Rate limiting diterapkan untuk percobaan login gagal.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Submit laporan
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. User memilih kategori, mengisi link upload, dan mengunggah screenshot.
+2. Validasi dilakukan di client dan server.
+3. Server mengecek duplicate entry per kategori per hari.
+4. Post disimpan ke tabel `blog_posts`.
+5. Screenshot diunggah ke bucket S3 dan metadata disimpan ke tabel `media`.
 
-## Deploy on Vercel
+### Verifikasi laporan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Admin dan manager dapat mengubah status laporan.
+2. Semua mutasi sensitif wajib lolos pemeriksaan auth/role di server action.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Dashboard
+
+Dashboard membaca ringkasan dan rekap dari tabel utama serta SQL views seperti:
+
+- `v_pelaporan_media_sosial`
+- `v_kuota_per_kota`
+- `v_rekapitulasi_pelaporan`
+
+## Konvensi Internal
+
+- `actions/` sebaiknya tipis: validasi akses, panggil logic, lalu return hasil
+- `lib/authorization.ts` dipakai untuk guard seperti `requireUser`, `requireAdmin`, dan `requireManagerOrAdmin`
+- query raw yang menyentuh SQL view perlu diberi nama fungsi yang jelas dan komentar singkat
+- generated Prisma berada di `app/generated/prisma`; hindari edit manual di folder itu
+
+## Environment Penting
+
+Beberapa environment variable yang wajib tersedia:
+
+- `DATABASE_URL`
+- `SESSION_SECRET`
+- `S3_ENDPOINT`
+- `S3_REGION`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+- `S3_BUCKET`
+- `NEXT_PUBLIC_S3_PUBLIC_URL`
+
+## Menjalankan Aplikasi
+
+```bash
+npm install
+npm run dev
+```
+
+Buka `http://localhost:3000`.
+
+## Quality Checklist Sebelum Rilis
+
+- jalankan `npm run lint`
+- pastikan `SESSION_SECRET` dan env storage terisi
+- cek login, submit laporan, edit laporan, verifikasi, dan bulk delete
+- cek dashboard untuk admin dan manager
+- pastikan upload screenshot berhasil dan URL media benar

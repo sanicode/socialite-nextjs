@@ -2,8 +2,8 @@ import { cookies } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from '@/app/lib/prisma'
 import { getUserRoles } from '@/app/lib/permissions'
+import { getSessionSecret } from '@/app/lib/env'
 
-const SECRET = process.env.SESSION_SECRET ?? 'change-me-in-production-secret-32'
 const COOKIE_NAME = 'sid'
 
 export type SessionUser = {
@@ -15,7 +15,7 @@ export type SessionUser = {
 }
 
 function sign(value: string): string {
-  const hmac = crypto.createHmac('sha256', SECRET)
+  const hmac = crypto.createHmac('sha256', getSessionSecret())
   hmac.update(value)
   return `${value}.${hmac.digest('base64url')}`
 }

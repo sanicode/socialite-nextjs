@@ -1,5 +1,6 @@
 'use server'
 
+import { cache } from 'react'
 import { prisma } from '@/app/lib/prisma'
 
 export type DashboardFilters = {
@@ -34,31 +35,45 @@ export type CityChartGroup = {
 
 export type ReportRow = Record<string, unknown>
 
+const getProvincesCached = cache(async () => {
+  return prisma.reg_provinces.findMany({ orderBy: { name: 'asc' } })
+})
+
+const getCitiesCached = cache(async (provinceId?: string) => {
+  const where = provinceId ? { province_id: parseInt(provinceId, 10) } : {}
+  return prisma.reg_cities.findMany({ where, orderBy: { name: 'asc' } })
+})
+
+const resolveLocationNames = cache(async (provinceId?: string, cityId?: string) => {
+  const [province, city] = await Promise.all([
+    provinceId
+      ? prisma.reg_provinces.findUnique({ where: { id: parseInt(provinceId, 10) } })
+      : Promise.resolve(null),
+    cityId
+      ? prisma.reg_cities.findUnique({ where: { id: BigInt(cityId) } })
+      : Promise.resolve(null),
+  ])
+
+  return {
+    provinceName: province?.name,
+    cityName: city?.name,
+  }
+})
+
 export async function getProvinces(): Promise<{ id: number; name: string }[]> {
-  const provinces = await prisma.reg_provinces.findMany({ orderBy: { name: 'asc' } })
+  const provinces = await getProvincesCached()
   return provinces.map((p) => ({ id: p.id, name: p.name }))
 }
 
 export async function getCities(provinceId?: string): Promise<{ id: string; name: string }[]> {
-  const where = provinceId ? { province_id: parseInt(provinceId, 10) } : {}
-  const cities = await prisma.reg_cities.findMany({ where, orderBy: { name: 'asc' } })
+  const cities = await getCitiesCached(provinceId)
   return cities.map((c) => ({ id: c.id.toString(), name: c.name }))
 }
 
 export async function getDashboardStats(filters: DashboardFilters): Promise<DashboardStats> {
   const { provinceId, cityId, dateFrom, dateTo, tenantId } = filters
 
-  // Resolve province/city IDs → names (view stores names, not IDs)
-  let provinceName: string | undefined
-  let cityName: string | undefined
-  if (provinceId) {
-    const p = await prisma.reg_provinces.findUnique({ where: { id: parseInt(provinceId, 10) } })
-    provinceName = p?.name
-  }
-  if (cityId) {
-    const c = await prisma.reg_cities.findUnique({ where: { id: BigInt(cityId) } })
-    cityName = c?.name
-  }
+  const { provinceName, cityName } = await resolveLocationNames(provinceId, cityId)
 
   const conditions: string[] = []
   const params: unknown[] = []
@@ -185,17 +200,7 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
 }
 
 export async function getProvinceChartData(filters: DashboardFilters): Promise<ProvinceChartItem[]> {
-  // Resolve province/city names from IDs (the view stores names, not IDs)
-  let provinceName: string | undefined
-  let cityName: string | undefined
-  if (filters.provinceId) {
-    const p = await prisma.reg_provinces.findUnique({ where: { id: parseInt(filters.provinceId, 10) } })
-    provinceName = p?.name
-  }
-  if (filters.cityId) {
-    const c = await prisma.reg_cities.findUnique({ where: { id: BigInt(filters.cityId) } })
-    cityName = c?.name
-  }
+  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
   const postConditions: string[] = []
   const postParams: unknown[] = []
@@ -277,17 +282,7 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
 }
 
 export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<CityChartGroup[]> {
-  // Resolve province/city names from IDs
-  let provinceName: string | undefined
-  let cityName: string | undefined
-  if (filters.provinceId) {
-    const p = await prisma.reg_provinces.findUnique({ where: { id: parseInt(filters.provinceId, 10) } })
-    provinceName = p?.name
-  }
-  if (filters.cityId) {
-    const c = await prisma.reg_cities.findUnique({ where: { id: BigInt(filters.cityId) } })
-    cityName = c?.name
-  }
+  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
   const postConditions: string[] = []
   const postParams: unknown[] = []
@@ -424,18 +419,18 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
     }
   }
   if (filters.provinceId) {
-    const prov = await prisma.reg_provinces.findUnique({ where: { id: parseInt(filters.provinceId, 10) } })
-    if (prov) {
+    const { provinceName } = await resolveLocationNames(filters.provinceId)
+    if (provinceName) {
       conditions.push(`propinsi = $${idx}`)
-      params.push(prov.name)
+      params.push(provinceName)
       idx++
     }
   }
   if (filters.cityId) {
-    const city = await prisma.reg_cities.findUnique({ where: { id: BigInt(filters.cityId) } })
-    if (city) {
+    const { cityName } = await resolveLocationNames(undefined, filters.cityId)
+    if (cityName) {
       conditions.push(`kabupaten_kota = $${idx}`)
-      params.push(city.name)
+      params.push(cityName)
       idx++
     }
   }

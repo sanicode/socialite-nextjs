@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { getCities } from '@/app/actions/dashboard'
+import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 
 type Props = {
   provinces: { id: number; name: string }[]
@@ -20,6 +21,7 @@ function addOneMonth(dateStr: string): string {
 export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, defaultDateTo }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [isPending, startTransition] = useTransition()
 
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
   const [dateFrom, setDateFrom] = useState(defaultDateFrom)
@@ -30,10 +32,22 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
   const currentCityId = searchParams.get('cityId') ?? ''
 
   useEffect(() => {
-    if (currentProvinceId) {
-      getCities(currentProvinceId).then(setCities)
-    } else {
-      setCities([])
+    let cancelled = false
+
+    async function loadCities() {
+      if (!currentProvinceId) {
+        if (!cancelled) setCities([])
+        return
+      }
+
+      const nextCities = await getCities(currentProvinceId)
+      if (!cancelled) setCities(nextCities)
+    }
+
+    void loadCities()
+
+    return () => {
+      cancelled = true
     }
   }, [currentProvinceId])
 
@@ -41,7 +55,9 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     const params = new URLSearchParams(searchParams.toString())
     params.set('dateFrom', from)
     params.set('dateTo', to)
-    router.push(`/dashboard?${params.toString()}`)
+    startTransition(() => {
+      router.push(`/dashboard?${params.toString()}`)
+    })
   }
 
   function handleDateFrom(val: string) {
@@ -83,7 +99,9 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
       params.delete(key)
     }
     if (key === 'provinceId') params.delete('cityId')
-    router.push(`/dashboard?${params.toString()}`)
+    startTransition(() => {
+      router.push(`/dashboard?${params.toString()}`)
+    })
   }
 
   const maxDateTo = addOneMonth(dateFrom)
@@ -91,6 +109,13 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
 
   return (
     <div className="space-y-1.5">
+      {isPending && (
+        <RequestLoadingOverlay
+          title="Memuat dashboard..."
+          description="Filter sedang diterapkan. Data akan diperbarui sebentar lagi."
+        />
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
@@ -98,6 +123,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             type="date"
             value={dateFrom}
             max={today}
+            disabled={isPending}
             onChange={(e) => handleDateFrom(e.target.value)}
             className="sm:w-44 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
@@ -112,6 +138,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             value={dateTo}
             min={dateFrom}
             max={maxDateTo}
+            disabled={isPending}
             onChange={(e) => handleDateTo(e.target.value)}
             className={`sm:w-44 px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 transition ${
               rangeError
@@ -125,6 +152,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Propinsi</span>
             <select
               value={currentProvinceId}
+              disabled={isPending}
               onChange={(e) => updateParam('provinceId', e.target.value)}
               className="sm:w-52 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
             >
@@ -143,7 +171,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             <select
               value={currentCityId}
               onChange={(e) => updateParam('cityId', e.target.value)}
-              disabled={!currentProvinceId}
+              disabled={!currentProvinceId || isPending}
               className="sm:w-52 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:opacity-50"
             >
               <option value="">Semua Kota</option>

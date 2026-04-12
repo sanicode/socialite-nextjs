@@ -7,6 +7,7 @@ import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
 import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
 import { useToast } from '@/app/components/ToastContext'
+import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 
 type Props = {
   posts: SerializedPost[]
@@ -27,6 +28,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
+  const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
 
   const closeModal = useCallback(() => setModal(null), [])
 
@@ -38,6 +40,22 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [modal, closeModal])
+
+  useEffect(() => {
+    const success = searchParams.get('success')
+    if (!success) return
+
+    if (success === 'created') {
+      showToast('success', 'Laporan Terkirim', 'Laporan berhasil dikirim.')
+    } else if (success === 'updated') {
+      showToast('success', 'Perubahan Tersimpan', 'Laporan berhasil diperbarui.')
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('success')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `/posts?${nextQuery}` : '/posts')
+  }, [router, searchParams, showToast])
 
   const currentSort = searchParams.get('sort') ?? 'desc'
 
@@ -77,7 +95,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     })
   }
 
-  function updateParam(key: string, value: string) {
+  const updateParam = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value) {
       params.set(key, value)
@@ -85,8 +103,25 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       params.delete(key)
     }
     if (key !== 'page') params.delete('page')
-    router.push(`/posts?${params.toString()}`)
-  }
+    startTransition(() => {
+      router.push(`/posts?${params.toString()}`)
+    })
+  }, [router, searchParams, startTransition])
+
+  useEffect(() => {
+    setSearchValue(searchParams.get('search') ?? '')
+  }, [searchParams])
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') ?? ''
+    if (searchValue === currentSearch) return
+
+    const timeoutId = window.setTimeout(() => {
+      updateParam('search', searchValue)
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [searchValue, searchParams, updateParam])
 
   function handleDelete(id: string) {
     if (!confirm('Hapus post ini? Tindakan tidak bisa dibatalkan.')) return
@@ -105,17 +140,26 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
 
   return (
     <div className="space-y-4">
+      {isPending && (
+        <RequestLoadingOverlay
+          title="Memuat data laporan..."
+          description="Perubahan filter atau halaman sedang diproses."
+        />
+      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
         <input
           type="search"
           placeholder="Cari..."
-          defaultValue={searchParams.get('search') ?? ''}
-          onChange={(e) => updateParam('search', e.target.value)}
+          value={searchValue}
+          disabled={isPending}
+          onChange={(e) => setSearchValue(e.target.value)}
           className="flex-1 min-w-[180px] px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
         />
         <select
           defaultValue={searchParams.get('category') ?? ''}
+          disabled={isPending}
           onChange={(e) => updateParam('category', e.target.value)}
           className="sm:w-48 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
         >
@@ -131,6 +175,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           <input
             type="date"
             defaultValue={searchParams.get('dateFrom') ?? ''}
+            disabled={isPending}
             onChange={(e) => updateParam('dateFrom', e.target.value)}
             className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
@@ -140,6 +185,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           <input
             type="date"
             defaultValue={searchParams.get('dateTo') ?? ''}
+            disabled={isPending}
             onChange={(e) => updateParam('dateTo', e.target.value)}
             className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
@@ -433,7 +479,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {total > 0
             ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} post`
@@ -441,6 +487,13 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
         </p>
         {totalPages > 1 && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => updateParam('page', '1')}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              First
+            </button>
             <button
               onClick={() => updateParam('page', String(Math.max(1, page - 1)))}
               disabled={page === 1}
@@ -463,6 +516,13 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
+            </button>
+            <button
+              onClick={() => updateParam('page', String(totalPages))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Last
             </button>
           </div>
         )}

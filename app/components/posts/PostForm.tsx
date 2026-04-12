@@ -35,6 +35,24 @@ const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; lab
   },
 }
 
+const ALERT_ICON = {
+  error: (
+    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    </svg>
+  ),
+  warning: (
+    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    </svg>
+  ),
+  success: (
+    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+}
+
 export default function PostForm({ action, post, categories }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -85,6 +103,19 @@ export default function PostForm({ action, post, categories }: Props) {
       ? `Link harus berupa URL ${platformHint.label} yang valid.`
       : null
 
+  const formMessages = state?.errors
+    ? [
+        ...(state.errors.category_id ?? []),
+        ...(state.errors.title ?? []),
+        ...(!hasScreenshot ? (state.errors.screenshot ?? []) : []),
+        ...(state.errors.body ?? []),
+      ]
+    : []
+
+  const screenshotError = !hasScreenshot ? state?.errors?.screenshot?.[0] : undefined
+
+  const alertType = state?.duplicate || state?.message ? 'error' : 'warning'
+
   return (
     <form action={formAction} className="space-y-6" encType="multipart/form-data">
 
@@ -96,6 +127,43 @@ export default function PostForm({ action, post, categories }: Props) {
 
       <input type="hidden" name="is_published" value="0" />
       <input type="hidden" name="body" value="-" />
+
+      {(state?.message || formMessages.length > 0) && (
+        <div
+          className={`rounded-xl border px-4 py-3 ${
+            alertType === 'error'
+              ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200'
+              : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5">
+              {ALERT_ICON[alertType]}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                {state?.duplicate
+                  ? 'Double Entry Terdeteksi'
+                  : state?.message
+                    ? 'Gagal Menyimpan'
+                    : 'Periksa Kembali Form'}
+              </p>
+
+              {state?.message && (
+                <p className="mt-1 text-sm leading-relaxed">{state.message}</p>
+              )}
+
+              {!state?.message && formMessages.length > 0 && (
+                <ul className="mt-2 space-y-1 text-sm leading-relaxed">
+                  {formMessages.map((message, index) => (
+                    <li key={`${message}-${index}`}>- {message}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -175,7 +243,7 @@ export default function PostForm({ action, post, categories }: Props) {
 
             <ImageUpload
               currentUrl={post?.thumbnail?.url ?? null}
-              error={state?.errors?.screenshot?.[0]}
+              error={screenshotError}
               onFileChange={setHasScreenshot}
             />
           </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const navItems = [
@@ -39,6 +40,19 @@ type Props = {
   onClose: () => void
   appName: string
   showDashboard: boolean
+}
+
+function LinkPendingHint() {
+  const { pending } = useLinkStatus()
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`ml-auto h-2 w-2 rounded-full bg-current transition-opacity duration-150 ${
+        pending ? 'opacity-80 animate-pulse' : 'opacity-0'
+      }`}
+    />
+  )
 }
 
 export default function Sidebar({ open, onClose, appName, showDashboard }: Props) {
@@ -111,6 +125,7 @@ export default function Sidebar({ open, onClose, appName, showDashboard }: Props
               >
                 {item.icon}
                 {item.label}
+                <LinkPendingHint />
               </Link>
             )
           })}
