@@ -2,7 +2,10 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getAccessLogs } from '@/app/lib/access-logs'
+import { isAccessLoggingEnabled } from '@/app/actions/logs'
 import AccessLogsTable from '@/app/components/settings/AccessLogsTable'
+import LogsToggle from '@/app/components/settings/LogsToggle'
+import LogsTruncateButton from '@/app/components/settings/LogsTruncateButton'
 
 type SearchParams = Promise<{
   page?: string
@@ -33,28 +36,41 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
 
-  const { rows, total } = await getAccessLogs({
-    page,
-    pageSize: PAGE_SIZE,
-    search: params.search,
-    eventType: params.eventType,
-    country: params.country,
-    path: params.path,
-    dateFrom: params.dateFrom,
-    dateTo: params.dateTo,
-  })
+  const [logsEnabled, { rows, total }] = await Promise.all([
+    isAccessLoggingEnabled(),
+    getAccessLogs({
+      page,
+      pageSize: PAGE_SIZE,
+      search: params.search,
+      eventType: params.eventType,
+      country: params.country,
+      path: params.path,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+    }),
+  ])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div>
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
-          <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Logs</h1>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            Riwayat akses aplikasi, login, dan request yang diblokir.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
+            <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Logs</h1>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              Riwayat akses aplikasi, login, dan request yang diblokir.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 pt-1">
+            <LogsTruncateButton />
+            <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+            <span className={`text-sm font-medium ${logsEnabled ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500'}`}>
+              {logsEnabled ? 'Aktif' : 'Nonaktif'}
+            </span>
+            <LogsToggle enabled={logsEnabled} />
+          </div>
         </div>
 
         <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 dark:border-neutral-800 dark:bg-neutral-900">

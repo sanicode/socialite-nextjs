@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
+import { getConfigValue } from '@/app/lib/configs'
 
 export type AccessLogEntry = {
   eventType: string
@@ -98,6 +99,9 @@ export async function getRequestMetadata() {
 
 export async function writeAccessLog(entry: AccessLogEntry): Promise<void> {
   try {
+    const logsEnabled = await getConfigValue('access_logs_enabled')
+    if (logsEnabled === '0') return
+
     const requestMetadata = await getRequestMetadata()
     const finalEntry = {
       ...requestMetadata,
