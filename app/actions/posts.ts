@@ -7,6 +7,8 @@ import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3, getMediaUrl } from '@/app/lib/s3'
 import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
+import { getSecuritySettings } from '@/app/lib/request-security'
+import { formatUploadFileSize } from '@/app/lib/upload-size'
 
 export type PostErrors = { title?: string[]; body?: string[]; category_id?: string[]; screenshot?: string[] }
 
@@ -329,7 +331,6 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
 }
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-const MAX_IMAGE_SIZE = 1 * 1024 * 1024 // 1MB
 
 async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
   const { randomBytes, randomUUID } = await import('crypto')
@@ -391,6 +392,7 @@ export async function createPost(
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
   const screenshot = formData.get('screenshot') as File | null
+  const { maxUploadedFileSizeBytes } = await getSecuritySettings()
 
   const errors: PostErrors = {}
 
@@ -400,8 +402,8 @@ export async function createPost(
     errors.screenshot = ['Bukti screenshot wajib diupload.']
   } else if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
     errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
-  } else if (screenshot.size > MAX_IMAGE_SIZE) {
-    errors.screenshot = ['Ukuran file terlalu besar (maks 1MB).']
+  } else if (screenshot.size > maxUploadedFileSizeBytes) {
+    errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
   }
 
   if (Object.keys(errors).length > 0) return { errors }
@@ -492,6 +494,7 @@ export async function updatePost(
   const oldMediaId = formData.get('old_media_id') as string | null
   const screenshot = formData.get('screenshot') as File | null
   const hasNewScreenshot = screenshot && screenshot.size > 0
+  const { maxUploadedFileSizeBytes } = await getSecuritySettings()
 
   const errors: PostErrors = {}
 
@@ -503,8 +506,8 @@ export async function updatePost(
   } else if (hasNewScreenshot) {
     if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
       errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
-    } else if (screenshot.size > MAX_IMAGE_SIZE) {
-      errors.screenshot = ['Ukuran file terlalu besar (maks 1MB).']
+    } else if (screenshot.size > maxUploadedFileSizeBytes) {
+      errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
     }
   }
 

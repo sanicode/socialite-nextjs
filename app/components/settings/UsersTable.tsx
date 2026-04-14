@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useTransition, useRef, useState } from 'react'
-import { toggleUserBlock, resetUserRateLimit, bulkToggleBlock, type UserRow } from '@/app/actions/users'
+import { toggleUserBlock, resetUserRateLimit, bulkToggleBlock, bulkResetRateLimit, type UserRow } from '@/app/actions/users'
 import { useToast } from '@/app/components/ToastContext'
 
 type Props = {
   users: UserRow[]
   totalBlocked: number
+  totalUnderAttack: number
   sortBy: string
   sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
@@ -60,9 +61,10 @@ type ConfirmState =
   | { type: 'block'; user: UserRow }
   | { type: 'reset'; user: UserRow }
   | { type: 'bulk'; ids: string[]; block: boolean }
+  | { type: 'bulkReset'; emails: string[] }
   | null
 
-export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searchParams }: Props) {
+export default function UsersTable({ users, totalBlocked, totalUnderAttack, sortBy, sortDir, searchParams }: Props) {
   const [pending, startTransition] = useTransition()
   const { showToast } = useToast()
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -71,6 +73,7 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
 
   const allPageSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id))
   const somePageSelected = users.some((u) => selectedIds.has(u.id))
+  const selectedUsers = users.filter((u) => selectedIds.has(u.id))
 
   function toggleAll() {
     setSelectedIds((prev) => {
@@ -87,7 +90,11 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -124,6 +131,10 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
           `${count} akun berhasil ${confirm.block ? 'diblokir' : 'dibuka blokirnya'}.`,
         )
         setSelectedIds(new Set())
+      } else if (confirm.type === 'bulkReset') {
+        const { count } = await bulkResetRateLimit(confirm.emails)
+        showToast('success', 'Rate Limit Direset', `Login attempts untuk ${count} akun telah dihapus.`)
+        setSelectedIds(new Set())
       }
     })
   }
@@ -132,6 +143,18 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
 
   return (
     <>
+      {/* Alert: accounts under attack */}
+      {totalUnderAttack > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800/60 dark:bg-red-950/30">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-950/60">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+          </span>
+          <p className="text-sm text-red-800 dark:text-red-300">
+            <span className="font-semibold">{totalUnderAttack.toLocaleString('id-ID')} akun</span> sedang diserang — terdeteksi lebih dari 10 percobaan login gagal dalam 1 jam terakhir.
+          </p>
+        </div>
+      )}
+
       {/* Alert: blocked users warning */}
       {totalBlocked > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/30">
@@ -151,6 +174,14 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
             {selectedCount} user dipilih
           </span>
           <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => openConfirm({ type: 'bulkReset', emails: selectedUsers.map((u) => u.email) })}
+              className="inline-flex items-center rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50 disabled:opacity-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30"
+            >
+              Reset Limit
+            </button>
             <button
               type="button"
               disabled={pending}
@@ -332,7 +363,7 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
             <div className="flex items-start gap-4">
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  confirm.type === 'reset'
+                  confirm.type === 'reset' || confirm.type === 'bulkReset'
                     ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400'
                     : confirm.type === 'bulk'
                     ? confirm.block
@@ -343,7 +374,7 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
                     : 'bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400'
                 }`}
               >
-                {confirm.type === 'reset' ? (
+                {confirm.type === 'reset' || confirm.type === 'bulkReset' ? (
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
@@ -357,6 +388,8 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
                 <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
                   {confirm.type === 'reset'
                     ? 'Reset Rate Limit?'
+                    : confirm.type === 'bulkReset'
+                    ? `Reset Rate Limit ${confirm.emails.length} Akun?`
                     : confirm.type === 'bulk'
                     ? confirm.block
                       ? `Blokir ${confirm.ids.length} Akun?`
@@ -368,6 +401,8 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
                 <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
                   {confirm.type === 'reset'
                     ? `Semua catatan login attempts untuk ${confirm.user.email} akan dihapus. User dapat langsung mencoba login kembali.`
+                    : confirm.type === 'bulkReset'
+                    ? `Login attempts untuk ${confirm.emails.length} akun yang dipilih akan dihapus. Mereka dapat langsung mencoba login kembali.`
                     : confirm.type === 'bulk'
                     ? confirm.block
                       ? `${confirm.ids.length} akun yang dipilih akan diblokir dan tidak dapat login.`
@@ -391,7 +426,7 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
                 type="button"
                 onClick={handleConfirm}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
-                  confirm.type === 'reset'
+                  confirm.type === 'reset' || confirm.type === 'bulkReset'
                     ? 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600'
                     : confirm.type === 'bulk'
                     ? confirm.block
@@ -402,7 +437,7 @@ export default function UsersTable({ users, totalBlocked, sortBy, sortDir, searc
                     : 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'
                 }`}
               >
-                {confirm.type === 'reset'
+                {confirm.type === 'reset' || confirm.type === 'bulkReset'
                   ? 'Ya, Reset'
                   : confirm.type === 'bulk'
                   ? confirm.block

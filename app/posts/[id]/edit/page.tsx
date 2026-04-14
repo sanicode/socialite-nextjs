@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getPostById, getCategories, updatePost } from '@/app/actions/posts'
 import PostForm from '@/app/components/posts/PostForm'
+import { getSecuritySettings } from '@/app/lib/request-security'
 import { getSessionUser } from '@/app/lib/session'
 
 type Params = Promise<{ id: string }>
@@ -14,7 +15,11 @@ export default async function EditPostPage({ params }: { params: Params }) {
   if (isManager && !isAdmin) redirect('/posts')
 
   const { id } = await params
-  const [post, categories] = await Promise.all([getPostById(id), getCategories()])
+  const [post, categories, securitySettings] = await Promise.all([
+    getPostById(id),
+    getCategories(),
+    getSecuritySettings(),
+  ])
 
   if (!post) notFound()
 
@@ -34,7 +39,12 @@ export default async function EditPostPage({ params }: { params: Params }) {
         </div>
 
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-6">
-          <PostForm action={updatePost} post={post} categories={categories} />
+          <PostForm
+            action={updatePost}
+            post={post}
+            categories={categories}
+            maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+          />
         </div>
       </div>
     </div>

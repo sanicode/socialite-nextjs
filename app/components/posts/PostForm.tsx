@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import type { PostFormState, SerializedCategory, SerializedPost } from '@/app/actions/posts'
 import ImageUpload from './ImageUpload'
 import { useToast } from '@/app/components/ToastContext'
+import { formatUploadFileSize } from '@/app/lib/upload-size'
 
 type Props = {
   action: (state: PostFormState, formData: FormData) => Promise<PostFormState>
   post?: SerializedPost
   categories: SerializedCategory[]
+  maxUploadFileSizeBytes: number
 }
 
 const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; label: string }> = {
@@ -53,7 +55,7 @@ const ALERT_ICON = {
   ),
 }
 
-export default function PostForm({ action, post, categories }: Props) {
+export default function PostForm({ action, post, categories, maxUploadFileSizeBytes }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
   const [state, formAction, pending] = useActionState(action, undefined)
@@ -61,6 +63,7 @@ export default function PostForm({ action, post, categories }: Props) {
   const [title, setTitle] = useState(post?.title ?? '')
   const [categoryId, setCategoryId] = useState(post?.blog_post_category_id ?? '')
   const [hasScreenshot, setHasScreenshot] = useState<boolean>(!!post?.thumbnail)
+  const [screenshotClientError, setScreenshotClientError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!state) return
@@ -103,21 +106,27 @@ export default function PostForm({ action, post, categories }: Props) {
       ? `Link harus berupa URL ${platformHint.label} yang valid.`
       : null
 
+  const hasExistingScreenshot = Boolean(post?.thumbnail)
+  const screenshotFieldError = screenshotClientError ?? state?.errors?.screenshot?.[0]
+  const screenshotMessages = screenshotClientError
+    ? [screenshotClientError]
+    : !hasScreenshot && !hasExistingScreenshot
+      ? (state?.errors?.screenshot ?? [])
+      : []
+
   const formMessages = state?.errors
     ? [
         ...(state.errors.category_id ?? []),
         ...(state.errors.title ?? []),
-        ...(!hasScreenshot ? (state.errors.screenshot ?? []) : []),
+        ...screenshotMessages,
         ...(state.errors.body ?? []),
       ]
     : []
 
-  const screenshotError = !hasScreenshot ? state?.errors?.screenshot?.[0] : undefined
-
   const alertType = state?.duplicate || state?.message ? 'error' : 'warning'
 
   return (
-    <form action={formAction} className="space-y-6" encType="multipart/form-data">
+    <form action={formAction} className="space-y-6">
 
       {post && <input type="hidden" name="id" value={post.id} />}
 
@@ -232,7 +241,7 @@ export default function PostForm({ action, post, categories }: Props) {
           {/* Screenshot */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Bukti Screenshot {!hasScreenshot && <span className="text-red-500">*</span>}
+              Bukti Screenshot {!hasScreenshot && !hasExistingScreenshot && <span className="text-red-500">*</span>}
 
               {post?.thumbnail && (
                 <span className="ml-2 text-xs text-neutral-400">
@@ -243,8 +252,11 @@ export default function PostForm({ action, post, categories }: Props) {
 
             <ImageUpload
               currentUrl={post?.thumbnail?.url ?? null}
-              error={screenshotError}
+              error={screenshotFieldError}
+              maxFileSizeBytes={maxUploadFileSizeBytes}
+              maxFileSizeLabel={formatUploadFileSize(maxUploadFileSizeBytes)}
               onFileChange={setHasScreenshot}
+              onValidationChange={setScreenshotClientError}
             />
           </div>
         </div>
@@ -260,8 +272,9 @@ export default function PostForm({ action, post, categories }: Props) {
                 pending ||
                 !title ||
                 !categoryId ||
-                !hasScreenshot ||
-                !!urlClientError
+                !(hasScreenshot || hasExistingScreenshot) ||
+                !!urlClientError ||
+                (!!screenshotClientError && !hasExistingScreenshot)
               }
               className="w-full py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >

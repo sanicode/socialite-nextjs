@@ -26,6 +26,9 @@ function getImageRemotePatterns(): NonNullable<NextConfig['images']>['remotePatt
 const nextConfig: NextConfig = {
   experimental: {
     authInterrupts: true,
+    serverActions: {
+      bodySizeLimit: '25mb',
+    },
   },
   images: {
     remotePatterns: getImageRemotePatterns(),

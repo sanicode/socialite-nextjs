@@ -6,10 +6,20 @@ import Image from 'next/image'
 type Props = {
   currentUrl?: string | null
   error?: string
+  maxFileSizeBytes: number
+  maxFileSizeLabel: string
   onFileChange?: (hasFile: boolean) => void
+  onValidationChange?: (message: string | null) => void
 }
 
-export default function ImageUpload({ currentUrl, error, onFileChange }: Props) {
+export default function ImageUpload({
+  currentUrl,
+  error,
+  maxFileSizeBytes,
+  maxFileSizeLabel,
+  onFileChange,
+  onValidationChange,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(currentUrl ?? null)
   const [isExisting, setIsExisting] = useState<boolean>(!!currentUrl)
@@ -17,10 +27,24 @@ export default function ImageUpload({ currentUrl, error, onFileChange }: Props) 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    const hasUsableScreenshot = Boolean(preview)
+
+    if (file.size > maxFileSizeBytes) {
+      if (inputRef.current) inputRef.current.value = ''
+      onValidationChange?.(
+        hasUsableScreenshot
+          ? `Ukuran file terlalu besar (maks ${maxFileSizeLabel}). Screenshot lama tetap digunakan.`
+          : `Ukuran file terlalu besar (maks ${maxFileSizeLabel}). Pilih file yang lebih kecil.`
+      )
+      onFileChange?.(hasUsableScreenshot)
+      return
+    }
+
     // Revoke previous object URL to avoid memory leaks
     if (preview && !isExisting) URL.revokeObjectURL(preview)
     setPreview(URL.createObjectURL(file))
     setIsExisting(false)
+    onValidationChange?.(null)
     onFileChange?.(true)
   }
 
@@ -29,6 +53,7 @@ export default function ImageUpload({ currentUrl, error, onFileChange }: Props) 
     setPreview(null)
     setIsExisting(false)
     if (inputRef.current) inputRef.current.value = ''
+    onValidationChange?.(null)
     onFileChange?.(false)
   }
 
@@ -68,7 +93,7 @@ export default function ImageUpload({ currentUrl, error, onFileChange }: Props) 
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span className="text-sm font-medium">Klik untuk pilih gambar</span>
-          <span className="text-xs">JPG, PNG, GIF, WebP — maks 1MB</span>
+          <span className="text-xs">JPG, PNG, GIF, WebP — maks {maxFileSizeLabel}</span>
         </button>
       )}
 

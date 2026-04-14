@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getCategories } from '@/app/actions/posts'
 import { createPost } from '@/app/actions/posts'
 import PostForm from '@/app/components/posts/PostForm'
+import { getSecuritySettings } from '@/app/lib/request-security'
 import { getSessionUser } from '@/app/lib/session'
 
 export default async function NewPostPage() {
@@ -12,7 +13,10 @@ export default async function NewPostPage() {
   const isManager = user.roles.includes('manager')
   if (isManager && !isAdmin) redirect('/posts')
 
-  const categories = await getCategories()
+  const [categories, securitySettings] = await Promise.all([
+    getCategories(),
+    getSecuritySettings(),
+  ])
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -32,7 +36,11 @@ export default async function NewPostPage() {
         </div>
 
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-6">
-          <PostForm action={createPost} categories={categories} />
+          <PostForm
+            action={createPost}
+            categories={categories}
+            maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+          />
         </div>
       </div>
     </div>

@@ -12,32 +12,36 @@ function formatCountdown(seconds: number): string {
   return `${s} detik`
 }
 
-function LoginForm() {
-  const [state, action, pending] = useActionState(login, undefined)
+function LoginFormBody({
+  state,
+  action,
+  pending,
+}: {
+  state: Awaited<ReturnType<typeof login>>
+  action: (formData: FormData) => void
+  pending: boolean
+}) {
   const { showToast } = useToast()
-  const [countdown, setCountdown] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState<number | null>(state?.retryAfter ?? null)
 
   useEffect(() => {
-    if (state?.retryAfter) {
-      setCountdown(state.retryAfter)
-    }
-  }, [state])
+    if (countdown === null || countdown <= 0) return
+    const timer = window.setInterval(() => {
+      setCountdown((current) => {
+        if (current === null) return null
+        if (current <= 1) return 0
+        return current - 1
+      })
+    }, 1000)
 
-  useEffect(() => {
-    if (!countdown) return
-    if (countdown <= 0) {
-      setCountdown(null)
-      return
-    }
-    const timer = setTimeout(() => setCountdown((c) => (c !== null ? c - 1 : null)), 1000)
-    return () => clearTimeout(timer)
+    return () => window.clearInterval(timer)
   }, [countdown])
 
   useEffect(() => {
     if (state?.message && !state.retryAfter) showToast('error', 'Login Gagal', state.message)
     if (state?.errors?.email) showToast('error', 'Email tidak valid', state.errors.email[0])
     if (state?.errors?.password) showToast('error', 'Password tidak valid', state.errors.password[0])
-  }, [state, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state, showToast])
 
   const isLocked = countdown !== null && countdown > 0
 
@@ -136,6 +140,11 @@ function LoginForm() {
       </div>
     </div>
   )
+}
+
+function LoginForm() {
+  const [state, action, pending] = useActionState(login, undefined)
+  return <LoginFormBody key={state?.retryAfter ?? 'none'} state={state} action={action} pending={pending} />
 }
 
 export default function LoginPageClient() {

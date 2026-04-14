@@ -6,6 +6,10 @@ import {
   type SecuritySettingsState,
 } from '@/app/actions/security'
 import { useToast } from '@/app/components/ToastContext'
+import {
+  UPLOAD_FILE_SIZE_OPTIONS,
+  formatUploadFileSize,
+} from '@/app/lib/upload-size'
 
 type Props = {
   initialState: NonNullable<SecuritySettingsState>
@@ -35,6 +39,9 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
   const [blockedIpsText, setBlockedIpsText] = useState(initialState.settings.blockedIpsText)
   const [allowedCountriesText, setAllowedCountriesText] = useState(initialState.settings.allowedCountriesText)
   const [allowUnknownCountries, setAllowUnknownCountries] = useState(initialState.settings.allowUnknownCountries)
+  const [maxUploadedFileSizeBytes, setMaxUploadedFileSizeBytes] = useState(
+    initialState.settings.maxUploadedFileSizeBytes
+  )
 
   useEffect(() => {
     if (!state) return
@@ -92,6 +99,28 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
       </div>
 
       <div className="space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+            Maximum uploaded file size
+          </label>
+          <select
+            name="maxUploadedFileSizeBytes"
+            value={maxUploadedFileSizeBytes}
+            onChange={(event) => setMaxUploadedFileSizeBytes(Number(event.target.value))}
+            disabled={pending}
+            className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-3 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:focus:ring-white"
+          >
+            {UPLOAD_FILE_SIZE_OPTIONS.map((option) => (
+              <option key={option.bytes} value={option.bytes}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            Batas maksimal upload pada Post. Saat ini: {formatUploadFileSize(maxUploadedFileSizeBytes)}.
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
             Blokir IP

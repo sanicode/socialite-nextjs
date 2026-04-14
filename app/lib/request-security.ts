@@ -2,6 +2,10 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getJsonConfig } from '@/app/lib/configs'
 import { writeAccessLog } from '@/app/lib/access-logs'
+import {
+  DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
+  normalizeUploadFileSizeBytes,
+} from '@/app/lib/upload-size'
 
 const SECURITY_CONFIG_KEY = 'app_security_policy'
 
@@ -9,6 +13,7 @@ export type SecuritySettings = {
   blockedIps: string[]
   allowedCountries: string[]
   allowUnknownCountries: boolean
+  maxUploadedFileSizeBytes: number
 }
 
 export type RequestSecurityContext = {
@@ -26,6 +31,7 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   blockedIps: [],
   allowedCountries: [],
   allowUnknownCountries: true,
+  maxUploadedFileSizeBytes: DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
 }
 
 function normalizeIp(ip: string): string {
@@ -41,6 +47,7 @@ export function normalizeSecuritySettings(input: Partial<SecuritySettings>): Sec
     blockedIps: Array.from(new Set((input.blockedIps ?? []).map(normalizeIp).filter(Boolean))),
     allowedCountries: Array.from(new Set((input.allowedCountries ?? []).map(normalizeCountry).filter(Boolean))),
     allowUnknownCountries: input.allowUnknownCountries ?? true,
+    maxUploadedFileSizeBytes: normalizeUploadFileSizeBytes(input.maxUploadedFileSizeBytes),
   }
 }
 

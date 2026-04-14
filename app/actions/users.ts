@@ -134,6 +134,19 @@ export async function bulkToggleBlock(userIds: string[], block: boolean): Promis
   return { count: result.count }
 }
 
+export async function bulkResetRateLimit(emails: string[]): Promise<{ count: number }> {
+  const admin = await requireAdmin()
+
+  await prisma.$executeRaw`
+    DELETE FROM login_attempts
+    WHERE email = ANY(${emails}::text[])
+  `
+
+  logEvent('warn', 'user.bulk_rate_limit_reset', { adminId: admin.id, count: emails.length, emails })
+  revalidatePath('/settings/users')
+  return { count: emails.length }
+}
+
 export async function resetUserRateLimit(email: string): Promise<void> {
   const admin = await requireAdmin()
 

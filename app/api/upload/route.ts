@@ -5,9 +5,10 @@ import { prisma } from '@/app/lib/prisma'
 import { requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
 import { writeAccessLog } from '@/app/lib/access-logs'
+import { getSecuritySettings } from '@/app/lib/request-security'
+import { formatUploadFileSize } from '@/app/lib/upload-size'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-const MAX_SIZE = 1 * 1024 * 1024 // 1MB
 const COLLECTION_NAME = 'blog-images'
 
 export async function POST(request: NextRequest) {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     const user = await requireUser()
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const { maxUploadedFileSizeBytes } = await getSecuritySettings()
 
     if (!file) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
@@ -27,9 +29,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (file.size > MAX_SIZE) {
+    if (file.size > maxUploadedFileSizeBytes) {
       return NextResponse.json(
-        { error: 'Ukuran file terlalu besar (maks 1MB)' },
+        { error: `Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).` },
         { status: 400 }
       )
     }
