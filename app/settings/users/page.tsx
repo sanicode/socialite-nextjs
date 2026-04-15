@@ -8,6 +8,7 @@ type SearchParams = Promise<{
   page?: string
   search?: string
   status?: string
+  loginSecurity?: string
   dateFrom?: string
   dateTo?: string
   sortBy?: string
@@ -33,11 +34,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
   const params = await searchParams
   const page   = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
 
-  const { users, total, totalBlocked, totalUnderAttack } = await getUsers({
+  const { users, total, totalBlocked, totalUnderAttack, totalRateLimited } = await getUsers({
     page,
     pageSize: PAGE_SIZE,
     search:   params.search,
     status:   params.status,
+    loginSecurity: params.loginSecurity,
     dateFrom: params.dateFrom,
     dateTo:   params.dateTo,
     sortBy:   params.sortBy,
@@ -59,13 +61,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
         </div>
 
         {/* Filter */}
-        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
+        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4 dark:border-neutral-800 dark:bg-neutral-900">
           <input
             type="search"
             name="search"
             defaultValue={params.search ?? ''}
             placeholder="Cari nama atau email..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white sm:col-span-2"
+            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white sm:col-span-2 xl:col-span-2"
           />
           <select
             name="status"
@@ -76,7 +78,17 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
             <option value="active">Aktif</option>
             <option value="blocked">Diblokir</option>
           </select>
-          <div className="flex items-center gap-2 sm:col-span-3">
+          <select
+            name="loginSecurity"
+            defaultValue={params.loginSecurity ?? ''}
+            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+          >
+            <option value="">Semua kondisi login</option>
+            <option value="has_attempts">Ada login attempts</option>
+            <option value="under_attack">Sedang diserang ({'>'}10/jam)</option>
+            <option value="rate_limited">Sedang kena rate limit</option>
+          </select>
+          <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-4">
             <span className="min-w-[7.5rem] text-xs font-medium text-neutral-500 dark:text-neutral-400">
               Terakhir Aktif
             </span>
@@ -94,7 +106,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
               className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
             />
           </div>
-          <div className="flex items-center gap-3 sm:col-span-3">
+          <div className="flex items-center gap-3 sm:col-span-2 xl:col-span-4">
             <button
               type="submit"
               className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
@@ -114,6 +126,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
           users={users}
           totalBlocked={totalBlocked}
           totalUnderAttack={totalUnderAttack}
+          totalRateLimited={totalRateLimited}
           sortBy={params.sortBy ?? 'name'}
           sortDir={(params.sortDir === 'desc' ? 'desc' : 'asc')}
           searchParams={params}

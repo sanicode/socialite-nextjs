@@ -16,16 +16,17 @@ export default function UsersLoading() {
         </div>
 
         {/* Filter */}
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <Skeleton className="h-10 rounded-lg sm:col-span-2" />
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <Skeleton className="h-10 rounded-lg sm:col-span-2 xl:col-span-2" />
           <Skeleton className="h-10 rounded-lg" />
-          <div className="flex items-center gap-2 sm:col-span-3">
+          <Skeleton className="h-10 rounded-lg" />
+          <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-4">
             <Skeleton className="h-3 w-28 rounded" />
             <Skeleton className="h-10 flex-1 rounded-lg" />
             <Skeleton className="h-3 w-3 rounded" />
             <Skeleton className="h-10 flex-1 rounded-lg" />
           </div>
-          <div className="flex gap-3 sm:col-span-3">
+          <div className="flex gap-3 sm:col-span-2 xl:col-span-4">
             <Skeleton className="h-10 w-20 rounded-lg" />
             <Skeleton className="h-10 w-20 rounded-lg" />
           </div>

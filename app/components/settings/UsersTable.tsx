@@ -9,6 +9,7 @@ type Props = {
   users: UserRow[]
   totalBlocked: number
   totalUnderAttack: number
+  totalRateLimited: number
   sortBy: string
   sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
@@ -64,7 +65,7 @@ type ConfirmState =
   | { type: 'bulkReset'; emails: string[] }
   | null
 
-export default function UsersTable({ users, totalBlocked, totalUnderAttack, sortBy, sortDir, searchParams }: Props) {
+export default function UsersTable({ users, totalBlocked, totalUnderAttack, totalRateLimited, sortBy, sortDir, searchParams }: Props) {
   const [pending, startTransition] = useTransition()
   const { showToast } = useToast()
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -151,6 +152,20 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, sort
           </span>
           <p className="text-sm text-red-800 dark:text-red-300">
             <span className="font-semibold">{totalUnderAttack.toLocaleString('id-ID')} akun</span> sedang diserang — terdeteksi lebih dari 10 percobaan login gagal dalam 1 jam terakhir.
+          </p>
+        </div>
+      )}
+
+      {/* Alert: rate-limited accounts */}
+      {totalRateLimited > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/30">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </span>
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <span className="font-semibold">{totalRateLimited.toLocaleString('id-ID')} akun</span> saat ini terdeteksi sedang terkena rate limit login.
           </p>
         </div>
       )}
@@ -281,6 +296,14 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, sort
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-neutral-600 dark:text-neutral-400">{u.email}</span>
+                      {u.is_rate_limited && (
+                        <span
+                          title="Akun ini memenuhi ambang rate limit email Tier 3 dalam 1 jam terakhir"
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+                        >
+                          Rate Limited
+                        </span>
+                      )}
                       {underAttack && (
                         <span
                           title={`${u.active_failed_attempts} percobaan gagal dalam 1 jam terakhir`}
