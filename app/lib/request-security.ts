@@ -16,6 +16,10 @@ export type SecuritySettings = {
   maxUploadedFileSizeBytes: number
 }
 
+export type SecuritySettingsInput = Partial<Omit<SecuritySettings, 'maxUploadedFileSizeBytes'>> & {
+  maxUploadedFileSizeBytes?: unknown
+}
+
 export type RequestSecurityContext = {
   ip: string | null
   country: string | null
@@ -42,7 +46,7 @@ function normalizeCountry(country: string): string {
   return country.trim().toUpperCase()
 }
 
-export function normalizeSecuritySettings(input: Partial<SecuritySettings>): SecuritySettings {
+export function normalizeSecuritySettings(input: SecuritySettingsInput): SecuritySettings {
   return {
     blockedIps: Array.from(new Set((input.blockedIps ?? []).map(normalizeIp).filter(Boolean))),
     allowedCountries: Array.from(new Set((input.allowedCountries ?? []).map(normalizeCountry).filter(Boolean))),
