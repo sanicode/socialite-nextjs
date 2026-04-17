@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useToast } from '@/app/components/ToastContext'
 import {
@@ -21,7 +22,46 @@ import {
 type Props = {
   tenants: TenantRow[]
   provinces: { id: number; name: string }[]
+  sortBy: string
+  sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
+}
+
+// ── Sort helpers ──────────────────────────────────────────────────────────────
+
+function buildSortHref(
+  searchParams: Record<string, string | undefined>,
+  col: string,
+  currentSortBy: string,
+  currentSortDir: 'asc' | 'desc'
+): string {
+  const nextDir = currentSortBy === col && currentSortDir === 'asc' ? 'desc' : 'asc'
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value && key !== 'sortBy' && key !== 'sortDir' && key !== 'page') query.set(key, value)
+  }
+  query.set('sortBy', col)
+  query.set('sortDir', nextDir)
+  return `/settings/tenants?${query.toString()}`
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
+  return (
+    <span className="ml-1 inline-flex flex-col">
+      <svg
+        className={`-mb-0.5 h-2.5 w-2.5 ${active && dir === 'asc' ? 'text-neutral-900 dark:text-white' : 'text-neutral-300 dark:text-neutral-600'}`}
+        viewBox="0 0 10 6" fill="currentColor"
+      >
+        <path d="M5 0L10 6H0z" />
+      </svg>
+      <svg
+        className={`h-2.5 w-2.5 ${active && dir === 'desc' ? 'text-neutral-900 dark:text-white' : 'text-neutral-300 dark:text-neutral-600'}`}
+        viewBox="0 0 10 6" fill="currentColor"
+      >
+        <path d="M5 6L0 0h10z" />
+      </svg>
+    </span>
+  )
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -328,17 +368,36 @@ function ManageUsersPanel({
   tenant,
   users,
   onUsersChange,
+  roleFilter,
 }: {
   tenant: TenantRow
   users: TenantUserRow[]
   onUsersChange: () => void
+  roleFilter?: 'manager' | 'operator'
 }) {
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null)
-  const [newRole, setNewRole] = useState<'manager' | 'operator'>('operator')
+  const [newRole, setNewRole] = useState<'manager' | 'operator'>(roleFilter ?? 'operator')
   const [detachTarget, setDetachTarget] = useState<TenantUserRow | null>(null)
   const detachDialogRef = useRef<HTMLDialogElement>(null)
+
+  // Local copy — updated optimistically on role change, synced from prop on attach/detach
+  const [localUsers, setLocalUsers] = useState<TenantUserRow[]>(users)
+  useEffect(() => { setLocalUsers(users) }, [users])
+
+  const [search, setSearch] = useState('')
+
+  const baseUsers = roleFilter ? localUsers.filter((u) => u.role === roleFilter) : localUsers
+  const displayedUsers = search.trim()
+    ? baseUsers.filter(
+        (u) =>
+          u.name.toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()) ||
+          (u.role ?? '').toLowerCase().includes(search.toLowerCase())
+      )
+    : baseUsers
+  const roleLabel = roleFilter === 'manager' ? 'Manager' : roleFilter === 'operator' ? 'Operator' : 'User'
 
   function openDetach(u: TenantUserRow) {
     setDetachTarget(u)
@@ -361,10 +420,11 @@ function ManageUsersPanel({
 
   function handleAttach() {
     if (!selectedUser) return
+    const role = roleFilter ?? newRole
     startTransition(async () => {
       try {
-        await attachTenantUser(tenant.id, selectedUser.id, newRole)
-        showToast('success', 'User Ditambahkan', `${selectedUser.name} berhasil ditambahkan sebagai ${newRole}.`)
+        await attachTenantUser(tenant.id, selectedUser.id, role)
+        showToast('success', 'User Ditambahkan', `${selectedUser.name} berhasil ditambahkan sebagai ${role}.`)
         setSelectedUser(null)
         onUsersChange()
       } catch (e) {
@@ -374,12 +434,15 @@ function ManageUsersPanel({
   }
 
   function handleRoleChange(tu: TenantUserRow, role: 'manager' | 'operator') {
+    // Optimistic update — update local state immediately, revert on error
+    const prev = localUsers
+    setLocalUsers((cur) => cur.map((u) => u.tenant_user_id === tu.tenant_user_id ? { ...u, role } : u))
     startTransition(async () => {
       try {
         await updateTenantUserRole(tu.tenant_user_id, role)
         showToast('success', 'Role Diubah', `Role ${tu.name} diubah menjadi ${role}.`)
-        onUsersChange()
       } catch (e) {
+        setLocalUsers(prev) // revert on failure
         showToast('error', 'Gagal', (e as Error).message)
       }
     })
@@ -387,60 +450,13 @@ function ManageUsersPanel({
 
   return (
     <div className="space-y-5">
-      {/* User list */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
-          User Terdaftar ({users.length})
+      {/* ── Add user (top) ── */}
+      <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          Tambah {roleLabel}
         </p>
-        {users.length === 0 ? (
-          <p className="text-sm text-neutral-400 dark:text-neutral-500 py-4 text-center">
-            Belum ada user di tenant ini.
-          </p>
-        ) : (
-          <div className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
-            {users.map((u) => (
-              <div key={u.tenant_user_id} className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-neutral-900 truncate dark:text-white">{u.name}</p>
-                  <p className="text-xs text-neutral-500 truncate dark:text-neutral-400">{u.email}</p>
-                </div>
-                {/* Role select */}
-                <select
-                  value={u.role ?? ''}
-                  disabled={pending}
-                  onChange={(e) => handleRoleChange(u, e.target.value as 'manager' | 'operator')}
-                  className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-                >
-                  <option value="">— role —</option>
-                  <option value="manager">Manager</option>
-                  <option value="operator">Operator</option>
-                </select>
-                {/* Detach */}
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => openDetach(u)}
-                  className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-                >
-                  Lepas
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Tambah User</span>
-        <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
-      </div>
-
-      {/* Add user */}
-      <div className="space-y-3">
         {selectedUser ? (
-          <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-800">
+          <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-neutral-900 dark:text-white">{selectedUser.name}</p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">{selectedUser.email}</p>
@@ -460,28 +476,96 @@ function ManageUsersPanel({
         )}
 
         <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <Label>Role</Label>
-            <select
-              className={selectCls()}
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as 'manager' | 'operator')}
-            >
-              <option value="operator">Operator</option>
-              <option value="manager">Manager</option>
-            </select>
-          </div>
-          <div className="pt-5">
+          {!roleFilter && (
+            <div className="flex-1">
+              <Label>Role</Label>
+              <select
+                className={selectCls()}
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value as 'manager' | 'operator')}
+              >
+                <option value="operator">Operator</option>
+                <option value="manager">Manager</option>
+              </select>
+            </div>
+          )}
+          <div className={roleFilter ? 'w-full' : 'pt-5'}>
             <button
               type="button"
               disabled={!selectedUser || pending}
               onClick={handleAttach}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              className="w-full rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
             >
-              {pending ? 'Memproses...' : 'Tambah'}
+              {pending ? 'Memproses...' : `Tambah sebagai ${roleLabel}`}
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ── User list ── */}
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            {roleLabel} Terdaftar ({baseUsers.length})
+          </p>
+          {baseUsers.length > 0 && (
+            <div className="relative">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama, email, role..."
+                className="rounded-lg border border-neutral-300 bg-white py-1.5 pl-3 pr-8 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {baseUsers.length === 0 ? (
+          <p className="py-4 text-center text-sm text-neutral-400 dark:text-neutral-500">
+            Belum ada {roleLabel.toLowerCase()} di tenant ini.
+          </p>
+        ) : displayedUsers.length === 0 ? (
+          <p className="py-4 text-center text-sm text-neutral-400 dark:text-neutral-500">
+            Tidak ada hasil untuk &quot;{search}&quot;.
+          </p>
+        ) : (
+          <div className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+            {displayedUsers.map((u) => (
+              <div key={u.tenant_user_id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-neutral-900 dark:text-white">{u.name}</p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{u.email}</p>
+                </div>
+                {/* Role select */}
+                {!roleFilter && (
+                  <select
+                    value={u.role ?? ''}
+                    disabled={pending}
+                    onChange={(e) => handleRoleChange(u, e.target.value as 'manager' | 'operator')}
+                    className="rounded-lg border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+                  >
+                    <option value="">— role —</option>
+                    <option value="manager">Manager</option>
+                    <option value="operator">Operator</option>
+                  </select>
+                )}
+                {/* Detach */}
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => openDetach(u)}
+                  className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+                >
+                  Lepas
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Detach confirmation dialog (nested) */}
@@ -521,7 +605,7 @@ function ManageUsersPanel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function TenantsTable({ tenants, provinces }: Props) {
+export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams }: Props) {
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
 
@@ -572,9 +656,11 @@ export default function TenantsTable({ tenants, provinces }: Props) {
   const [usersTenant, setUsersTenant] = useState<TenantRow | null>(null)
   const [tenantUsers, setTenantUsers] = useState<TenantUserRow[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [filterRole, setFilterRole] = useState<'manager' | 'operator' | null>(null)
 
-  function openUsers(tenant: TenantRow) {
+  function openUsers(tenant: TenantRow, role: 'manager' | 'operator' | null = null) {
     setUsersTenant(tenant)
+    setFilterRole(role)
     loadUsers(tenant.id)
     usersDialogRef.current?.showModal()
   }
@@ -618,14 +704,31 @@ export default function TenantsTable({ tenants, provinces }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800">
-              {['Nama', 'Domain', 'Kota', 'Manager', 'Operator', 'Aksi'].map((h) => (
-                <th
-                  key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400"
-                >
-                  {h}
+              {/* Sortable columns */}
+              {([
+                { label: 'Nama',     col: 'name'           },
+                { label: 'Domain',   col: null              },
+                { label: 'Kota',     col: 'city'           },
+                { label: 'Manager',  col: 'manager_count'  },
+                { label: 'Operator', col: 'operator_count' },
+              ] as const).map(({ label, col }) => (
+                <th key={label} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  {col ? (
+                    <Link
+                      href={buildSortHref(searchParams, col, sortBy, sortDir)}
+                      className="inline-flex items-center hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      {label}
+                      <SortIcon active={sortBy === col} dir={sortDir} />
+                    </Link>
+                  ) : (
+                    label
+                  )}
                 </th>
               ))}
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                Aksi
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -644,22 +747,30 @@ export default function TenantsTable({ tenants, provinces }: Props) {
                     {t.city ?? <span className="text-neutral-300 dark:text-neutral-600">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      t.manager_count > 0
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400'
-                        : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500'
-                    }`}>
+                    <button
+                      type="button"
+                      onClick={() => openUsers(t, 'manager')}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer ${
+                        t.manager_count > 0
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:hover:bg-blue-900/70'
+                          : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700'
+                      }`}
+                    >
                       {t.manager_count}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      t.operator_count > 0
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                        : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500'
-                    }`}>
+                    <button
+                      type="button"
+                      onClick={() => openUsers(t, 'operator')}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer ${
+                        t.operator_count > 0
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:hover:bg-emerald-900/70'
+                          : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700'
+                      }`}
+                    >
                       {t.operator_count}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -753,7 +864,9 @@ export default function TenantsTable({ tenants, provinces }: Props) {
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Kelola User</h2>
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+              {filterRole === 'manager' ? 'Kelola Manager' : filterRole === 'operator' ? 'Kelola Operator' : 'Kelola User'}
+            </h2>
             {usersTenant && (
               <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{usersTenant.name}</p>
             )}
@@ -780,6 +893,7 @@ export default function TenantsTable({ tenants, provinces }: Props) {
             tenant={usersTenant}
             users={tenantUsers}
             onUsersChange={() => loadUsers(usersTenant.id)}
+            roleFilter={filterRole ?? undefined}
           />
         )}
       </dialog>

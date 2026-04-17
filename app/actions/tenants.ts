@@ -12,7 +12,7 @@ export type TenantRow = {
   id: string
   name: string
   domain: string | null
-  city: string | null
+  city: string | null        // city name from reg_cities
   manager_count: number
   operator_count: number
 }
@@ -52,7 +52,9 @@ export async function getTenants(params: {
   page?: number
   pageSize?: number
   search?: string
-  city?: string
+  cityId?: string
+  sortBy?: string
+  sortDir?: string
 } = {}): Promise<{ tenants: TenantRow[]; total: number }> {
   await requireAdmin()
 
@@ -60,7 +62,7 @@ export async function getTenants(params: {
   const pageSize = params.pageSize ?? 20
   const offset   = (page - 1) * pageSize
 
-  // Build WHERE conditions (applied to the outer tenants query)
+  // ── WHERE ────────────────────────────────────────────────────────────────────
   const conditions: string[] = []
   const qParams: unknown[]   = []
   let idx = 1
@@ -70,32 +72,40 @@ export async function getTenants(params: {
     qParams.push(`%${params.search}%`)
     idx++
   }
-  if (params.city) {
-    // Filter via EXISTS on addresses so it doesn't interfere with the COUNT subqueries
+  if (params.cityId) {
     conditions.push(
-      `EXISTS (SELECT 1 FROM addresses WHERE tenant_id = t.id AND city ILIKE $${idx} LIMIT 1)`
+      `EXISTS (SELECT 1 FROM addresses WHERE tenant_id = t.id AND city_id = $${idx} LIMIT 1)`
     )
-    qParams.push(`%${params.city}%`)
+    qParams.push(parseInt(params.cityId, 10))
     idx++
   }
 
   const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
 
-  // role_count_subquery: counts distinct tenant_users who hold a given role.
-  // Handles BOTH Spatie assignment patterns:
-  //   1. model_type = 'App\Models\TenantUser', model_id = tenant_user.id
-  //   2. model_type = 'App\Models\User',       model_id = user.id
+  // ── ORDER BY ─────────────────────────────────────────────────────────────────
+  const dir = params.sortDir === 'desc' ? 'DESC' : 'ASC'
+  const orderBy = (() => {
+    switch (params.sortBy) {
+      case 'city':            return `city ${dir} NULLS LAST`
+      case 'manager_count':   return `manager_count ${dir}`
+      case 'operator_count':  return `operator_count ${dir}`
+      default:                return `t.name ${dir}`   // 'name' or unset
+    }
+  })()
+
+  // ── Correlated subqueries for role counts ─────────────────────────────────
+  // Spatie standard: model_type = 'App\Models\TenantUser', model_id = tenant_user.id
   const roleCountSql = (roleName: string) => `
     (SELECT COUNT(DISTINCT tu.id)
      FROM tenant_user tu
-     JOIN users u ON u.id = tu.user_id
      WHERE tu.tenant_id = t.id
        AND EXISTS (
          SELECT 1
          FROM model_has_roles mhr
-         JOIN roles r ON r.id = mhr.role_id AND r.name = '${roleName}'
-         WHERE (mhr.model_type = 'App\\Models\\TenantUser' AND mhr.model_id = tu.id)
-            OR (mhr.model_type = 'App\\Models\\User'       AND mhr.model_id = u.id)
+         JOIN roles r ON r.id = mhr.role_id
+         WHERE r.name = '${roleName}'
+           AND mhr.model_type = 'App\\Models\\TenantUser'
+           AND mhr.model_id = tu.id
        )
     )`
 
@@ -112,12 +122,12 @@ export async function getTenants(params: {
          t.id,
          t.name,
          t.domain,
-         (SELECT city FROM addresses WHERE tenant_id = t.id ORDER BY id LIMIT 1) AS city,
+         (SELECT rc.name FROM addresses a2 JOIN reg_cities rc ON rc.id = a2.city_id WHERE a2.tenant_id = t.id ORDER BY a2.id LIMIT 1) AS city,
          ${roleCountSql('manager')}  AS manager_count,
          ${roleCountSql('operator')} AS operator_count
        FROM tenants t
        ${where}
-       ORDER BY t.name ASC
+       ORDER BY ${orderBy}
        LIMIT $${idx} OFFSET $${idx + 1}`,
       ...qParams,
       pageSize,
@@ -176,10 +186,7 @@ export async function getTenantDetail(tenantId: string): Promise<TenantDetail | 
 export async function getTenantUsers(tenantId: string): Promise<TenantUserRow[]> {
   await requireAdmin()
 
-  // Role is resolved from model_has_roles using both Spatie assignment patterns:
-  //   • App\Models\TenantUser (preferred — tenant-scoped role)
-  //   • App\Models\User       (fallback — user-level role)
-  // The correlated subquery picks the first match, preferring TenantUser pattern.
+  // Spatie standard: model_type = 'App\Models\TenantUser', model_id = tenant_user.id
   const rows = await prisma.$queryRawUnsafe<{
     tenant_user_id: bigint
     user_id: bigint
@@ -196,12 +203,8 @@ export async function getTenantUsers(tenantId: string): Promise<TenantUserRow[]>
          SELECT r.name
          FROM model_has_roles mhr
          JOIN roles r ON r.id = mhr.role_id
-         WHERE (mhr.model_type = 'App\\Models\\TenantUser' AND mhr.model_id = tu.id)
-            OR (mhr.model_type = 'App\\Models\\User'       AND mhr.model_id = u.id)
-         ORDER BY CASE mhr.model_type
-           WHEN 'App\\Models\\TenantUser' THEN 0
-           ELSE 1
-         END
+         WHERE mhr.model_type = 'App\\Models\\TenantUser'
+           AND mhr.model_id = tu.id
          LIMIT 1
        ) AS role
      FROM tenant_user tu
@@ -233,10 +236,28 @@ export async function searchUsersForTenant(
     `SELECT u.id, u.name, u.email
      FROM users u
      WHERE (u.name ILIKE $1 OR u.email ILIKE $1)
+       AND u.is_blocked = false
+       -- Belum terdaftar di tenant ini
        AND u.id NOT IN (
          SELECT user_id FROM tenant_user WHERE tenant_id = $2
        )
-       AND u.is_blocked = false
+       -- Belum memiliki role (Spatie standard: model_id = tu.id)
+       AND NOT EXISTS (
+         SELECT 1
+         FROM model_has_roles mhr
+         JOIN roles r ON r.id = mhr.role_id AND r.name IN ('manager', 'operator')
+         JOIN tenant_user tu ON tu.id = mhr.model_id
+         WHERE mhr.model_type = 'App\\Models\\TenantUser'
+           AND tu.user_id = u.id
+       )
+       -- Belum memiliki role (legacy: model_id = u.id)
+       AND NOT EXISTS (
+         SELECT 1
+         FROM model_has_roles mhr
+         JOIN roles r ON r.id = mhr.role_id AND r.name IN ('manager', 'operator')
+         WHERE mhr.model_type = 'App\\Models\\TenantUser'
+           AND mhr.model_id = u.id
+       )
      ORDER BY u.name ASC
      LIMIT 10`,
     `%${query.trim()}%`,
@@ -261,6 +282,23 @@ export async function getCitiesForSelect(provinceId: number): Promise<{ id: stri
     orderBy: { name: 'asc' },
   })
   return rows.map((c) => ({ id: c.id.toString(), name: c.name }))
+}
+
+export async function searchRegCities(query: string): Promise<{ id: string; name: string }[]> {
+  await requireAdmin()
+  if (!query || query.trim().length < 1) return []
+  const rows = await prisma.reg_cities.findMany({
+    where: { name: { contains: query.trim(), mode: 'insensitive' } },
+    orderBy: { name: 'asc' },
+    take: 20,
+  })
+  return rows.map((c) => ({ id: c.id.toString(), name: c.name }))
+}
+
+export async function getRegCityById(cityId: string): Promise<string | null> {
+  await requireAdmin()
+  const city = await prisma.reg_cities.findUnique({ where: { id: BigInt(cityId) } })
+  return city?.name ?? null
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────

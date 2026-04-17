@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
-import { getTenants, getProvincesForSelect } from '@/app/actions/tenants'
+import { getTenants, getProvincesForSelect, getRegCityById } from '@/app/actions/tenants'
 import TenantsTable from '@/app/components/settings/TenantsTable'
+import CitySelectFilter from '@/app/components/settings/CitySelectFilter'
 
 type SearchParams = Promise<{
   page?: string
   search?: string
-  city?: string
+  cityId?: string
+  sortBy?: string
+  sortDir?: string
 }>
 
 const PAGE_SIZE = 20
@@ -29,14 +32,20 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
 
-  const [{ tenants, total }, provinces] = await Promise.all([
+  const sortBy  = params.sortBy  ?? 'name'
+  const sortDir = params.sortDir === 'desc' ? 'desc' : 'asc'
+
+  const [{ tenants, total }, provinces, selectedCityName] = await Promise.all([
     getTenants({
       page,
       pageSize: PAGE_SIZE,
       search: params.search,
-      city: params.city,
+      cityId: params.cityId,
+      sortBy,
+      sortDir,
     }),
     getProvincesForSelect(),
+    params.cityId ? getRegCityById(params.cityId) : Promise.resolve(null),
   ])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -62,12 +71,9 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
             placeholder="Cari nama atau domain..."
             className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
           />
-          <input
-            type="search"
-            name="city"
-            defaultValue={params.city ?? ''}
-            placeholder="Cari kota..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+          <CitySelectFilter
+            defaultCityId={params.cityId}
+            defaultCityName={selectedCityName ?? undefined}
           />
           <div className="flex items-center gap-3 sm:col-span-2">
             <button
@@ -88,6 +94,8 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
         <TenantsTable
           tenants={tenants}
           provinces={provinces}
+          sortBy={sortBy}
+          sortDir={sortDir}
           searchParams={params}
         />
 
