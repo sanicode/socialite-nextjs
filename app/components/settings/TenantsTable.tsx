@@ -608,6 +608,7 @@ function ManageUsersPanel({
 export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams }: Props) {
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
+  const [localTenants, setLocalTenants] = useState<TenantRow[]>(tenants)
 
   // ── Edit info dialog ──
   const editDialogRef = useRef<HTMLDialogElement>(null)
@@ -668,7 +669,18 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
   function loadUsers(tenantId: string) {
     setLoadingUsers(true)
     getTenantUsers(tenantId)
-      .then(setTenantUsers)
+      .then((users) => {
+        setTenantUsers(users)
+        const managerCount  = users.filter((u) => u.role === 'manager').length
+        const operatorCount = users.filter((u) => u.role === 'operator').length
+        setLocalTenants((prev) =>
+          prev.map((t) =>
+            t.id === tenantId
+              ? { ...t, manager_count: managerCount, operator_count: operatorCount }
+              : t
+          )
+        )
+      })
       .finally(() => setLoadingUsers(false))
   }
 
@@ -732,7 +744,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
             </tr>
           </thead>
           <tbody>
-            {tenants.map((t) => {
+            {localTenants.map((t) => {
               const hasUsers = t.manager_count + t.operator_count > 0
               return (
                 <tr
@@ -806,7 +818,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
               )
             })}
 
-            {tenants.length === 0 && (
+            {localTenants.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400 dark:text-neutral-500">
                   Tidak ada tenant.

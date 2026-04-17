@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import UserMenu from './UserMenu'
+import ThemeToggle from './ThemeToggle'
 import { ToastProvider } from './ToastContext'
 import ToastContainer from './ToastContainer'
 
@@ -11,10 +12,11 @@ type Props = {
   appName: string
   showDashboard: boolean
   showSettings: boolean
+  showOperators: boolean
   children: React.ReactNode
 }
 
-export default function ShellClient({ user, appName, showDashboard, showSettings, children }: Props) {
+export default function ShellClient({ user, appName, showDashboard, showSettings, showOperators, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -22,7 +24,7 @@ export default function ShellClient({ user, appName, showDashboard, showSettings
     <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -51,6 +53,9 @@ export default function ShellClient({ user, appName, showDashboard, showSettings
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Theme toggle */}
+          <ThemeToggle />
 
           {/* User menu */}
           <UserMenu name={user.name} email={user.email} role={user.role} tenantName={user.tenantName} />

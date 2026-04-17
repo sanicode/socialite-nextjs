@@ -46,6 +46,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   const appName = process.env.APP_NAME ?? 'Admin Panel'
   const showDashboard = user.isAdmin || user.isManager
+  const showOperators = user.isManager
 
   const requestMetadata = await getRequestMetadata()
   await writeAccessLog({
@@ -57,5 +58,5 @@ export default async function AppShell({ children }: { children: React.ReactNode
     userEmail: user.email,
   })
 
-  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin}>{children}</ShellClient>
+  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators}>{children}</ShellClient>
 }

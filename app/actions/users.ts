@@ -5,13 +5,24 @@ import { requireAdmin } from '@/app/lib/authorization'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { Prisma } from '@/app/generated/prisma/client'
+import bcrypt from 'bcryptjs'
+
+const MODEL_TYPE_USER = 'App\\Models\\User'
+
+export type RoleOption = {
+  id: string
+  name: string
+}
 
 export type UserRow = {
   id: string
   name: string
   email: string
+  phone_number: string | null
   is_blocked: boolean
   is_admin: boolean
+  direct_role_id: string | null
+  direct_role_name: string | null
   last_seen_at: string | null
   active_failed_attempts: number
   is_under_attack: boolean
@@ -163,7 +174,7 @@ export async function getUsers(params: {
   const [users, total, totalBlocked] = await Promise.all([
     prisma.users.findMany({
       where,
-      select: { id: true, name: true, email: true, is_blocked: true, is_admin: true, last_seen_at: true },
+      select: { id: true, name: true, email: true, phone_number: true, is_blocked: true, is_admin: true, last_seen_at: true },
       orderBy,
       take: pageSize,
       skip: offset,
@@ -171,6 +182,14 @@ export async function getUsers(params: {
     prisma.users.count({ where }),
     prisma.users.count({ where: { is_blocked: true } }),
   ])
+
+  const roleAssignments = await prisma.model_has_roles.findMany({
+    where: { model_type: MODEL_TYPE_USER, model_id: { in: users.map((u) => u.id) } },
+    include: { roles: { select: { id: true, name: true } } },
+  })
+  const roleMap = new Map(
+    roleAssignments.map((r) => [r.model_id.toString(), { id: r.role_id.toString(), name: r.roles.name }])
+  )
 
   return {
     total,
@@ -181,8 +200,11 @@ export async function getUsers(params: {
       id: u.id.toString(),
       name: u.name,
       email: u.email,
+      phone_number: u.phone_number ?? null,
       is_blocked: u.is_blocked,
       is_admin: u.is_admin,
+      direct_role_id: roleMap.get(u.id.toString())?.id ?? null,
+      direct_role_name: roleMap.get(u.id.toString())?.name ?? null,
       last_seen_at: u.last_seen_at?.toISOString() ?? null,
       active_failed_attempts: countMap.get(u.email.toLowerCase()) ?? 0,
       is_under_attack: (countMap.get(u.email.toLowerCase()) ?? 0) > 10,
@@ -242,5 +264,109 @@ export async function resetUserRateLimit(email: string): Promise<void> {
   `
 
   logEvent('warn', 'user.rate_limit_reset', { adminId: admin.id, email, emailKey, emailIpKey })
+  revalidatePath('/settings/users')
+}
+
+export async function getRolesForUserForm(): Promise<RoleOption[]> {
+  await requireAdmin()
+  const roles = await prisma.roles.findMany({
+    where: { tenant_id: null },
+    orderBy: { name: 'asc' },
+  })
+  return roles.map((r) => ({ id: r.id.toString(), name: r.name }))
+}
+
+export async function createUser(data: {
+  name: string
+  email: string
+  phone_number: string
+  password?: string
+  role_id?: string
+  is_admin?: boolean
+}): Promise<void> {
+  const admin = await requireAdmin()
+
+  const name  = data.name.trim()
+  const email = data.email.trim().toLowerCase()
+  const phone = data.phone_number.trim()
+  if (!name)  throw new Error('Nama tidak boleh kosong.')
+  if (!email) throw new Error('Email tidak boleh kosong.')
+  if (!phone) throw new Error('Nomor telp tidak boleh kosong.')
+
+  const existing = await prisma.users.findUnique({ where: { email } })
+  if (existing) throw new Error('Email sudah terdaftar.')
+
+  const rawPassword = data.password?.trim() || phone
+  const hashed = await bcrypt.hash(rawPassword, 12)
+
+  const newUser = await prisma.users.create({
+    data: {
+      name,
+      email,
+      password: hashed,
+      phone_number: phone,
+      is_admin: data.is_admin ?? false,
+      is_blocked: false,
+    },
+  })
+
+  if (data.role_id) {
+    await prisma.model_has_roles.create({
+      data: { role_id: BigInt(data.role_id), model_type: MODEL_TYPE_USER, model_id: newUser.id },
+    })
+  }
+
+  logEvent('info', 'user.created', { adminId: admin.id, email })
+  revalidatePath('/settings/users')
+}
+
+export async function updateUser(
+  userId: string,
+  data: {
+    name: string
+    email: string
+    phone_number: string
+    password?: string
+    role_id?: string | null
+    is_admin?: boolean
+  }
+): Promise<void> {
+  const admin = await requireAdmin()
+
+  const name  = data.name.trim()
+  const email = data.email.trim().toLowerCase()
+  const phone = data.phone_number.trim()
+  if (!name)  throw new Error('Nama tidak boleh kosong.')
+  if (!email) throw new Error('Email tidak boleh kosong.')
+  if (!phone) throw new Error('Nomor telp tidak boleh kosong.')
+
+  const duplicate = await prisma.users.findFirst({
+    where: { email, NOT: { id: BigInt(userId) } },
+  })
+  if (duplicate) throw new Error('Email sudah digunakan user lain.')
+
+  const updateData: Prisma.usersUpdateInput = {
+    name,
+    email,
+    phone_number: phone,
+    is_admin: data.is_admin ?? false,
+  }
+
+  if (data.password?.trim()) {
+    updateData.password = await bcrypt.hash(data.password.trim(), 12)
+  }
+
+  await prisma.users.update({ where: { id: BigInt(userId) }, data: updateData })
+
+  await prisma.model_has_roles.deleteMany({
+    where: { model_type: MODEL_TYPE_USER, model_id: BigInt(userId) },
+  })
+  if (data.role_id) {
+    await prisma.model_has_roles.create({
+      data: { role_id: BigInt(data.role_id), model_type: MODEL_TYPE_USER, model_id: BigInt(userId) },
+    })
+  }
+
+  logEvent('info', 'user.updated', { adminId: admin.id, userId, email })
   revalidatePath('/settings/users')
 }

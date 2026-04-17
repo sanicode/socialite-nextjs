@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useTransition, useRef, useState } from 'react'
 import { toggleUserBlock, resetUserRateLimit, bulkToggleBlock, bulkResetRateLimit, type UserRow } from '@/app/actions/users'
 import { useToast } from '@/app/components/ToastContext'
+import UserFormDialog from './UserFormDialog'
 
 type Props = {
   users: UserRow[]
@@ -71,6 +72,7 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [editUser, setEditUser] = useState<UserRow | null>(null)
 
   const allPageSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id))
   const somePageSelected = users.some((u) => selectedIds.has(u.id))
@@ -144,6 +146,11 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
 
   return (
     <>
+      {/* Edit user dialog */}
+      {editUser && (
+        <UserFormDialog mode="edit" user={editUser} onClose={() => setEditUser(null)} />
+      )}
+
       {/* Alert: accounts under attack */}
       {totalUnderAttack > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800/60 dark:bg-red-950/30">
@@ -337,6 +344,13 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
                   {/* Aksi */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditUser(u)}
+                        className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      >
+                        Edit
+                      </button>
                       {u.active_failed_attempts > 0 && (
                         <button
                           type="button"

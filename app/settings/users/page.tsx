@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getUsers } from '@/app/actions/users'
 import UsersTable from '@/app/components/settings/UsersTable'
+import AddUserButton from '@/app/components/settings/AddUserButton'
 
 type SearchParams = Promise<{
   page?: string
@@ -52,12 +53,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
 
-        <div>
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
-          <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Users</h1>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            Kelola akun pengguna, status blokir, dan reset rate limit login.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
+            <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Users</h1>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              Kelola akun pengguna, status blokir, dan reset rate limit login.
+            </p>
+          </div>
+          <AddUserButton />
         </div>
 
         {/* Filter */}
