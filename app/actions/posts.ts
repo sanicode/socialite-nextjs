@@ -352,6 +352,7 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
       : null,
     province: provinceName,
     city: cityName,
+    source_url: post.source_url ?? null,
   }
 }
 
