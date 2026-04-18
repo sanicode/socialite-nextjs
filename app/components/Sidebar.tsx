@@ -69,14 +69,6 @@ type Props = {
   showLaporanSemua: boolean
   showLaporanUpload: boolean
   showLaporanAmplifikasi: boolean
-  user: {
-    name: string;
-    email: string;
-    role: string | {
-        name: string;
-    }; // Penting untuk pengecekan di Sidebar
-    tenants: { pivot: { roles: (string | { name: string })[] } }[] | null;
-  } | null; // Tambahkan prop user
 }
 
 function LinkPendingHint() {
@@ -86,7 +78,7 @@ function LinkPendingHint() {
   )
 }
 
-export default function Sidebar({ open, onClose, appName, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, user }: Props) {
+export default function Sidebar({ open, onClose, appName, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
   const pathname = usePathname()
 
   // Filter dashboard item

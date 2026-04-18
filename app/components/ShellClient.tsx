@@ -30,7 +30,7 @@ export default function ShellClient({ user, appName, showDashboard, showSettings
     <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi} user={user} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi} />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
