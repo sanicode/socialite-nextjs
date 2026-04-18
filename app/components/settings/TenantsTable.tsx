@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useToast } from '@/app/components/ToastContext'
 import {
@@ -29,11 +29,11 @@ type Props = {
 
 // ── Sort helpers ──────────────────────────────────────────────────────────────
 
-function buildSortHref(
+function buildHref(
   searchParams: Record<string, string | undefined>,
   col: string,
   currentSortBy: string,
-  currentSortDir: 'asc' | 'desc'
+  currentSortDir: 'asc' | 'desc',
 ): string {
   const nextDir = currentSortBy === col && currentSortDir === 'asc' ? 'desc' : 'asc'
   const query = new URLSearchParams()
@@ -607,8 +607,16 @@ function ManageUsersPanel({
 
 export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams }: Props) {
   const { showToast } = useToast()
+  const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [sorting, startSortTransition] = useTransition()
   const [localTenants, setLocalTenants] = useState<TenantRow[]>(tenants)
+  useEffect(() => { setLocalTenants(tenants) }, [tenants])
+
+  function handleSort(col: string) {
+    const href = buildHref(searchParams, col, sortBy, sortDir)
+    startSortTransition(() => { router.push(href, { scroll: false }) })
+  }
 
   // ── Edit info dialog ──
   const editDialogRef = useRef<HTMLDialogElement>(null)
@@ -707,6 +715,8 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
     })
   }
 
+
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -717,25 +727,23 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
           <thead>
             <tr className="border-b border-neutral-200 dark:border-neutral-800">
               {/* Sortable columns */}
-              {([
+              {[
                 { label: 'Nama',     col: 'name'           },
-                { label: 'Domain',   col: null              },
+                { label: 'Domain',   col: 'domain'         },
                 { label: 'Kota',     col: 'city'           },
                 { label: 'Manager',  col: 'manager_count'  },
                 { label: 'Operator', col: 'operator_count' },
-              ] as const).map(({ label, col }) => (
-                <th key={label} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                  {col ? (
-                    <Link
-                      href={buildSortHref(searchParams, col, sortBy, sortDir)}
-                      className="inline-flex items-center hover:text-neutral-900 dark:hover:text-white transition-colors"
-                    >
-                      {label}
-                      <SortIcon active={sortBy === col} dir={sortDir} />
-                    </Link>
-                  ) : (
-                    label
-                  )}
+              ].map(({ label, col }) => (
+                <th key={col} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  <button
+                    type="button"
+                    onClick={() => handleSort(col)}
+                    disabled={sorting}
+                    className="inline-flex items-center gap-0.5 hover:text-neutral-900 dark:hover:text-white transition-colors disabled:opacity-60"
+                  >
+                    {label}
+                    <SortIcon active={sortBy === col} dir={sortDir} />
+                  </button>
                 </th>
               ))}
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">

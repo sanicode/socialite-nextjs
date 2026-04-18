@@ -99,6 +99,10 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     params.push(cityName)
     idx++
   }
+
+  // Tenant scoping: if tenantId is provided, we need to join with users and tenant_user to filter by tenant's users
+  // log tenantId and idx for debugging
+  console.log('Tenant ID:', tenantId, 'Param Index:', idx)
   if (tenantId) {
     // Scope to users belonging to this tenant via email lookup
     conditions.push(
@@ -121,7 +125,7 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     ...params
   )
 
-  // User count (kuota) from v_kuota_per_kota — not filtered by date
+  // User count (kuota) from v_kuota_per_kota — not filtered by date but filtered by current city of manager
   const kuotaConditions: string[] = []
   const kuotaParams: unknown[] = []
   let ki = 1
@@ -135,6 +139,15 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     kuotaParams.push(cityName)
     ki++
   }
+  // Tenant scoping: if tenantId is provided, we need to filter kuota by tenant's users as well
+  if (tenantId) {
+    kuotaConditions.push(
+      `tenant_id IN (SELECT tenant_id FROM tenant_user WHERE user_id IN (SELECT id FROM users WHERE email IN (SELECT email FROM users u JOIN tenant_user tu ON tu.user_id = u.id WHERE tu.tenant_id = $${ki})))`
+    )
+    kuotaParams.push(parseInt(tenantId, 10))
+    ki++
+  }
+  
   const kuotaWhere = kuotaConditions.length > 0 ? 'WHERE ' + kuotaConditions.join(' AND ') : ''
 
   const kuotaResult = await prisma.$queryRawUnsafe<{ user_count: bigint }[]>(

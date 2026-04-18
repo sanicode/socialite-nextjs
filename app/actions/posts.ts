@@ -10,6 +10,27 @@ import { logEvent } from '@/app/lib/logger'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 
+export async function updatePostStatus(postId: string, status: string) {
+  try {
+    await prisma.blog_posts.update({
+      where: { id: BigInt(postId) },
+      data: { status: status as any }
+    })
+    
+    // Opsional: Revalidate agar data di server terupdate
+    revalidatePath('/posts/users/[userId]/[status]', 'page')
+    
+    //return { success: true }
+    return {
+      message: `Status post berhasil diupdate.`,
+      success: 'updated',
+    }
+  } catch (error) {
+    console.error(error)
+    throw new Error("Failed to update status")
+  }
+}
+
 export type PostErrors = { title?: string[]; body?: string[]; category_id?: string[]; screenshot?: string[] }
 
 export type PostFormState =
@@ -42,6 +63,7 @@ export type SerializedPost = {
   user: { id: string; name: string } | null
   province: string | null
   city: string | null
+  source_url: string | null
 }
 
 export type SerializedCategory = {
@@ -123,8 +145,9 @@ export async function getPosts(params: {
   dateFrom?: string
   dateTo?: string
   sortOrder?: 'asc' | 'desc'
+  postType?: 'upload' | 'amplifikasi'
 }): Promise<{ posts: SerializedPost[]; total: number }> {
-  const { search, categoryId, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc' } = params
+  const { search, categoryId, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType } = params
   const pageSize = 10
   const skip = (page - 1) * pageSize
 
@@ -160,6 +183,7 @@ export async function getPosts(params: {
         ...(dateTo && { lte: new Date(dateTo + 'T23:59:59') }),
       },
     }),
+    ...(postType ? { source_url: postType } : {}),
   }
 
   const [posts, total] = await Promise.all([
@@ -244,6 +268,7 @@ export async function getPosts(params: {
               name: p.blog_post_categories.name,
             }
           : null,
+        source_url: p.source_url ?? null,
         thumbnail: media
           ? {
               id: media.id.toString(),
@@ -380,13 +405,19 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
   })
 }
 
-export async function createPost(
-  state: PostFormState,
-  formData: FormData
-): Promise<PostFormState> {
+type PostVariantOpts = {
+  requireTitle: boolean
+  requireScreenshot: boolean
+  validateUrl: boolean
+  sourceUrl: string | null
+  redirectBase: string
+}
+
+async function processCreate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
   const sessionUser = assertNotManagerOnly(await requireUser())
 
-  const title = (formData.get('title') as string)?.trim()
+  const rawTitle = (formData.get('title') as string)?.trim()
+  const title = rawTitle || '-'
   const body = (formData.get('body') as string)?.trim()
   const description = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
@@ -397,25 +428,26 @@ export async function createPost(
   const errors: PostErrors = {}
 
   if (!categoryId) errors.category_id = ['Kategori wajib dipilih.']
-  if (!title) errors.title = ['Link upload tidak boleh kosong.']
-  if (!screenshot || screenshot.size === 0) {
-    errors.screenshot = ['Bukti screenshot wajib diupload.']
-  } else if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
-    errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
-  } else if (screenshot.size > maxUploadedFileSizeBytes) {
-    errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+  if (opts.requireTitle && !rawTitle) errors.title = ['Link upload tidak boleh kosong.']
+  if (opts.requireScreenshot) {
+    if (!screenshot || screenshot.size === 0) {
+      errors.screenshot = ['Bukti screenshot wajib diupload.']
+    } else if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
+      errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+    } else if (screenshot.size > maxUploadedFileSizeBytes) {
+      errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+    }
   }
 
   if (Object.keys(errors).length > 0) return { errors }
 
-  // Validate URL matches the selected platform category
-  if (categoryId) {
+  if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
       select: { name: true },
     })
     if (category) {
-      const urlError = validateUrlForCategory(title, category.name)
+      const urlError = validateUrlForCategory(rawTitle, category.name)
       if (urlError) return { errors: { title: [urlError] } }
     }
   }
@@ -426,7 +458,6 @@ export async function createPost(
     select: { tenant_id: true },
   })
 
-  // Duplicate check: same user + same category + same calendar date
   if (categoryId) {
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
@@ -435,6 +466,7 @@ export async function createPost(
       where: {
         user_id: userId,
         blog_post_category_id: BigInt(categoryId),
+        source_url: opts.sourceUrl ?? null,
         created_at: { gte: startOfDay, lte: endOfDay },
       },
       select: { id: true },
@@ -455,7 +487,7 @@ export async function createPost(
     data: {
       title,
       slug: generateSlug(title),
-      body,
+      body: body || '-',
       description,
       status: 'pending',
       is_published: isPublished,
@@ -463,30 +495,26 @@ export async function createPost(
       user_id: userId,
       tenant_id: tenantUser?.tenant_id ?? null,
       blog_post_category_id: categoryId ? BigInt(categoryId) : null,
+      source_url: opts.sourceUrl,
       created_at: new Date(),
     },
   })
 
-  // Upload screenshot to S3 now that we have the post ID
-  await uploadScreenshot(screenshot!, post.id)
+  if (opts.requireScreenshot && screenshot && screenshot.size > 0) {
+    await uploadScreenshot(screenshot, post.id)
+  }
 
-  logEvent('info', 'posts.create', {
-    postId: post.id.toString(),
-    userId: sessionUser.id,
-    categoryId,
-  })
-  revalidatePath('/posts')
-  redirect('/posts?success=created')
+  logEvent('info', 'posts.create', { postId: post.id.toString(), userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })
+  revalidatePath(opts.redirectBase)
+  redirect(`${opts.redirectBase}?success=created`)
 }
 
-export async function updatePost(
-  state: PostFormState,
-  formData: FormData
-): Promise<PostFormState> {
+async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
   const sessionUser = assertNotManagerOnly(await requireUser())
 
   const id = formData.get('id') as string
-  const title = (formData.get('title') as string)?.trim()
+  const rawTitle = (formData.get('title') as string)?.trim()
+  const title = rawTitle || '-'
   const body = (formData.get('body') as string)?.trim()
   const description = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
@@ -499,28 +527,28 @@ export async function updatePost(
   const errors: PostErrors = {}
 
   if (!categoryId) errors.category_id = ['Kategori wajib dipilih.']
-  if (!title) errors.title = ['Link upload tidak boleh kosong.']
-  // Screenshot required only if no existing media
-  if (!oldMediaId && (!screenshot || screenshot.size === 0)) {
-    errors.screenshot = ['Bukti screenshot wajib diupload.']
-  } else if (hasNewScreenshot) {
-    if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
-      errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
-    } else if (screenshot.size > maxUploadedFileSizeBytes) {
-      errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+  if (opts.requireTitle && !rawTitle) errors.title = ['Link upload tidak boleh kosong.']
+  if (opts.requireScreenshot) {
+    if (!oldMediaId && (!screenshot || screenshot.size === 0)) {
+      errors.screenshot = ['Bukti screenshot wajib diupload.']
+    } else if (hasNewScreenshot) {
+      if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
+        errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+      } else if (screenshot.size > maxUploadedFileSizeBytes) {
+        errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+      }
     }
   }
 
   if (Object.keys(errors).length > 0) return { errors }
 
-  // Validate URL matches the selected platform category
-  if (categoryId) {
+  if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
       select: { name: true },
     })
     if (category) {
-      const urlError = validateUrlForCategory(title, category.name)
+      const urlError = validateUrlForCategory(rawTitle, category.name)
       if (urlError) return { errors: { title: [urlError] } }
     }
   }
@@ -535,22 +563,16 @@ export async function updatePost(
     data: {
       title,
       slug: generateSlug(title),
-      body,
+      body: body || '-',
       description,
       is_published: isPublished,
-      published_at:
-        isPublished && !currentPost?.is_published
-          ? new Date()
-          : isPublished
-            ? undefined
-            : null,
+      published_at: isPublished && !currentPost?.is_published ? new Date() : isPublished ? undefined : null,
       blog_post_category_id: categoryId ? BigInt(categoryId) : null,
       updated_at: new Date(),
     },
   })
 
-  // If new screenshot selected: delete old from S3, upload new
-  if (hasNewScreenshot) {
+  if (opts.requireScreenshot && hasNewScreenshot) {
     if (oldMediaId) {
       const oldMedia = await prisma.media.findUnique({ where: { id: BigInt(oldMediaId) } })
       if (oldMedia) {
@@ -561,14 +583,39 @@ export async function updatePost(
     await uploadScreenshot(screenshot, BigInt(id))
   }
 
-  logEvent('info', 'posts.update', {
-    postId: id,
-    userId: sessionUser.id,
-    categoryId,
-    replacedScreenshot: hasNewScreenshot,
-  })
+  logEvent('info', 'posts.update', { postId: id, userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })
+  revalidatePath(opts.redirectBase)
+  redirect(`${opts.redirectBase}?success=updated`)
+}
+
+function revalidatePosts() {
   revalidatePath('/posts')
-  redirect('/posts?success=updated')
+  revalidatePath('/posts/upload')
+  revalidatePath('/posts/amplifikasi')
+}
+
+const DEFAULT_OPTS: PostVariantOpts = { requireTitle: true, requireScreenshot: true, validateUrl: true, sourceUrl: null, redirectBase: '/posts' }
+const UPLOAD_OPTS: PostVariantOpts  = { requireTitle: true, requireScreenshot: false, validateUrl: true, sourceUrl: 'upload', redirectBase: '/posts/upload' }
+const AMPLIF_OPTS: PostVariantOpts  = { requireTitle: false, requireScreenshot: true, validateUrl: false, sourceUrl: 'amplifikasi', redirectBase: '/posts/amplifikasi' }
+
+export async function createPost(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processCreate(formData, DEFAULT_OPTS)
+}
+export async function createUpload(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processCreate(formData, UPLOAD_OPTS)
+}
+export async function createAmplifikasi(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processCreate(formData, AMPLIF_OPTS)
+}
+
+export async function updatePost(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processUpdate(formData, DEFAULT_OPTS)
+}
+export async function updateUpload(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processUpdate(formData, UPLOAD_OPTS)
+}
+export async function updateAmplifikasi(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  return processUpdate(formData, AMPLIF_OPTS)
 }
 
 export async function deletePost(id: string): Promise<void> {
@@ -587,7 +634,7 @@ export async function deletePost(id: string): Promise<void> {
     deletedMediaCount,
     failedS3Deletes,
   })
-  revalidatePath('/posts')
+  revalidatePosts()
 }
 
 export async function bulkDeletePosts(ids: string[]): Promise<void> {
@@ -610,7 +657,7 @@ export async function bulkDeletePosts(ids: string[]): Promise<void> {
     deletedMediaCount,
     failedS3Deletes,
   })
-  revalidatePath('/posts')
+  revalidatePosts()
 }
 
 export async function togglePublish(id: string, currentStatus: boolean): Promise<void> {
@@ -628,7 +675,7 @@ export async function togglePublish(id: string, currentStatus: boolean): Promise
     userId: sessionUser.id,
     nextStatus: !currentStatus,
   })
-  revalidatePath('/posts')
+  revalidatePosts()
 }
 
 export async function updateStatus(id: string, status: 'pending' | 'valid' | 'invalid'): Promise<void> {
@@ -645,5 +692,5 @@ export async function updateStatus(id: string, status: 'pending' | 'valid' | 'in
     userId: sessionUser.id,
     status,
   })
-  revalidatePath('/posts')
+  revalidatePosts()
 }

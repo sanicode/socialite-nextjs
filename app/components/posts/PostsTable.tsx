@@ -16,11 +16,15 @@ type Props = {
   page: number
   isAdmin: boolean
   canVerify: boolean
+  basePath?: string
+  variant?: 'default' | 'upload' | 'amplifikasi'
 }
 
 const PAGE_SIZE = 10
 
-export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify }: Props) {
+export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default' }: Props) {
+  const showUrl = variant !== 'amplifikasi'
+  const showScreenshot = variant !== 'upload'
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -54,7 +58,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     const params = new URLSearchParams(searchParams.toString())
     params.delete('success')
     const nextQuery = params.toString()
-    router.replace(nextQuery ? `/posts?${nextQuery}` : '/posts')
+    router.replace(nextQuery ? `${basePath}?${nextQuery}` : basePath)
   }, [router, searchParams, showToast])
 
   const currentSort = searchParams.get('sort') ?? 'desc'
@@ -104,7 +108,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     }
     if (key !== 'page') params.delete('page')
     startTransition(() => {
-      router.push(`/posts?${params.toString()}`)
+      router.push(`${basePath}?${params.toString()}`)
     })
   }, [router, searchParams, startTransition])
 
@@ -246,13 +250,26 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       </svg>
                     )}
                   </button>
+                </th>                
+
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                  Media Sosial
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-16">
-                  Screenshot
+
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                  Jenis
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
-                  Link Upload
-                </th>
+                
+                {showScreenshot && (
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-16">
+                    Screenshot
+                  </th>
+                )}
+                {showUrl && (
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
+                    Link Upload
+                  </th>
+                )}
                 {canVerify && (
                   <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36 hidden md:table-cell">
                     Author
@@ -268,9 +285,6 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                     Kota
                   </th>
                 )}
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
-                  Kategori
-                </th>
                 {canVerify && (
                   <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
                     Verifikasi
@@ -290,9 +304,9 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                     colSpan={canVerify ? 10 : 6}
                     className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400"
                   >
-                    Belum ada post.{' '}
-                    <Link href="/posts/new" className="underline">
-                      Buat post pertama
+                    Belum ada laporan.{' '}
+                    <Link href={`${basePath}/new`} className="underline">
+                      Buat laporan pertama Anda
                     </Link>
                   </td>
                 </tr>
@@ -325,51 +339,76 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       : '—'}
                   </td>
 
-                  {/* Thumbnail */}
-                  <td className="px-4 py-3">
-                    {post.thumbnail ? (
-                      <button
-                        type="button"
-                        onClick={() => setModal({ type: 'image', url: post.thumbnail!.url, title: post.title ?? '' })}
-                        className="w-12 h-12 rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-800 relative flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-neutral-900 dark:hover:ring-white transition"
-                      >
-                        <Image
-                          src={post.thumbnail.url}
-                          alt={post.title ?? ''}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </button>
+                  {/* Category */}
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {post.category ? (
+                      <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                        {post.category.name}
+                      </span>
                     ) : (
-                      <div className="w-12 h-12 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                        <svg
-                          className="w-5 h-5 text-neutral-400"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
+                      <span className="text-neutral-400 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-left align-middle">
+                    {post.source_url === 'upload' ? (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">Upload</span>
+                    ) : post.source_url === 'amplifikasi' ? (
+                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs font-medium">Amplifikasi</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 text-xs font-medium">Umum</span>
                     )}
                   </td>
 
+
+                  {/* Thumbnail */}
+                  {showScreenshot && (
+                    <td className="px-4 py-3">
+                      {post.thumbnail ? (
+                        <button
+                          type="button"
+                          onClick={() => setModal({ type: 'image', url: post.thumbnail!.url, title: post.title ?? '' })}
+                          className="w-12 h-12 rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-800 relative flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-neutral-900 dark:hover:ring-white transition"
+                        >
+                          <Image
+                            src={post.thumbnail.url}
+                            alt={post.title ?? ''}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </button>
+                      ) : (
+                        <div className="w-12 h-12 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
+                          <svg
+                            className="w-5 h-5 text-neutral-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
+                  )}
+
                   {/* Link Upload */}
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
-                      className="font-medium text-neutral-900 dark:text-white line-clamp-1 font-mono text-left hover:underline cursor-pointer"
-                    >
-                      {post.title}
-                    </button>
-                  </td>
+                  {showUrl && (
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
+                        className="font-medium text-neutral-900 dark:text-white line-clamp-1 font-mono text-left hover:underline cursor-pointer"
+                      >
+                        {post.title}
+                      </button>
+                    </td>
+                  )}
 
                   {/* Author */}
                   {canVerify && (
@@ -397,17 +436,6 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       </span>
                     </td>
                   )}
-
-                  {/* Category */}
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    {post.category ? (
-                      <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
-                        {post.category.name}
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 text-xs">—</span>
-                    )}
-                  </td>
 
                   {/* Verifikasi */}
                   {canVerify && (
@@ -452,7 +480,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       ) : (
                         (isAdmin || canVerify) && (
                         <Link
-                          href={`/posts/${post.id}/edit`}
+                          href={`${basePath}/${post.id}/edit`}
                           className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
                         >
                           Edit

@@ -13,10 +13,16 @@ type Props = {
   showDashboard: boolean
   showSettings: boolean
   showOperators: boolean
+  showLaporanPerOperator: boolean
+  showLaporanSemua: boolean
+  showLaporanUpload: boolean
+  showLaporanAmplifikasi: boolean
   children: React.ReactNode
 }
 
-export default function ShellClient({ user, appName, showDashboard, showSettings, showOperators, children }: Props) {
+
+
+export default function ShellClient({ user, appName, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -24,7 +30,7 @@ export default function ShellClient({ user, appName, showDashboard, showSettings
     <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi} user={user} />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -58,7 +64,12 @@ export default function ShellClient({ user, appName, showDashboard, showSettings
           <ThemeToggle />
 
           {/* User menu */}
-          <UserMenu name={user.name} email={user.email} role={user.role} tenantName={user.tenantName} />
+        <UserMenu 
+          name={user?.name || 'Guest'} 
+          email={user?.email || ''} 
+          role={user?.role || 'User'} 
+          tenantName={user?.tenantName || ''} 
+        />
         </header>
 
         {/* Page content */}

@@ -7,7 +7,7 @@ type Props = {
 export default function StatCards({ stats }: Props) {
   const cards = [
     {
-      label: 'Total User',
+      label: 'Total Operator',
       value: stats.userCount,
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

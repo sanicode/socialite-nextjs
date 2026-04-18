@@ -17,6 +17,7 @@ async function getSessionUser() {
   const roles = await getUserRoles(userId)
   const isAdmin = roles.includes('admin')
   const isManager = roles.includes('manager')
+  const isOperator = roles.includes('operator')
   const role = roles[0] ?? 'operator'
 
   // Fetch tenant name
@@ -47,8 +48,11 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const appName = process.env.APP_NAME ?? 'Admin Panel'
   const showDashboard = user.isAdmin || user.isManager
   const showOperators = user.isManager
-
+  const showLaporanPerOperator = user.isAdmin || user.isManager
+  const showLaporanSemua = user.isAdmin || user.isManager
   const requestMetadata = await getRequestMetadata()
+  const showlaporanUpload = !user.isAdmin || !user.isManager
+  const showLaporanAmplifikasi = !user.isAdmin || !user.isManager
   await writeAccessLog({
     eventType: 'page_view',
     status: 'allowed',
@@ -58,5 +62,5 @@ export default async function AppShell({ children }: { children: React.ReactNode
     userEmail: user.email,
   })
 
-  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators}>{children}</ShellClient>
+  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showlaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi}>{children}</ShellClient>
 }

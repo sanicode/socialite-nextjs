@@ -12,6 +12,8 @@ type Props = {
   post?: SerializedPost
   categories: SerializedCategory[]
   maxUploadFileSizeBytes: number
+  variant?: 'default' | 'upload' | 'amplifikasi'
+  basePath?: string
 }
 
 const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; label: string }> = {
@@ -55,12 +57,15 @@ const ALERT_ICON = {
   ),
 }
 
-export default function PostForm({ action, post, categories, maxUploadFileSizeBytes }: Props) {
+export default function PostForm({ action, post, categories, maxUploadFileSizeBytes, variant = 'default', basePath = '/posts' }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
   const [state, formAction, pending] = useActionState(action, undefined)
 
-  const [title, setTitle] = useState(post?.title ?? '')
+  const showUrl        = variant !== 'amplifikasi'
+  const showScreenshot = variant !== 'upload'
+
+  const [title, setTitle] = useState(showUrl ? (post?.title ?? '') : '-')
   const [categoryId, setCategoryId] = useState(post?.blog_post_category_id ?? '')
   const [hasScreenshot, setHasScreenshot] = useState<boolean>(!!post?.thumbnail)
   const [screenshotClientError, setScreenshotClientError] = useState<string | null>(null)
@@ -82,11 +87,10 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
     if (errs) {
       const messages = [
         ...(errs.category_id ?? []),
-        ...(errs.title ?? []),
-        ...(errs.screenshot ?? []),
+        ...(showUrl ? (errs.title ?? []) : []),
+        ...(showScreenshot ? (errs.screenshot ?? []) : []),
         ...(errs.body ?? []),
       ]
-
       if (messages.length > 0) {
         showToast('warning', 'Periksa Kembali Form', messages.join(' · '))
       }
@@ -95,29 +99,31 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
 
   const selectedCategory = categories.find((c) => c.id === categoryId)
 
-  const platformHint = selectedCategory
+  const platformHint = showUrl && selectedCategory
     ? Object.entries(PLATFORM_HINTS).find(([key]) =>
         selectedCategory.name.toLowerCase().includes(key)
       )?.[1]
     : null
 
   const urlClientError =
-    title && platformHint && !platformHint.pattern.test(title)
+    showUrl && title && platformHint && !platformHint.pattern.test(title)
       ? `Link harus berupa URL ${platformHint.label} yang valid.`
       : null
 
   const hasExistingScreenshot = Boolean(post?.thumbnail)
-  const screenshotFieldError = screenshotClientError ?? state?.errors?.screenshot?.[0]
-  const screenshotMessages = screenshotClientError
-    ? [screenshotClientError]
-    : !hasScreenshot && !hasExistingScreenshot
-      ? (state?.errors?.screenshot ?? [])
-      : []
+  const screenshotFieldError = showScreenshot ? (screenshotClientError ?? state?.errors?.screenshot?.[0]) : null
+  const screenshotMessages = showScreenshot
+    ? (screenshotClientError
+        ? [screenshotClientError]
+        : !hasScreenshot && !hasExistingScreenshot
+          ? (state?.errors?.screenshot ?? [])
+          : [])
+    : []
 
   const formMessages = state?.errors
     ? [
         ...(state.errors.category_id ?? []),
-        ...(state.errors.title ?? []),
+        ...(showUrl ? (state.errors.title ?? []) : []),
         ...screenshotMessages,
         ...(state.errors.body ?? []),
       ]
@@ -125,17 +131,21 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
 
   const alertType = state?.duplicate || state?.message ? 'error' : 'warning'
 
+  const submitDisabled =
+    pending ||
+    !categoryId ||
+    (showUrl && (!title || !!urlClientError)) ||
+    (showScreenshot && !(hasScreenshot || hasExistingScreenshot)) ||
+    (showScreenshot && !!screenshotClientError && !hasExistingScreenshot)
+
   return (
     <form action={formAction} className="space-y-6">
 
       {post && <input type="hidden" name="id" value={post.id} />}
-
-      {post?.thumbnail?.id && (
-        <input type="hidden" name="old_media_id" value={post.thumbnail.id} />
-      )}
-
+      {post?.thumbnail?.id && <input type="hidden" name="old_media_id" value={post.thumbnail.id} />}
       <input type="hidden" name="is_published" value="0" />
       <input type="hidden" name="body" value="-" />
+      {!showUrl && <input type="hidden" name="title" value="-" />}
 
       {(state?.message || formMessages.length > 0) && (
         <div
@@ -146,22 +156,12 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
           }`}
         >
           <div className="flex items-start gap-3">
-            <span className="mt-0.5">
-              {ALERT_ICON[alertType]}
-            </span>
+            <span className="mt-0.5">{ALERT_ICON[alertType]}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">
-                {state?.duplicate
-                  ? 'Double Entry Terdeteksi'
-                  : state?.message
-                    ? 'Gagal Menyimpan'
-                    : 'Periksa Kembali Form'}
+                {state?.duplicate ? 'Double Entry Terdeteksi' : state?.message ? 'Gagal Menyimpan' : 'Periksa Kembali Form'}
               </p>
-
-              {state?.message && (
-                <p className="mt-1 text-sm leading-relaxed">{state.message}</p>
-              )}
-
+              {state?.message && <p className="mt-1 text-sm leading-relaxed">{state.message}</p>}
               {!state?.message && formMessages.length > 0 && (
                 <ul className="mt-2 space-y-1 text-sm leading-relaxed">
                   {formMessages.map((message, index) => (
@@ -182,119 +182,91 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
           {/* Kategori */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Kategori {!categoryId && <span className="text-red-500">*</span>}
+              Media Sosial {!categoryId && <span className="text-red-500">*</span>}
             </label>
-
             <select
               name="category_id"
               value={categoryId}
               required
               onChange={(e) => setCategoryId(e.target.value)}
               className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${
-                state?.errors?.category_id
-                  ? 'border-red-400 dark:border-red-500'
-                  : 'border-neutral-300 dark:border-neutral-700'
+                state?.errors?.category_id ? 'border-red-400 dark:border-red-500' : 'border-neutral-300 dark:border-neutral-700'
               }`}
             >
-              <option value="">— Pilih kategori —</option>
+              <option value="">— Pilih Media Sosial —</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
-
             {state?.errors?.category_id && (
-              <p className="mt-1.5 text-xs text-red-500">
-                {state.errors.category_id[0]}
-              </p>
+              <p className="mt-1.5 text-xs text-red-500">{state.errors.category_id[0]}</p>
             )}
           </div>
 
-          {/* Link Upload */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Link Upload {!title && <span className="text-red-500">*</span>}
-            </label>
-
-            <input
-              name="title"
-              type="url"
-              value={title}
-              required
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={platformHint?.placeholder ?? 'https://...'}
-              className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${
-                state?.errors?.title || urlClientError
-                  ? 'border-red-400 dark:border-red-500'
-                  : 'border-neutral-300 dark:border-neutral-700'
-              }`}
-            />
-
-            {(state?.errors?.title || urlClientError) && (
-              <p className="mt-1.5 text-xs text-red-500">
-                {state?.errors?.title?.[0] ?? urlClientError}
-              </p>
-            )}
-          </div>
-
-          {/* Screenshot */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-              Bukti Screenshot {!hasScreenshot && !hasExistingScreenshot && <span className="text-red-500">*</span>}
-
-              {post?.thumbnail && (
-                <span className="ml-2 text-xs text-neutral-400">
-                  (kosongkan untuk tetap menggunakan screenshot lama)
-                </span>
+          {/* Link Upload — hanya untuk default & upload */}
+          {showUrl && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Link Upload {!title && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                name="title"
+                type="url"
+                value={title}
+                required
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={platformHint?.placeholder ?? 'https://...'}
+                className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${
+                  state?.errors?.title || urlClientError ? 'border-red-400 dark:border-red-500' : 'border-neutral-300 dark:border-neutral-700'
+                }`}
+              />
+              {(state?.errors?.title || urlClientError) && (
+                <p className="mt-1.5 text-xs text-red-500">{state?.errors?.title?.[0] ?? urlClientError}</p>
               )}
-            </label>
+            </div>
+          )}
 
-            <ImageUpload
-              currentUrl={post?.thumbnail?.url ?? null}
-              error={screenshotFieldError}
-              maxFileSizeBytes={maxUploadFileSizeBytes}
-              maxFileSizeLabel={formatUploadFileSize(maxUploadFileSizeBytes)}
-              onFileChange={setHasScreenshot}
-              onValidationChange={setScreenshotClientError}
-            />
-          </div>
+          {/* Screenshot — hanya untuk default & amplifikasi */}
+          {showScreenshot && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Bukti Screenshot {!hasScreenshot && !hasExistingScreenshot && <span className="text-red-500">*</span>}
+                {post?.thumbnail && (
+                  <span className="ml-2 text-xs text-neutral-400">
+                    (kosongkan untuk tetap menggunakan screenshot lama)
+                  </span>
+                )}
+              </label>
+              <ImageUpload
+                currentUrl={post?.thumbnail?.url ?? null}
+                error={screenshotFieldError}
+                maxFileSizeBytes={maxUploadFileSizeBytes}
+                maxFileSizeLabel={formatUploadFileSize(maxUploadFileSizeBytes)}
+                onFileChange={setHasScreenshot}
+                onValidationChange={setScreenshotClientError}
+              />
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-5">
-
           <div className="flex flex-col gap-2 pt-2">
-
             <button
               type="submit"
-              disabled={
-                pending ||
-                !title ||
-                !categoryId ||
-                !(hasScreenshot || hasExistingScreenshot) ||
-                !!urlClientError ||
-                (!!screenshotClientError && !hasExistingScreenshot)
-              }
+              disabled={submitDisabled}
               className="w-full py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {pending
-                ? 'Memproses...'
-                : post
-                ? 'Simpan Perubahan'
-                : 'Submit'}
+              {pending ? 'Memproses...' : post ? 'Simpan Perubahan' : 'Submit'}
             </button>
-
             <button
               type="button"
-              onClick={() => router.push('/posts')}
+              onClick={() => router.push(basePath)}
               className="w-full py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
             >
               Batal
             </button>
-
           </div>
-
         </div>
       </div>
     </form>
