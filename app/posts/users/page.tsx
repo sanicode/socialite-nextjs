@@ -3,8 +3,19 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/app/lib/prisma'
 import SearchInput from '@/app/components/posts/users/SearchInput'
 import Link from 'next/link'
+import PostsByUsersTable from '@/app/components/posts/users/PostsByUsersTable'
 
-type SearchParams = Promise<{ search?: string }>
+type SearchParams = Promise<{ search?: string; sortBy?: string; sortDir?: string }>
+
+const ALLOWED_SORT_COLS: Record<string, string> = {
+  provinsi:       'p.name',
+  kabupaten_kota: 'c.name',
+  operator:       'u.name',
+  email:          'u.email',
+  pending_posts:  'pending_posts',
+  valid_posts:    'valid_posts',
+  invalid_posts:  'invalid_posts',
+}
 
 export default async function PostsByUsersPage({
   searchParams,
@@ -17,8 +28,12 @@ export default async function PostsByUsersPage({
     redirect('/posts/upload')
   }
 
-  const { search } = await searchParams
+  const { search, sortBy: rawSortBy, sortDir: rawSortDir } = await searchParams
   const isAdmin = user.roles.includes('admin')
+
+  const sortBy  = ALLOWED_SORT_COLS[rawSortBy ?? ''] ? (rawSortBy ?? 'operator') : 'operator'
+  const sortDir = rawSortDir === 'desc' ? 'DESC' : 'ASC'
+  const orderCol = ALLOWED_SORT_COLS[sortBy]
 
   const tenantUser = await prisma.tenant_user.findFirst({
     where: { user_id: BigInt(user.id) },
@@ -74,7 +89,7 @@ export default async function PostsByUsersPage({
     LEFT JOIN reg_provinces p ON p.id = c.province_id
     ${whereClause}
     GROUP BY p.name, c.name, u.email, u.name, u.id
-    ORDER BY u.name ASC
+    ORDER BY ${orderCol} ${sortDir} NULLS LAST
   `, ...params)
 
   return (
@@ -106,63 +121,7 @@ export default async function PostsByUsersPage({
 
         {/* Table */}
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Provinsi</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Kota</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Nama</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Email</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Pending</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Valid</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Invalid</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-neutral-400 dark:text-neutral-500">
-                      Tidak ada data
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row, i) => (
-                    <tr key={i} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
-                      <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.provinsi ?? '-'}</td>
-                      <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.kabupaten_kota ?? '-'}</td>
-                      <td className="px-4 py-3 font-medium text-neutral-900 dark:text-white">{row.operator}</td>
-                      <td className="px-4 py-3 text-neutral-500 dark:text-neutral-400">{row.email}</td>
-                      <td className="px-4 py-3 text-right">
-                        <a
-                          href={`/posts/users/${row.user_id}/pending`}
-                          className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition"
-                        >
-                          {row.pending_posts}
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <a
-                          href={`/posts/users/${row.user_id}/valid`}
-                          className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition"
-                        >
-                          {row.valid_posts}
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <a
-                          href={`/posts/users/${row.user_id}/invalid`}
-                          className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
-                        >
-                          {row.invalid_posts}
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <PostsByUsersTable rows={rows} sortBy={sortBy} sortDir={sortDir.toLowerCase()} />
         </div>
 
       </div>

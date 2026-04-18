@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useTransition, useState, useEffect, useCallback } from 'react'
+import { useTransition, useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
@@ -30,6 +30,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
   const { showToast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const handledSuccess = useRef<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
@@ -47,7 +48,8 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
 
   useEffect(() => {
     const success = searchParams.get('success')
-    if (!success) return
+    if (!success || handledSuccess.current === success) return
+    handledSuccess.current = success
 
     if (success === 'created') {
       showToast('success', 'Laporan Terkirim', 'Laporan berhasil dikirim.')
@@ -161,6 +163,18 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           onChange={(e) => setSearchValue(e.target.value)}
           className="flex-1 min-w-[180px] px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
         />
+        {variant === 'default' && (
+          <select
+            defaultValue={searchParams.get('jenis') ?? ''}
+            disabled={isPending}
+            onChange={(e) => updateParam('jenis', e.target.value)}
+            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          >
+            <option value="">Semua jenis</option>
+            <option value="upload">Upload</option>
+            <option value="amplifikasi">Amplifikasi</option>
+          </select>
+        )}
         <select
           defaultValue={searchParams.get('category') ?? ''}
           disabled={isPending}
