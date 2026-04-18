@@ -239,7 +239,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
               </label>
               <ImageUpload
                 currentUrl={post?.thumbnail?.url ?? null}
-                error={screenshotFieldError}
+                error={screenshotFieldError ?? undefined}
                 maxFileSizeBytes={maxUploadFileSizeBytes}
                 maxFileSizeLabel={formatUploadFileSize(maxUploadFileSizeBytes)}
                 onFileChange={setHasScreenshot}
