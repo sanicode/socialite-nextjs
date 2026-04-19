@@ -111,7 +111,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
       : null
 
   const hasExistingScreenshot = Boolean(post?.thumbnail)
-  const screenshotFieldError = showScreenshot ? (screenshotClientError ?? state?.errors?.screenshot?.[0]) : null
+  const screenshotFieldError = showScreenshot ? (screenshotClientError ?? state?.errors?.screenshot?.[0] ?? null) : null
   const screenshotMessages = showScreenshot
     ? (screenshotClientError
         ? [screenshotClientError]
