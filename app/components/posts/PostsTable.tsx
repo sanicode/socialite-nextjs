@@ -274,11 +274,11 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   </th>
                 )}
 
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32">
                   Jenis
                 </th>                
 
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32">
                   Media Sosial
                 </th>
                 {showUrl && (
@@ -404,7 +404,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   </td>
 
                   {/* Category */}
-                  <td className="px-4 py-3 hidden md:table-cell">
+                  <td className="px-4 py-3">
                     {post.category ? (
                       <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
                         {post.category.name}
