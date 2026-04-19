@@ -1,43 +1,65 @@
+export const dynamic = 'force-dynamic'
+
 import { getSessionUser } from '@/app/lib/session'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/app/lib/prisma'
 import Link from 'next/link'
+import UserPostsTableClient from './UserPostsTableClient'
+import UserPostsFilterClient from './UserPostsFilterClient'
 
-import UserPostsTableClient from './UserPostsTableClient';
+type SearchParams = Promise<{
+  jenis?: string
+  category?: string
+  dateFrom?: string
+  dateTo?: string
+}>
 
-export default async function UserPostsByStatusPage({ params }: { params: Promise<any> }) {
+export default async function UserPostsByStatusPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ userId: string; status: string }>
+  searchParams: SearchParams
+}) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   if (!user.roles.some(role => ['admin', 'manager'].includes(role))) redirect('/posts/upload')
 
   const { userId, status } = await params
-  
+  const { jenis, category, dateFrom, dateTo } = await searchParams
+
   if (!userId || isNaN(Number(userId))) {
     return <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6 text-neutral-500">User ID tidak valid</div>
   }
 
-  const userData = await prisma.users.findUnique({
-    where: { id: BigInt(userId) },
-  })
-
+  const userData = await prisma.users.findUnique({ where: { id: BigInt(userId) } })
   if (!userData) {
     return <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6 text-neutral-500">User tidak ditemukan</div>
   }
 
+  const categories = await prisma.blog_post_categories.findMany({ orderBy: { name: 'asc' } })
+
+  const where: Record<string, any> = {
+    user_id: userData.id,
+    status,
+    ...(jenis === 'upload' || jenis === 'amplifikasi' ? { source_url: jenis } : {}),
+    ...(category ? { blog_post_category_id: BigInt(category) } : {}),
+    ...(dateFrom || dateTo ? {
+      created_at: {
+        ...(dateFrom ? { gte: new Date(dateFrom + 'T00:00:00') } : {}),
+        ...(dateTo   ? { lte: new Date(dateTo   + 'T23:59:59') } : {}),
+      },
+    } : {}),
+  }
+
   const posts = await prisma.blog_posts.findMany({
-    where: {
-      user_id: userData.id,
-      status,
-    },
+    where,
     orderBy: { created_at: 'desc' },
-    include: {
-      blog_post_categories: true,
-    },
+    include: { blog_post_categories: true },
   })
 
   const postIds = posts.map((p) => p.id)
   let mediaByPostId: Record<string, any> = {}
-
   if (postIds.length > 0) {
     const media = await prisma.media.findMany({
       where: {
@@ -47,8 +69,6 @@ export default async function UserPostsByStatusPage({ params }: { params: Promis
       },
       orderBy: { order_column: 'asc' },
     })
-
-    // Grouping media secara efisien
     mediaByPostId = media.reduce((acc, m) => {
       const id = m.model_id.toString()
       if (!acc[id]) acc[id] = m
@@ -56,14 +76,15 @@ export default async function UserPostsByStatusPage({ params }: { params: Promis
     }, {} as Record<string, any>)
   }
 
-  // Helper untuk menangani serialisasi BigInt
-  const serialize = (data: any) => JSON.parse(JSON.stringify(data, (_, v) => 
+  const serialize = (data: any) => JSON.parse(JSON.stringify(data, (_, v) =>
     typeof v === 'bigint' ? v.toString() : v
   ))
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* Header */}
         <div className="flex items-center gap-3">
           <Link
             href="/posts/users"
@@ -76,14 +97,32 @@ export default async function UserPostsByStatusPage({ params }: { params: Promis
             Laporan {status} — {userData.name}
           </h1>
         </div>
+
+        {/* Filter */}
+        <UserPostsFilterClient
+          categories={serialize(categories)}
+          jenis={jenis ?? ''}
+          category={category ?? ''}
+          dateFrom={dateFrom ?? ''}
+          dateTo={dateTo ?? ''}
+        />
+
+        {/* Jumlah hasil */}
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 -mt-2">
+          {posts.length} laporan ditemukan
+        </p>
+
+        {/* Table */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
           <UserPostsTableClient
+            key={`${jenis}-${category}-${dateFrom}-${dateTo}`}
             posts={serialize(posts)}
             mediaByPostId={serialize(mediaByPostId)}
             userData={serialize(userData)}
             status={status}
           />
         </div>
+
       </div>
     </div>
   )
