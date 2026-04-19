@@ -98,7 +98,7 @@ export default async function PostsByUsersPage({
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Per Operator</h1>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Pelaporan Per Operator</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             {rows.length} operator ditemukan
           </p>
