@@ -155,6 +155,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
+        
         <input
           type="search"
           placeholder="Cari..."
@@ -163,31 +164,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           onChange={(e) => setSearchValue(e.target.value)}
           className="flex-1 min-w-[180px] px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
         />
-        {variant === 'default' && (
-          <select
-            defaultValue={searchParams.get('jenis') ?? ''}
-            disabled={isPending}
-            onChange={(e) => updateParam('jenis', e.target.value)}
-            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          >
-            <option value="">Semua jenis</option>
-            <option value="upload">Upload</option>
-            <option value="amplifikasi">Amplifikasi</option>
-          </select>
-        )}
-        <select
-          defaultValue={searchParams.get('category') ?? ''}
-          disabled={isPending}
-          onChange={(e) => updateParam('category', e.target.value)}
-          className="sm:w-48 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-        >
-          <option value="">Semua kategori</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
+
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
@@ -207,7 +184,32 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
             onChange={(e) => updateParam('dateTo', e.target.value)}
             className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
-        </label>
+        </label>        
+        {variant === 'default' && (
+          <select
+            defaultValue={searchParams.get('jenis') ?? ''}
+            disabled={isPending}
+            onChange={(e) => updateParam('jenis', e.target.value)}
+            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          >
+            <option value="">Semua jenis</option>
+            <option value="upload">Upload</option>
+            <option value="amplifikasi">Amplifikasi</option>
+          </select>
+        )}
+        <select
+          defaultValue={searchParams.get('category') ?? ''}
+          disabled={isPending}
+          onChange={(e) => updateParam('category', e.target.value)}
+          className="sm:w-48 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+        >
+          <option value="">Semua Media Sosial</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Bulk Action Bar */}
@@ -264,14 +266,6 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       </svg>
                     )}
                   </button>
-                </th>                
-
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
-                  Media Sosial
-                </th>
-
-                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
-                  Jenis
                 </th>
                 
                 {showScreenshot && (
@@ -279,6 +273,14 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                     Screenshot
                   </th>
                 )}
+
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                  Jenis
+                </th>                
+
+                <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32 hidden md:table-cell">
+                  Media Sosial
+                </th>
                 {showUrl && (
                   <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
                     Link Upload
@@ -353,27 +355,6 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       : '—'}
                   </td>
 
-                  {/* Category */}
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    {post.category ? (
-                      <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
-                        {post.category.name}
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-left align-middle">
-                    {post.source_url === 'upload' ? (
-                      <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">Upload</span>
-                    ) : post.source_url === 'amplifikasi' ? (
-                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs font-medium">Amplifikasi</span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 text-xs font-medium">Umum</span>
-                    )}
-                  </td>
-
-
                   {/* Thumbnail */}
                   {showScreenshot && (
                     <td className="px-4 py-3">
@@ -410,6 +391,28 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                       )}
                     </td>
                   )}
+
+                  {/* Source Type */}
+                  <td className="px-4 py-3 text-left align-middle">
+                    {post.source_url === 'upload' ? (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">Upload</span>
+                    ) : post.source_url === 'amplifikasi' ? (
+                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs font-medium">Amplifikasi</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 text-xs font-medium">Umum</span>
+                    )}
+                  </td>
+
+                  {/* Category */}
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {post.category ? (
+                      <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                        {post.category.name}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 text-xs">—</span>
+                    )}
+                  </td>
 
                   {/* Link Upload */}
                   {showUrl && (

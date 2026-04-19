@@ -46,6 +46,26 @@ export default function UserPostsFilterClient({ categories, jenis, category, dat
       <div className="flex flex-wrap items-end gap-3">
 
         <div className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
+          <input
+            type="date"
+            name="dateFrom"
+            defaultValue={dateFrom}
+            className="px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
+          <input
+            type="date"
+            name="dateTo"
+            defaultValue={dateTo}
+            className="px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          />
+        </div>
+        
+        <div className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Jenis</span>
           <select
             name="jenis"
@@ -70,26 +90,6 @@ export default function UserPostsFilterClient({ categories, jenis, category, dat
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
-          <input
-            type="date"
-            name="dateFrom"
-            defaultValue={dateFrom}
-            className="px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
-          <input
-            type="date"
-            name="dateTo"
-            defaultValue={dateTo}
-            className="px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          />
         </div>
 
         <button

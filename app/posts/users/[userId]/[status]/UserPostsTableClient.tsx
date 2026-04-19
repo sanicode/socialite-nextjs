@@ -41,11 +41,11 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800">
+              <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Tanggal</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Screenshot</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Link Upload</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Jenis</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Media Sosial</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Tanggal</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Link Upload</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Status</th>
             </tr>
           </thead>
@@ -73,6 +73,9 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
 
                 return (
                   <tr key={post.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
+                    <td className="px-4 py-3 text-center text-neutral-500 dark:text-neutral-400">
+                      {post.created_at ? new Date(post.created_at).toLocaleDateString('id-ID') : '-'}
+                    </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">
                         {media ? (
@@ -98,9 +101,6 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs truncate">
-                      {post.title ?? '-'}
-                    </td>
                     <td className="px-4 py-3 text-center align-middle">
                       {post.source_url === 'upload' ? (
                         <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">Upload</span>
@@ -115,8 +115,8 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                         {post.blog_post_categories?.name ?? '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-neutral-500 dark:text-neutral-400">
-                      {post.created_at ? new Date(post.created_at).toLocaleDateString('id-ID') : '-'}
+                    <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs truncate">
+                      {post.title ?? '-'}
                     </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">
