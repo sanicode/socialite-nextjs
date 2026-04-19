@@ -17,9 +17,24 @@ export default function ReportTable({ data }: Props) {
   const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
   const pageData = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  function isUrl(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    try { return ['http:', 'https:'].includes(new URL(value).protocol) } catch { return false }
+  }
+
   function handleExport() {
     if (data.length === 0) return
     const ws = XLSX.utils.json_to_sheet(data)
+    const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1')
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: R, c: C })
+        const cell = ws[addr]
+        if (cell && isUrl(cell.v)) {
+          cell.l = { Target: cell.v }
+        }
+      }
+    }
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Rekapitulasi')
     XLSX.writeFile(wb, `rekapitulasi_pelaporan_${new Date().toISOString().slice(0, 10)}.xlsx`)
@@ -37,6 +52,23 @@ export default function ReportTable({ data }: Props) {
       return value.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
     }
     return String(value)
+  }
+
+  function renderCell(value: unknown) {
+    const text = formatCell(value)
+    if (isUrl(value)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 dark:text-blue-400 underline hover:opacity-80 transition truncate max-w-xs block"
+        >
+          {value}
+        </a>
+      )
+    }
+    return <span>{text}</span>
   }
 
   return (
@@ -92,7 +124,7 @@ export default function ReportTable({ data }: Props) {
                     key={col}
                     className="px-4 py-3 text-neutral-700 dark:text-neutral-300 whitespace-nowrap"
                   >
-                    {formatCell(row[col])}
+                    {renderCell(row[col])}
                   </td>
                 ))}
               </tr>
