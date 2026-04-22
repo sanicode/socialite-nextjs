@@ -8,6 +8,8 @@ import type { Prisma } from '@/app/generated/prisma/client'
 import bcrypt from 'bcryptjs'
 
 const MODEL_TYPE_USER = 'App\\Models\\User'
+const BULK_IMPORT_DOMAIN = 'bmi.com'
+const MAX_BULK_IMPORT_ROWS = 500
 
 export type RoleOption = {
   id: string
@@ -35,6 +37,170 @@ export type GetUsersResult = {
   totalBlocked: number
   totalUnderAttack: number
   totalRateLimited: number
+}
+
+export type BulkUserImportStatus = 'valid' | 'duplicate_existing' | 'duplicate_input' | 'invalid'
+
+export type BulkUserImportRow = {
+  line: number
+  name: string
+  phone_number: string
+  email: string
+  status: BulkUserImportStatus
+  message: string
+}
+
+export type BulkUserImportPreview = {
+  rows: BulkUserImportRow[]
+  totalRows: number
+  validRows: number
+  duplicateExistingRows: number
+  duplicateInputRows: number
+  invalidRows: number
+}
+
+export type BulkUserImportResult = BulkUserImportPreview & {
+  createdRows: number
+  skippedRows: number
+}
+
+type ParsedBulkUserRow = {
+  line: number
+  name: string
+  phone_number: string
+  email: string
+  status: BulkUserImportStatus
+  message: string
+}
+
+function normalizeBulkPhone(value: string) {
+  let phone = value.replace(/\D/g, '')
+  if (phone.startsWith('62')) phone = `0${phone.slice(2)}`
+  if (phone.startsWith('8')) phone = `0${phone}`
+  return phone
+}
+
+function parseBulkUserLine(rawLine: string, line: number): ParsedBulkUserRow | null {
+  const text = rawLine.trim()
+  if (!text) return null
+
+  let name = ''
+  let rawPhone = ''
+
+  if (text.includes('\t')) {
+    const parts = text.split('\t').map((part) => part.trim())
+    name = parts[0] ?? ''
+    rawPhone = parts[1] ?? ''
+  } else {
+    const match = text.match(/^(.+?)\s+([+()0-9][+()0-9 .-]{7,})$/)
+    name = match?.[1]?.trim() ?? ''
+    rawPhone = match?.[2]?.trim() ?? ''
+  }
+
+  const phone = normalizeBulkPhone(rawPhone)
+  const email = phone ? `${phone}@${BULK_IMPORT_DOMAIN}` : ''
+
+  if (!name || !phone) {
+    return {
+      line,
+      name,
+      phone_number: phone,
+      email,
+      status: 'invalid',
+      message: 'Format baris tidak valid.',
+    }
+  }
+
+  if (name.length > 255) {
+    return {
+      line,
+      name,
+      phone_number: phone,
+      email,
+      status: 'invalid',
+      message: 'Nama lebih dari 255 karakter.',
+    }
+  }
+
+  if (!/^0\d{9,14}$/.test(phone)) {
+    return {
+      line,
+      name,
+      phone_number: phone,
+      email,
+      status: 'invalid',
+      message: 'Nomor HP harus 10-15 digit dan diawali 0.',
+    }
+  }
+
+  return {
+    line,
+    name,
+    phone_number: phone,
+    email,
+    status: 'valid',
+    message: 'Siap diimport.',
+  }
+}
+
+function summarizeBulkImportRows(rows: BulkUserImportRow[]): BulkUserImportPreview {
+  return {
+    rows,
+    totalRows: rows.length,
+    validRows: rows.filter((row) => row.status === 'valid').length,
+    duplicateExistingRows: rows.filter((row) => row.status === 'duplicate_existing').length,
+    duplicateInputRows: rows.filter((row) => row.status === 'duplicate_input').length,
+    invalidRows: rows.filter((row) => row.status === 'invalid').length,
+  }
+}
+
+async function buildBulkUserImportPreview(rawText: string): Promise<BulkUserImportPreview> {
+  const parsedRows = rawText
+    .split(/\r?\n/)
+    .map((line, index) => parseBulkUserLine(line, index + 1))
+    .filter((row): row is ParsedBulkUserRow => row !== null)
+
+  if (parsedRows.length > MAX_BULK_IMPORT_ROWS) {
+    throw new Error(`Maksimal ${MAX_BULK_IMPORT_ROWS} user per import.`)
+  }
+
+  const seenEmails = new Set<string>()
+  const candidateEmails: string[] = []
+  const rowsWithInputDuplicates = parsedRows.map((row) => {
+    if (row.status !== 'valid') return row
+    if (seenEmails.has(row.email)) {
+      return {
+        ...row,
+        status: 'duplicate_input' as const,
+        message: 'Duplikat di data import.',
+      }
+    }
+    seenEmails.add(row.email)
+    candidateEmails.push(row.email)
+    return row
+  })
+
+  const existingUsers = candidateEmails.length
+    ? await prisma.users.findMany({
+        where: { email: { in: candidateEmails } },
+        select: { email: true },
+      })
+    : []
+  const existingEmails = new Set(existingUsers.map((user) => user.email.toLowerCase()))
+
+  const rows = rowsWithInputDuplicates.map((row): BulkUserImportRow => {
+    if (row.status !== 'valid') return row
+    if (existingEmails.has(row.email)) {
+      return {
+        ...row,
+        status: 'duplicate_existing',
+        message: 'Email sudah terdaftar.',
+      }
+    }
+    return row
+  })
+
+  return summarizeBulkImportRows(rows)
 }
 
 export async function getUsers(params: {
@@ -274,6 +440,57 @@ export async function getRolesForUserForm(): Promise<RoleOption[]> {
     orderBy: { name: 'asc' },
   })
   return roles.map((r) => ({ id: r.id.toString(), name: r.name }))
+}
+
+export async function previewUsersBulkImportFromText(rawText: string): Promise<BulkUserImportPreview> {
+  await requireAdmin()
+
+  return buildBulkUserImportPreview(rawText)
+}
+
+export async function importUsersBulkFromText(rawText: string): Promise<BulkUserImportResult> {
+  const admin = await requireAdmin()
+
+  const preview = await buildBulkUserImportPreview(rawText)
+  const rowsToCreate = preview.rows.filter((row) => row.status === 'valid')
+
+  if (rowsToCreate.length === 0) {
+    return {
+      ...preview,
+      createdRows: 0,
+      skippedRows: preview.totalRows,
+    }
+  }
+
+  const data = await Promise.all(
+    rowsToCreate.map(async (row) => ({
+      name: row.name,
+      email: row.email,
+      password: await bcrypt.hash(row.phone_number, 12),
+      phone_number: row.phone_number,
+      is_admin: false,
+      is_blocked: false,
+    }))
+  )
+
+  const result = await prisma.users.createMany({
+    data,
+    skipDuplicates: true,
+  })
+
+  logEvent('info', 'user.bulk_imported', {
+    adminId: admin.id,
+    source: 'text',
+    created: result.count,
+    skipped: preview.totalRows - result.count,
+  })
+  revalidatePath('/settings/users')
+
+  return {
+    ...preview,
+    createdRows: result.count,
+    skippedRows: preview.totalRows - result.count,
+  }
 }
 
 export async function createUser(data: {

@@ -4,6 +4,7 @@ import { getSessionUser } from '@/app/lib/session'
 import { getUsers } from '@/app/actions/users'
 import UsersTable from '@/app/components/settings/UsersTable'
 import AddUserButton from '@/app/components/settings/AddUserButton'
+import ImportUsersButton from '@/app/components/settings/ImportUsersButton'
 
 type SearchParams = Promise<{
   page?: string
@@ -61,7 +62,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
               Kelola akun pengguna, status blokir, dan reset rate limit login.
             </p>
           </div>
-          <AddUserButton />
+          <div className="flex flex-wrap justify-end gap-2">
+            <ImportUsersButton />
+            <AddUserButton />
+          </div>
         </div>
 
         {/* Filter */}

@@ -25,6 +25,10 @@ export default function TenantsLoading() {
           </div>
         </div>
 
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+
         {/* Table */}
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           {/* Header */}

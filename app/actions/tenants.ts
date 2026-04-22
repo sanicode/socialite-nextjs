@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/app/lib/authorization'
 import { prisma } from '@/app/lib/prisma'
@@ -7,6 +8,8 @@ import { logEvent } from '@/app/lib/logger'
 
 // Used when creating/deleting role assignments via Prisma (not inline SQL)
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
+const TENANT_OPERATOR_IMPORT_DOMAIN = 'bmi.com'
+const MAX_TENANT_OPERATOR_IMPORT_ROWS = 500
 
 export type TenantRow = {
   id: string
@@ -32,6 +35,20 @@ export type TenantDetail = {
   }
 }
 
+export type TenantFormData = {
+  name: string
+  domain?: string
+  address: {
+    id?: string
+    address_line_1?: string
+    city?: string
+    state?: string
+    zip?: string
+    province_id?: number | null
+    city_id?: number | null
+  }
+}
+
 export type TenantUserRow = {
   tenant_user_id: string
   user_id: string
@@ -44,6 +61,50 @@ export type UserSearchResult = {
   id: string
   name: string
   email: string
+}
+
+export type TenantOperatorImportStatus =
+  | 'valid'
+  | 'duplicate_input'
+  | 'not_found'
+  | 'blocked'
+  | 'already_in_tenant'
+  | 'already_has_tenant_role'
+  | 'invalid'
+
+export type TenantOperatorImportRow = {
+  line: number
+  phone_number: string
+  email: string
+  user_id: string | null
+  name: string | null
+  status: TenantOperatorImportStatus
+  message: string
+}
+
+export type TenantOperatorImportPreview = {
+  rows: TenantOperatorImportRow[]
+  totalRows: number
+  validRows: number
+  duplicateInputRows: number
+  notFoundRows: number
+  blockedRows: number
+  alreadyInTenantRows: number
+  alreadyHasTenantRoleRows: number
+  invalidRows: number
+}
+
+export type TenantOperatorImportResult = TenantOperatorImportPreview & {
+  createdRows: number
+  skippedRows: number
+}
+
+type ParsedOperatorImportRow = {
+  line: number
+  phone_number: string
+  email: string
+  status: TenantOperatorImportStatus
+  message: string
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -225,6 +286,197 @@ export async function getTenantUsers(tenantId: string): Promise<TenantUserRow[]>
 
 // ── User search ───────────────────────────────────────────────────────────────
 
+function normalizeImportPhone(value: string) {
+  let phone = value.replace(/\D/g, '')
+  if (phone.startsWith('62')) phone = `0${phone.slice(2)}`
+  if (phone.startsWith('8')) phone = `0${phone}`
+  return phone
+}
+
+function parseOperatorImportLine(rawLine: string, line: number): ParsedOperatorImportRow | null {
+  const text = rawLine.trim()
+  if (!text) return null
+
+  const phone = normalizeImportPhone(text)
+  const email = phone ? `${phone}@${TENANT_OPERATOR_IMPORT_DOMAIN}` : ''
+
+  if (!/^0\d{9,14}$/.test(phone)) {
+    return {
+      line,
+      phone_number: phone,
+      email,
+      status: 'invalid',
+      message: 'Nomor HP harus 10-15 digit dan diawali 0.',
+    }
+  }
+
+  return {
+    line,
+    phone_number: phone,
+    email,
+    status: 'valid',
+    message: 'Siap diimport.',
+  }
+}
+
+function summarizeOperatorImportRows(rows: TenantOperatorImportRow[]): TenantOperatorImportPreview {
+  return {
+    rows,
+    totalRows: rows.length,
+    validRows: rows.filter((row) => row.status === 'valid').length,
+    duplicateInputRows: rows.filter((row) => row.status === 'duplicate_input').length,
+    notFoundRows: rows.filter((row) => row.status === 'not_found').length,
+    blockedRows: rows.filter((row) => row.status === 'blocked').length,
+    alreadyInTenantRows: rows.filter((row) => row.status === 'already_in_tenant').length,
+    alreadyHasTenantRoleRows: rows.filter((row) => row.status === 'already_has_tenant_role').length,
+    invalidRows: rows.filter((row) => row.status === 'invalid').length,
+  }
+}
+
+async function buildTenantOperatorImportPreview(
+  tenantId: string,
+  rawText: string
+): Promise<TenantOperatorImportPreview> {
+  const tenantBigId = BigInt(tenantId)
+  const parsedRows = rawText
+    .split(/\r?\n/)
+    .map((line, index) => parseOperatorImportLine(line, index + 1))
+    .filter((row): row is ParsedOperatorImportRow => row !== null)
+
+  if (parsedRows.length > MAX_TENANT_OPERATOR_IMPORT_ROWS) {
+    throw new Error(`Maksimal ${MAX_TENANT_OPERATOR_IMPORT_ROWS} operator per import.`)
+  }
+
+  const seenPhones = new Set<string>()
+  const phones: string[] = []
+  const emails: string[] = []
+  const rowsWithInputDuplicates = parsedRows.map((row) => {
+    if (row.status !== 'valid') return row
+    if (seenPhones.has(row.phone_number)) {
+      return {
+        ...row,
+        status: 'duplicate_input' as const,
+        message: 'Duplikat di data import.',
+      }
+    }
+    seenPhones.add(row.phone_number)
+    phones.push(row.phone_number)
+    emails.push(row.email)
+    return row
+  })
+
+  const users = phones.length
+    ? await prisma.users.findMany({
+        where: {
+          OR: [
+            { email: { in: emails } },
+            { phone_number: { in: phones } },
+          ],
+        },
+        select: { id: true, name: true, email: true, phone_number: true, is_blocked: true },
+      })
+    : []
+
+  const userByPhoneOrEmail = new Map<string, (typeof users)[number]>()
+  for (const user of users) {
+    userByPhoneOrEmail.set(user.email.toLowerCase(), user)
+    if (user.phone_number) userByPhoneOrEmail.set(normalizeImportPhone(user.phone_number), user)
+  }
+
+  const userIds = users.map((user) => user.id)
+  const tenantUsers = userIds.length
+    ? await prisma.tenant_user.findMany({
+        where: { user_id: { in: userIds } },
+        select: { id: true, tenant_id: true, user_id: true },
+      })
+    : []
+
+  const currentTenantUserIds = new Set(
+    tenantUsers
+      .filter((tu) => tu.tenant_id === tenantBigId)
+      .map((tu) => tu.user_id.toString())
+  )
+
+  const tenantUserIds = tenantUsers.map((tu) => tu.id)
+  const roleAssignments = tenantUserIds.length
+    ? await prisma.model_has_roles.findMany({
+        where: {
+          model_type: MODEL_TYPE_TENANT_USER,
+          model_id: { in: tenantUserIds },
+        },
+        select: { model_id: true },
+      })
+    : []
+
+  const tenantUserIdById = new Map(tenantUsers.map((tu) => [tu.id.toString(), tu]))
+  const userIdsWithTenantRoles = new Set(
+    roleAssignments
+      .map((role) => tenantUserIdById.get(role.model_id.toString())?.user_id.toString())
+      .filter((userId): userId is string => Boolean(userId))
+  )
+
+  const rows = rowsWithInputDuplicates.map((row): TenantOperatorImportRow => {
+    const user = userByPhoneOrEmail.get(row.phone_number) ?? userByPhoneOrEmail.get(row.email)
+
+    if (row.status !== 'valid') {
+      return {
+        ...row,
+        user_id: user?.id.toString() ?? null,
+        name: user?.name ?? null,
+      }
+    }
+
+    if (!user) {
+      return {
+        ...row,
+        user_id: null,
+        name: null,
+        status: 'not_found',
+        message: 'User tidak ditemukan.',
+      }
+    }
+
+    const userId = user.id.toString()
+    if (user.is_blocked) {
+      return {
+        ...row,
+        user_id: userId,
+        name: user.name,
+        status: 'blocked',
+        message: 'User sedang diblokir.',
+      }
+    }
+
+    if (currentTenantUserIds.has(userId)) {
+      return {
+        ...row,
+        user_id: userId,
+        name: user.name,
+        status: 'already_in_tenant',
+        message: 'User sudah terdaftar di tenant ini.',
+      }
+    }
+
+    if (userIdsWithTenantRoles.has(userId)) {
+      return {
+        ...row,
+        user_id: userId,
+        name: user.name,
+        status: 'already_has_tenant_role',
+        message: 'User sudah memiliki role tenant_user.',
+      }
+    }
+
+    return {
+      ...row,
+      user_id: userId,
+      name: user.name,
+    }
+  })
+
+  return summarizeOperatorImportRows(rows)
+}
+
 export async function searchUsersForTenant(
   query: string,
   tenantId: string
@@ -241,22 +493,13 @@ export async function searchUsersForTenant(
        AND u.id NOT IN (
          SELECT user_id FROM tenant_user WHERE tenant_id = $2
        )
-       -- Belum memiliki role (Spatie standard: model_id = tu.id)
+       -- Belum pernah memiliki role tenant_user apa pun
        AND NOT EXISTS (
          SELECT 1
          FROM model_has_roles mhr
-         JOIN roles r ON r.id = mhr.role_id AND r.name IN ('manager', 'operator')
          JOIN tenant_user tu ON tu.id = mhr.model_id
          WHERE mhr.model_type = 'App\\Models\\TenantUser'
            AND tu.user_id = u.id
-       )
-       -- Belum memiliki role (legacy: model_id = u.id)
-       AND NOT EXISTS (
-         SELECT 1
-         FROM model_has_roles mhr
-         JOIN roles r ON r.id = mhr.role_id AND r.name IN ('manager', 'operator')
-         WHERE mhr.model_type = 'App\\Models\\TenantUser'
-           AND mhr.model_id = u.id
        )
      ORDER BY u.name ASC
      LIMIT 10`,
@@ -265,6 +508,98 @@ export async function searchUsersForTenant(
   )
 
   return rows.map((r) => ({ id: r.id.toString(), name: r.name, email: r.email }))
+}
+
+export async function previewTenantOperatorImportFromText(
+  tenantId: string,
+  rawText: string
+): Promise<TenantOperatorImportPreview> {
+  await requireAdmin()
+
+  return buildTenantOperatorImportPreview(tenantId, rawText)
+}
+
+export async function importTenantOperatorsFromText(
+  tenantId: string,
+  rawText: string
+): Promise<TenantOperatorImportResult> {
+  const admin = await requireAdmin()
+
+  const preview = await buildTenantOperatorImportPreview(tenantId, rawText)
+  const rowsToCreate = preview.rows.filter(
+    (row): row is TenantOperatorImportRow & { user_id: string; name: string } =>
+      row.status === 'valid' && row.user_id !== null && row.name !== null
+  )
+
+  if (rowsToCreate.length === 0) {
+    return {
+      ...preview,
+      createdRows: 0,
+      skippedRows: preview.totalRows,
+    }
+  }
+
+  const role = await prisma.roles.findFirst({
+    where: { name: 'operator' },
+    orderBy: [{ is_tenant_role: 'desc' }, { id: 'asc' }],
+  })
+  if (!role) throw new Error("Role 'operator' tidak ditemukan di database.")
+
+  const userIds = rowsToCreate.map((row) => BigInt(row.user_id))
+  const insertResult = await prisma.$queryRaw<{ count: bigint }[]>`
+    WITH candidate(user_id) AS (
+      SELECT DISTINCT UNNEST(${userIds}::bigint[])
+    ),
+    eligible AS (
+      SELECT c.user_id
+      FROM candidate c
+      INNER JOIN users u ON u.id = c.user_id
+      WHERE u.is_blocked = false
+        AND NOT EXISTS (
+          SELECT 1
+          FROM tenant_user tu
+          WHERE tu.tenant_id = ${BigInt(tenantId)}
+            AND tu.user_id = c.user_id
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM tenant_user tu
+          INNER JOIN model_has_roles mhr
+            ON mhr.model_type = ${MODEL_TYPE_TENANT_USER}
+           AND mhr.model_id = tu.id
+          WHERE tu.user_id = c.user_id
+        )
+    ),
+    inserted_tenant_users AS (
+      INSERT INTO tenant_user (tenant_id, user_id, created_at, updated_at)
+      SELECT ${BigInt(tenantId)}, user_id, NOW(), NOW()
+      FROM eligible
+      RETURNING id
+    ),
+    inserted_roles AS (
+      INSERT INTO model_has_roles (role_id, model_type, model_id)
+      SELECT ${role.id}, ${MODEL_TYPE_TENANT_USER}, id
+      FROM inserted_tenant_users
+      RETURNING model_id
+    )
+    SELECT COUNT(*)::bigint AS count
+    FROM inserted_roles
+  `
+  const createdRows = Number(insertResult[0]?.count ?? 0)
+
+  logEvent('info', 'tenant.operator_bulk_imported', {
+    adminId: admin.id,
+    tenantId,
+    created: createdRows,
+    skipped: preview.totalRows - createdRows,
+  })
+  revalidatePath('/settings/tenants')
+
+  return {
+    ...preview,
+    createdRows,
+    skippedRows: preview.totalRows - createdRows,
+  }
 }
 
 // ── Provinces / cities for select ─────────────────────────────────────────────
@@ -303,36 +638,13 @@ export async function getRegCityById(cityId: string): Promise<string | null> {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-export async function updateTenant(
-  tenantId: string,
-  data: {
-    name: string
-    domain?: string
-    address: {
-      id?: string
-      address_line_1?: string
-      city?: string
-      state?: string
-      zip?: string
-      province_id?: number | null
-      city_id?: number | null
-    }
-  }
-): Promise<void> {
-  const admin = await requireAdmin()
+function cleanTenantFormData(data: TenantFormData) {
+  const name = data.name.trim()
+  if (!name) throw new Error('Nama tenant tidak boleh kosong')
 
-  if (!data.name.trim()) throw new Error('Nama tenant tidak boleh kosong')
-
-  await prisma.tenants.update({
-    where: { id: BigInt(tenantId) },
-    data: {
-      name: data.name.trim(),
-      domain: data.domain?.trim() || null,
-    },
-  })
-
+  const domain = data.domain?.trim() || null
   const { id: addressId, ...addressFields } = data.address
-  const cleanAddress = {
+  const address = {
     address_line_1: addressFields.address_line_1?.trim() || null,
     city: addressFields.city?.trim() || null,
     state: addressFields.state?.trim() || null,
@@ -341,11 +653,77 @@ export async function updateTenant(
     city_id: addressFields.city_id ?? null,
   }
 
+  return { name, domain, addressId, address }
+}
+
+export async function createTenant(data: TenantFormData): Promise<void> {
+  const admin = await requireAdmin()
+
+  const { name, domain, address } = cleanTenantFormData(data)
+
+  if (domain) {
+    const existing = await prisma.tenants.findUnique({ where: { domain } })
+    if (existing) throw new Error('Domain sudah digunakan tenant lain.')
+  }
+
+  const tenant = await prisma.$transaction(async (tx) => {
+    const createdTenant = await tx.tenants.create({
+      data: {
+        uuid: randomUUID(),
+        name,
+        domain,
+        created_by: BigInt(admin.id),
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    })
+
+    await tx.addresses.create({
+      data: {
+        ...address,
+        tenant_id: createdTenant.id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    })
+
+    return createdTenant
+  })
+
+  logEvent('info', 'tenant.created', { adminId: admin.id, tenantId: tenant.id.toString() })
+  revalidatePath('/settings/tenants')
+}
+
+export async function updateTenant(
+  tenantId: string,
+  data: TenantFormData
+): Promise<void> {
+  const admin = await requireAdmin()
+
+  const { name, domain, addressId, address } = cleanTenantFormData(data)
+
+  await prisma.tenants.update({
+    where: { id: BigInt(tenantId) },
+    data: {
+      name,
+      domain,
+      updated_at: new Date(),
+    },
+  })
+
   if (addressId) {
-    await prisma.addresses.update({ where: { id: BigInt(addressId) }, data: cleanAddress })
+    await prisma.addresses.update({
+      where: { id: BigInt(addressId) },
+      data: { ...address, updated_at: new Date() },
+    })
   } else {
     await prisma.addresses.create({
-      data: { ...cleanAddress, tenant_id: BigInt(tenantId) },
+      data: {
+        ...address,
+        tenant_id: BigInt(tenantId),
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
     })
   }
 

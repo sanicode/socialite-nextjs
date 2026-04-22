@@ -4,8 +4,11 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useToast } from '@/app/components/ToastContext'
 import {
+  createTenant,
   getTenantDetail,
   getTenantUsers,
+  importTenantOperatorsFromText,
+  previewTenantOperatorImportFromText,
   searchUsersForTenant,
   updateTenant,
   deleteTenant,
@@ -15,6 +18,10 @@ import {
   getCitiesForSelect,
   type TenantRow,
   type TenantDetail,
+  type TenantFormData,
+  type TenantOperatorImportPreview,
+  type TenantOperatorImportRow,
+  type TenantOperatorImportStatus,
   type TenantUserRow,
   type UserSearchResult,
 } from '@/app/actions/tenants'
@@ -78,6 +85,88 @@ function Label({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">{children}</label>
 }
 
+function getOperatorImportStatusLabel(status: TenantOperatorImportStatus) {
+  switch (status) {
+    case 'valid':
+      return 'Valid'
+    case 'duplicate_input':
+      return 'Duplikat'
+    case 'not_found':
+      return 'Tidak ada'
+    case 'blocked':
+      return 'Diblokir'
+    case 'already_in_tenant':
+      return 'Sudah di tenant'
+    case 'already_has_tenant_role':
+      return 'Sudah punya role'
+    case 'invalid':
+      return 'Invalid'
+  }
+}
+
+function getOperatorImportStatusClass(status: TenantOperatorImportStatus) {
+  switch (status) {
+    case 'valid':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+    case 'duplicate_input':
+      return 'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400'
+    case 'not_found':
+      return 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+    case 'blocked':
+      return 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400'
+    case 'already_in_tenant':
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400'
+    case 'already_has_tenant_role':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+    case 'invalid':
+      return 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400'
+  }
+}
+
+function OperatorImportSummary({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{label}</p>
+      <p className="mt-0.5 text-base font-semibold text-neutral-900 dark:text-white">{value.toLocaleString('id-ID')}</p>
+    </div>
+  )
+}
+
+function OperatorImportPreviewTable({ rows }: { rows: TenantOperatorImportRow[] }) {
+  return (
+    <div className="max-h-64 overflow-auto rounded-xl border border-neutral-200 dark:border-neutral-700">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead className="sticky top-0 bg-neutral-50 dark:bg-neutral-800">
+          <tr className="border-b border-neutral-200 dark:border-neutral-700">
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Baris</th>
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">No HP</th>
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">User</th>
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Email</th>
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Status</th>
+            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.line}-${row.phone_number}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+              <td className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">{row.line}</td>
+              <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300">{row.phone_number || '-'}</td>
+              <td className="px-3 py-2 font-medium text-neutral-900 dark:text-white">{row.name ?? '-'}</td>
+              <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300">{row.email || '-'}</td>
+              <td className="px-3 py-2">
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getOperatorImportStatusClass(row.status)}`}>
+                  {getOperatorImportStatusLabel(row.status)}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">{row.message}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ── Edit Info Form (inside dialog) ────────────────────────────────────────────
 
 type EditFormState = {
@@ -92,19 +181,55 @@ type EditFormState = {
   city_id: string
 }
 
-function EditInfoPanel({
+function buildEmptyTenantDetail(): TenantDetail {
+  return {
+    id: '',
+    name: '',
+    domain: null,
+    address: {
+      id: null,
+      address_line_1: null,
+      city: null,
+      state: null,
+      zip: null,
+      province_id: null,
+      city_id: null,
+    },
+  }
+}
+
+function buildTenantFormData(form: EditFormState): TenantFormData {
+  return {
+    name: form.name,
+    domain: form.domain,
+    address: {
+      id: form.address_id || undefined,
+      address_line_1: form.address_line_1,
+      city: form.city,
+      state: form.state,
+      zip: form.zip,
+      province_id: form.province_id ? parseInt(form.province_id, 10) : null,
+      city_id: form.city_id ? parseInt(form.city_id, 10) : null,
+    },
+  }
+}
+
+function TenantInfoPanel({
   detail,
   provinces,
   onSave,
   onCancel,
   saving,
+  submitLabel = 'Simpan',
 }: {
   detail: TenantDetail
   provinces: { id: number; name: string }[]
   onSave: (form: EditFormState) => void
   onCancel: () => void
   saving: boolean
+  submitLabel?: string
 }) {
+  const initialProvinceId = detail.address.province_id?.toString() ?? ''
   const [form, setForm] = useState<EditFormState>({
     name: detail.name,
     domain: detail.domain ?? '',
@@ -113,21 +238,29 @@ function EditInfoPanel({
     city: detail.address.city ?? '',
     state: detail.address.state ?? '',
     zip: detail.address.zip ?? '',
-    province_id: detail.address.province_id?.toString() ?? '',
+    province_id: initialProvinceId,
     city_id: detail.address.city_id?.toString() ?? '',
   })
 
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
-  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(Boolean(initialProvinceId))
 
-  // Load cities when province changes
   useEffect(() => {
-    if (!form.province_id) { setCities([]); return }
-    setLoadingCities(true)
-    getCitiesForSelect(parseInt(form.province_id, 10))
-      .then(setCities)
-      .finally(() => setLoadingCities(false))
-  }, [form.province_id])
+    if (!initialProvinceId) return
+
+    let cancelled = false
+    getCitiesForSelect(parseInt(initialProvinceId, 10))
+      .then((nextCities) => {
+        if (!cancelled) setCities(nextCities)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCities(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialProvinceId])
 
   function set(field: keyof EditFormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -135,6 +268,16 @@ function EditInfoPanel({
 
   function handleProvinceChange(provinceId: string) {
     setForm((prev) => ({ ...prev, province_id: provinceId, city_id: '', city: '' }))
+    setCities([])
+    if (!provinceId) {
+      setLoadingCities(false)
+      return
+    }
+
+    setLoadingCities(true)
+    getCitiesForSelect(parseInt(provinceId, 10))
+      .then(setCities)
+      .finally(() => setLoadingCities(false))
   }
 
   function handleCityChange(cityId: string) {
@@ -261,7 +404,7 @@ function EditInfoPanel({
           disabled={saving || !form.name.trim()}
           className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
         >
-          {saving ? 'Menyimpan...' : 'Simpan'}
+          {saving ? 'Menyimpan...' : submitLabel}
         </button>
       </div>
     </div>
@@ -377,10 +520,16 @@ function ManageUsersPanel({
 }) {
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
+  const [importPending, startImportTransition] = useTransition()
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null)
   const [newRole, setNewRole] = useState<'manager' | 'operator'>(roleFilter ?? 'operator')
   const [detachTarget, setDetachTarget] = useState<TenantUserRow | null>(null)
   const detachDialogRef = useRef<HTMLDialogElement>(null)
+  const importDialogRef = useRef<HTMLDialogElement>(null)
+  const [importText, setImportText] = useState('')
+  const [importPreview, setImportPreview] = useState<TenantOperatorImportPreview | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importAction, setImportAction] = useState<'preview' | 'import' | null>(null)
 
   // Local copy — updated optimistically on role change, synced from prop on attach/detach
   const [localUsers, setLocalUsers] = useState<TenantUserRow[]>(users)
@@ -402,6 +551,60 @@ function ManageUsersPanel({
   function openDetach(u: TenantUserRow) {
     setDetachTarget(u)
     detachDialogRef.current?.showModal()
+  }
+
+  function openImportOperators() {
+    setImportText('')
+    setImportPreview(null)
+    setImportError(null)
+    setImportAction(null)
+    importDialogRef.current?.showModal()
+  }
+
+  function handleImportTextChange(value: string) {
+    setImportText(value)
+    setImportPreview(null)
+    setImportError(null)
+  }
+
+  function handleImportPreview() {
+    setImportError(null)
+    setImportAction('preview')
+    startImportTransition(async () => {
+      try {
+        const preview = await previewTenantOperatorImportFromText(tenant.id, importText)
+        setImportPreview(preview)
+        if (preview.totalRows === 0) setImportError('Tidak ada nomor HP yang bisa diproses.')
+      } catch (e) {
+        setImportError((e as Error).message)
+      } finally {
+        setImportAction(null)
+      }
+    })
+  }
+
+  function handleImportOperators() {
+    setImportError(null)
+    setImportAction('import')
+    startImportTransition(async () => {
+      try {
+        const result = await importTenantOperatorsFromText(tenant.id, importText)
+        setImportPreview(result)
+        showToast(
+          result.createdRows > 0 ? 'success' : 'warning',
+          'Import Operator Selesai',
+          `${result.createdRows.toLocaleString('id-ID')} operator ditambahkan, ${result.skippedRows.toLocaleString('id-ID')} dilewati.`
+        )
+        if (result.createdRows > 0) {
+          importDialogRef.current?.close()
+          onUsersChange()
+        }
+      } catch (e) {
+        setImportError((e as Error).message)
+      } finally {
+        setImportAction(null)
+      }
+    })
   }
 
   function confirmDetach() {
@@ -452,9 +655,24 @@ function ManageUsersPanel({
     <div className="space-y-5">
       {/* ── Add user (top) ── */}
       <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-          Tambah {roleLabel}
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            Tambah {roleLabel}
+          </p>
+          {roleFilter === 'operator' && (
+            <button
+              type="button"
+              onClick={openImportOperators}
+              disabled={pending || importPending}
+              className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0-12l4 4m-4-4L8 7M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
+              </svg>
+              Import
+            </button>
+          )}
+        </div>
         {selectedUser ? (
           <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="min-w-0 flex-1">
@@ -568,6 +786,85 @@ function ManageUsersPanel({
         )}
       </div>
 
+      {/* Operator import dialog (nested) */}
+      <dialog
+        ref={importDialogRef}
+        className="fixed top-1/2 left-1/2 m-0 w-[calc(100vw-2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-black/60 dark:border-neutral-700 dark:bg-neutral-900"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-5 py-4 dark:border-neutral-700">
+          <div>
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Import Operator</h3>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{tenant.name}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => importDialogRef.current?.close()}
+            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="max-h-[76vh] space-y-4 overflow-y-auto p-5">
+          {importError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+              {importError}
+            </div>
+          )}
+
+          <div>
+            <Label>Nomor HP operator</Label>
+            <textarea
+              value={importText}
+              onChange={(e) => handleImportTextChange(e.target.value)}
+              rows={9}
+              placeholder={`085645215121\n087711060007\n082233159002`}
+              className={`${inputCls()} font-mono text-xs leading-5`}
+            />
+          </div>
+
+          {importPreview && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <OperatorImportSummary label="Total" value={importPreview.totalRows} />
+                <OperatorImportSummary label="Valid" value={importPreview.validRows} />
+                <OperatorImportSummary label="Tidak Ada" value={importPreview.notFoundRows} />
+                <OperatorImportSummary label="Dilewati" value={importPreview.totalRows - importPreview.validRows} />
+              </div>
+              <OperatorImportPreviewTable rows={importPreview.rows} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-neutral-200 px-5 py-4 sm:flex-row sm:justify-end dark:border-neutral-700">
+          <button
+            type="button"
+            onClick={() => importDialogRef.current?.close()}
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={handleImportPreview}
+            disabled={importPending || !importText.trim()}
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          >
+            {importAction === 'preview' ? 'Memeriksa...' : 'Preview'}
+          </button>
+          <button
+            type="button"
+            onClick={handleImportOperators}
+            disabled={importPending || !importPreview || importPreview.validRows === 0}
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+          >
+            {importAction === 'import' ? 'Mengimport...' : 'Import Valid Operators'}
+          </button>
+        </div>
+      </dialog>
+
       {/* Detach confirmation dialog (nested) */}
       <dialog
         ref={detachDialogRef}
@@ -618,6 +915,28 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
     startSortTransition(() => { router.push(href, { scroll: false }) })
   }
 
+  // ── Create dialog ──
+  const createDialogRef = useRef<HTMLDialogElement>(null)
+  const [createFormKey, setCreateFormKey] = useState(0)
+
+  function openCreate() {
+    setCreateFormKey((key) => key + 1)
+    createDialogRef.current?.showModal()
+  }
+
+  function handleCreate(form: EditFormState) {
+    startTransition(async () => {
+      try {
+        await createTenant(buildTenantFormData(form))
+        showToast('success', 'Tenant Dibuat', `${form.name} berhasil ditambahkan.`)
+        createDialogRef.current?.close()
+        router.refresh()
+      } catch (e) {
+        showToast('error', 'Gagal Membuat', (e as Error).message)
+      }
+    })
+  }
+
   // ── Edit info dialog ──
   const editDialogRef = useRef<HTMLDialogElement>(null)
   const [editTarget, setEditTarget] = useState<TenantRow | null>(null)
@@ -638,22 +957,11 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
     if (!editTarget) return
     startTransition(async () => {
       try {
-        await updateTenant(editTarget.id, {
-          name: form.name,
-          domain: form.domain,
-          address: {
-            id: form.address_id || undefined,
-            address_line_1: form.address_line_1,
-            city: form.city,
-            state: form.state,
-            zip: form.zip,
-            province_id: form.province_id ? parseInt(form.province_id, 10) : null,
-            city_id: form.city_id ? parseInt(form.city_id, 10) : null,
-          },
-        })
+        await updateTenant(editTarget.id, buildTenantFormData(form))
         showToast('success', 'Tenant Diperbarui', `Data ${editTarget.name} berhasil disimpan.`)
         editDialogRef.current?.close()
         setEditTarget(null)
+        router.refresh()
       } catch (e) {
         showToast('error', 'Gagal Menyimpan', (e as Error).message)
       }
@@ -721,6 +1029,20 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
 
   return (
     <>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Tenant
+        </button>
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <table className="w-full text-sm">
@@ -802,14 +1124,6 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
                       >
                         Edit
                       </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => openUsers(t)}
-                        className="rounded-lg border border-blue-300 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
-                      >
-                        Users
-                      </button>
                       {!hasUsers && (
                         <button
                           type="button"
@@ -836,6 +1150,40 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
           </tbody>
         </table>
       </div>
+
+      {/* ── Create Dialog ── */}
+      <dialog
+        ref={createDialogRef}
+        className="fixed top-1/2 left-1/2 m-0 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl backdrop:bg-black/40 dark:border-neutral-700 dark:bg-neutral-900"
+      >
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Create Tenant</h2>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+              Buat tenant baru beserta alamat untuk mapping kota.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => createDialogRef.current?.close()}
+            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <TenantInfoPanel
+          key={createFormKey}
+          detail={buildEmptyTenantDetail()}
+          provinces={provinces}
+          onSave={handleCreate}
+          onCancel={() => createDialogRef.current?.close()}
+          saving={pending}
+          submitLabel="Create Tenant"
+        />
+      </dialog>
 
       {/* ── Edit Info Dialog ── */}
       <dialog
@@ -867,7 +1215,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
         )}
 
         {!loadingEdit && editDetail && (
-          <EditInfoPanel
+          <TenantInfoPanel
             detail={editDetail}
             provinces={provinces}
             onSave={handleSaveEdit}
@@ -960,4 +1308,3 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
     </>
   )
 }
-
