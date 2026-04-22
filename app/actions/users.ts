@@ -164,18 +164,19 @@ async function buildBulkUserImportPreview(rawText: string): Promise<BulkUserImpo
     throw new Error(`Maksimal ${MAX_BULK_IMPORT_ROWS} user per import.`)
   }
 
-  const seenEmails = new Set<string>()
+  const firstLineByEmail = new Map<string, number>()
   const candidateEmails: string[] = []
   const rowsWithInputDuplicates = parsedRows.map((row) => {
     if (row.status !== 'valid') return row
-    if (seenEmails.has(row.email)) {
+    const firstLine = firstLineByEmail.get(row.email)
+    if (firstLine) {
       return {
         ...row,
         status: 'duplicate_input' as const,
-        message: 'Duplikat di data import.',
+        message: `Duplikat di data import dengan baris ${firstLine}.`,
       }
     }
-    seenEmails.add(row.email)
+    firstLineByEmail.set(row.email, row.line)
     candidateEmails.push(row.email)
     return row
   })
@@ -183,18 +184,39 @@ async function buildBulkUserImportPreview(rawText: string): Promise<BulkUserImpo
   const existingUsers = candidateEmails.length
     ? await prisma.users.findMany({
         where: { email: { in: candidateEmails } },
-        select: { email: true },
+        select: { id: true, email: true },
       })
     : []
-  const existingEmails = new Set(existingUsers.map((user) => user.email.toLowerCase()))
+  const existingUserByEmail = new Map(existingUsers.map((user) => [user.email.toLowerCase(), user]))
+  const existingUserIds = existingUsers.map((user) => user.id)
+  const tenantRows = existingUserIds.length
+    ? await prisma.$queryRaw<{ user_id: bigint; tenant_name: string }[]>`
+        SELECT tu.user_id, t.name AS tenant_name
+        FROM tenant_user tu
+        INNER JOIN tenants t ON t.id = tu.tenant_id
+        WHERE tu.user_id = ANY(${existingUserIds}::bigint[])
+        ORDER BY t.name ASC
+      `
+    : []
+  const tenantNamesByUserId = new Map<string, string[]>()
+  for (const row of tenantRows) {
+    const userId = row.user_id.toString()
+    const tenantNames = tenantNamesByUserId.get(userId) ?? []
+    tenantNames.push(row.tenant_name)
+    tenantNamesByUserId.set(userId, tenantNames)
+  }
 
   const rows = rowsWithInputDuplicates.map((row): BulkUserImportRow => {
     if (row.status !== 'valid') return row
-    if (existingEmails.has(row.email)) {
+    const existingUser = existingUserByEmail.get(row.email)
+    if (existingUser) {
+      const tenantNames = tenantNamesByUserId.get(existingUser.id.toString()) ?? []
       return {
         ...row,
         status: 'duplicate_existing',
-        message: 'Email sudah terdaftar.',
+        message: tenantNames.length
+          ? `Email sudah terdaftar di tenant: ${tenantNames.join(', ')}.`
+          : 'Email sudah terdaftar, belum terdaftar di tenant.',
       }
     }
     return row
