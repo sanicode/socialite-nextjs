@@ -20,6 +20,7 @@ import {
   type TenantDetail,
   type TenantFormData,
   type TenantOperatorImportPreview,
+  type TenantOperatorImportResult,
   type TenantOperatorImportRow,
   type TenantOperatorImportStatus,
   type TenantUserRow,
@@ -511,11 +512,13 @@ function ManageUsersPanel({
   tenant,
   users,
   onUsersChange,
+  onOperatorCountChange,
   roleFilter,
 }: {
   tenant: TenantRow
   users: TenantUserRow[]
   onUsersChange: () => void
+  onOperatorCountChange?: (count: number) => void
   roleFilter?: 'manager' | 'operator'
 }) {
   const { showToast } = useToast()
@@ -527,7 +530,7 @@ function ManageUsersPanel({
   const detachDialogRef = useRef<HTMLDialogElement>(null)
   const importDialogRef = useRef<HTMLDialogElement>(null)
   const [importText, setImportText] = useState('')
-  const [importPreview, setImportPreview] = useState<TenantOperatorImportPreview | null>(null)
+  const [importPreview, setImportPreview] = useState<TenantOperatorImportPreview | TenantOperatorImportResult | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importAction, setImportAction] = useState<'preview' | 'import' | null>(null)
 
@@ -574,6 +577,7 @@ function ManageUsersPanel({
       try {
         const preview = await previewTenantOperatorImportFromText(tenant.id, importText)
         setImportPreview(preview)
+        onOperatorCountChange?.(preview.operatorTotalRows)
         if (preview.totalRows === 0) setImportError('Tidak ada nomor HP yang bisa diproses.')
       } catch (e) {
         setImportError((e as Error).message)
@@ -590,10 +594,11 @@ function ManageUsersPanel({
       try {
         const result = await importTenantOperatorsFromText(tenant.id, importText)
         setImportPreview(result)
+        onOperatorCountChange?.(result.operatorTotalRows)
         showToast(
           result.createdRows > 0 ? 'success' : 'warning',
           'Import Operator Selesai',
-          `${result.createdRows.toLocaleString('id-ID')} operator ditambahkan, ${result.skippedRows.toLocaleString('id-ID')} dilewati.`
+          `${result.createdRows.toLocaleString('id-ID')} operator ditambahkan, ${result.skippedRows.toLocaleString('id-ID')} dilewati. Total operator sekarang ${result.operatorTotalRows.toLocaleString('id-ID')}.`
         )
         if (result.createdRows > 0) {
           importDialogRef.current?.close()
@@ -827,11 +832,12 @@ function ManageUsersPanel({
 
           {importPreview && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <OperatorImportSummary label="Total" value={importPreview.totalRows} />
-                <OperatorImportSummary label="Valid" value={importPreview.validRows} />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <OperatorImportSummary label="Baris" value={importPreview.totalRows} />
+                <OperatorImportSummary label="Siap Import" value={importPreview.validRows} />
                 <OperatorImportSummary label="Tidak Ada" value={importPreview.notFoundRows} />
                 <OperatorImportSummary label="Dilewati" value={importPreview.totalRows - importPreview.validRows} />
+                <OperatorImportSummary label="Operator Saat Ini" value={importPreview.operatorTotalRows} />
               </div>
               <OperatorImportPreviewTable rows={importPreview.rows} />
             </div>
@@ -1261,6 +1267,13 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
             tenant={usersTenant}
             users={tenantUsers}
             onUsersChange={() => loadUsers(usersTenant.id)}
+            onOperatorCountChange={(operatorCount) => {
+              setLocalTenants((prev) =>
+                prev.map((t) =>
+                  t.id === usersTenant.id ? { ...t, operator_count: operatorCount } : t
+                )
+              )
+            }}
             roleFilter={filterRole ?? undefined}
           />
         )}

@@ -77,6 +77,7 @@ export type TenantOperatorImportRow = {
   phone_number: string
   email: string
   user_id: string | null
+  tenant_user_id: string | null
   name: string | null
   status: TenantOperatorImportStatus
   message: string
@@ -85,6 +86,7 @@ export type TenantOperatorImportRow = {
 export type TenantOperatorImportPreview = {
   rows: TenantOperatorImportRow[]
   totalRows: number
+  operatorTotalRows: number
   validRows: number
   duplicateInputRows: number
   notFoundRows: number
@@ -105,6 +107,22 @@ type ParsedOperatorImportRow = {
   email: string
   status: TenantOperatorImportStatus
   message: string
+}
+
+async function getTenantRoleCount(tenantId: string, roleName: 'manager' | 'operator') {
+  const result = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(DISTINCT tu.id)::bigint AS count
+    FROM tenant_user tu
+    INNER JOIN model_has_roles mhr
+      ON mhr.model_type = ${MODEL_TYPE_TENANT_USER}
+     AND mhr.model_id = tu.id
+    INNER JOIN roles r
+      ON r.id = mhr.role_id
+     AND r.name = ${roleName}
+    WHERE tu.tenant_id = ${BigInt(tenantId)}
+  `
+
+  return Number(result[0]?.count ?? 0)
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -319,10 +337,14 @@ function parseOperatorImportLine(rawLine: string, line: number): ParsedOperatorI
   }
 }
 
-function summarizeOperatorImportRows(rows: TenantOperatorImportRow[]): TenantOperatorImportPreview {
+function summarizeOperatorImportRows(
+  rows: TenantOperatorImportRow[],
+  operatorTotalRows: number
+): TenantOperatorImportPreview {
   return {
     rows,
     totalRows: rows.length,
+    operatorTotalRows,
     validRows: rows.filter((row) => row.status === 'valid').length,
     duplicateInputRows: rows.filter((row) => row.status === 'duplicate_input').length,
     notFoundRows: rows.filter((row) => row.status === 'not_found').length,
@@ -391,10 +413,10 @@ async function buildTenantOperatorImportPreview(
       })
     : []
 
-  const currentTenantUserIds = new Set(
+  const currentTenantUserByUserId = new Map(
     tenantUsers
       .filter((tu) => tu.tenant_id === tenantBigId)
-      .map((tu) => tu.user_id.toString())
+      .map((tu) => [tu.user_id.toString(), tu])
   )
 
   const tenantUserIds = tenantUsers.map((tu) => tu.id)
@@ -404,11 +426,19 @@ async function buildTenantOperatorImportPreview(
           model_type: MODEL_TYPE_TENANT_USER,
           model_id: { in: tenantUserIds },
         },
-        select: { model_id: true },
+        select: { model_id: true, roles: { select: { name: true } } },
       })
     : []
 
   const tenantUserIdById = new Map(tenantUsers.map((tu) => [tu.id.toString(), tu]))
+  const roleNamesByTenantUserId = new Map<string, string[]>()
+  for (const assignment of roleAssignments) {
+    const key = assignment.model_id.toString()
+    roleNamesByTenantUserId.set(key, [
+      ...(roleNamesByTenantUserId.get(key) ?? []),
+      assignment.roles.name,
+    ])
+  }
   const userIdsWithTenantRoles = new Set(
     roleAssignments
       .map((role) => tenantUserIdById.get(role.model_id.toString())?.user_id.toString())
@@ -422,6 +452,7 @@ async function buildTenantOperatorImportPreview(
       return {
         ...row,
         user_id: user?.id.toString() ?? null,
+        tenant_user_id: user ? currentTenantUserByUserId.get(user.id.toString())?.id.toString() ?? null : null,
         name: user?.name ?? null,
       }
     }
@@ -430,6 +461,7 @@ async function buildTenantOperatorImportPreview(
       return {
         ...row,
         user_id: null,
+        tenant_user_id: null,
         name: null,
         status: 'not_found',
         message: 'User tidak ditemukan.',
@@ -441,19 +473,47 @@ async function buildTenantOperatorImportPreview(
       return {
         ...row,
         user_id: userId,
+        tenant_user_id: currentTenantUserByUserId.get(userId)?.id.toString() ?? null,
         name: user.name,
         status: 'blocked',
         message: 'User sedang diblokir.',
       }
     }
 
-    if (currentTenantUserIds.has(userId)) {
+    const currentTenantUser = currentTenantUserByUserId.get(userId)
+    const currentTenantRoles = currentTenantUser
+      ? roleNamesByTenantUserId.get(currentTenantUser.id.toString()) ?? []
+      : []
+
+    if (currentTenantUser && currentTenantRoles.includes('operator')) {
       return {
         ...row,
         user_id: userId,
+        tenant_user_id: currentTenantUser.id.toString(),
         name: user.name,
         status: 'already_in_tenant',
-        message: 'User sudah terdaftar di tenant ini.',
+        message: 'User sudah terdaftar sebagai operator di tenant ini.',
+      }
+    }
+
+    if (currentTenantUser && currentTenantRoles.length === 0) {
+      return {
+        ...row,
+        user_id: userId,
+        tenant_user_id: currentTenantUser.id.toString(),
+        name: user.name,
+        message: 'Tenant user sudah ada tanpa role; role operator akan dilengkapi.',
+      }
+    }
+
+    if (currentTenantUser) {
+      return {
+        ...row,
+        user_id: userId,
+        tenant_user_id: currentTenantUser.id.toString(),
+        name: user.name,
+        status: 'already_in_tenant',
+        message: `User sudah terdaftar sebagai ${currentTenantRoles.join(', ')} di tenant ini.`,
       }
     }
 
@@ -461,6 +521,7 @@ async function buildTenantOperatorImportPreview(
       return {
         ...row,
         user_id: userId,
+        tenant_user_id: null,
         name: user.name,
         status: 'already_has_tenant_role',
         message: 'User sudah memiliki role tenant_user.',
@@ -470,11 +531,14 @@ async function buildTenantOperatorImportPreview(
     return {
       ...row,
       user_id: userId,
+      tenant_user_id: null,
       name: user.name,
     }
   })
 
-  return summarizeOperatorImportRows(rows)
+  const operatorTotalRows = await getTenantRoleCount(tenantId, 'operator')
+
+  return summarizeOperatorImportRows(rows, operatorTotalRows)
 }
 
 export async function searchUsersForTenant(
@@ -526,12 +590,12 @@ export async function importTenantOperatorsFromText(
   const admin = await requireAdmin()
 
   const preview = await buildTenantOperatorImportPreview(tenantId, rawText)
-  const rowsToCreate = preview.rows.filter(
+  const rowsToImport = preview.rows.filter(
     (row): row is TenantOperatorImportRow & { user_id: string; name: string } =>
       row.status === 'valid' && row.user_id !== null && row.name !== null
   )
 
-  if (rowsToCreate.length === 0) {
+  if (rowsToImport.length === 0) {
     return {
       ...preview,
       createdRows: 0,
@@ -545,10 +609,32 @@ export async function importTenantOperatorsFromText(
   })
   if (!role) throw new Error("Role 'operator' tidak ditemukan di database.")
 
-  const userIds = rowsToCreate.map((row) => BigInt(row.user_id))
+  const newUserIds = rowsToImport
+    .filter((row) => row.tenant_user_id === null)
+    .map((row) => BigInt(row.user_id))
+  const existingTenantUserIds = rowsToImport
+    .filter((row) => row.tenant_user_id !== null)
+    .map((row) => BigInt(row.tenant_user_id as string))
   const insertResult = await prisma.$queryRaw<{ count: bigint }[]>`
-    WITH candidate(user_id) AS (
-      SELECT DISTINCT UNNEST(${userIds}::bigint[])
+    WITH existing_tenant_user(id) AS (
+      SELECT DISTINCT UNNEST(${existingTenantUserIds}::bigint[])
+    ),
+    eligible_existing AS (
+      SELECT tu.id
+      FROM existing_tenant_user e
+      INNER JOIN tenant_user tu ON tu.id = e.id
+      INNER JOIN users u ON u.id = tu.user_id
+      WHERE tu.tenant_id = ${BigInt(tenantId)}
+        AND u.is_blocked = false
+        AND NOT EXISTS (
+          SELECT 1
+          FROM model_has_roles mhr
+          WHERE mhr.model_type = ${MODEL_TYPE_TENANT_USER}
+            AND mhr.model_id = tu.id
+        )
+    ),
+    candidate(user_id) AS (
+      SELECT DISTINCT UNNEST(${newUserIds}::bigint[])
     ),
     eligible AS (
       SELECT c.user_id
@@ -579,13 +665,19 @@ export async function importTenantOperatorsFromText(
     inserted_roles AS (
       INSERT INTO model_has_roles (role_id, model_type, model_id)
       SELECT ${role.id}, ${MODEL_TYPE_TENANT_USER}, id
-      FROM inserted_tenant_users
+      FROM (
+        SELECT id FROM eligible_existing
+        UNION
+        SELECT id FROM inserted_tenant_users
+      ) target_tenant_users
+      ON CONFLICT DO NOTHING
       RETURNING model_id
     )
     SELECT COUNT(*)::bigint AS count
     FROM inserted_roles
   `
   const createdRows = Number(insertResult[0]?.count ?? 0)
+  const operatorTotalRows = await getTenantRoleCount(tenantId, 'operator')
 
   logEvent('info', 'tenant.operator_bulk_imported', {
     adminId: admin.id,
@@ -597,6 +689,7 @@ export async function importTenantOperatorsFromText(
 
   return {
     ...preview,
+    operatorTotalRows,
     createdRows,
     skippedRows: preview.totalRows - createdRows,
   }
