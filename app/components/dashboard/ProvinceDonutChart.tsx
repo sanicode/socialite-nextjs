@@ -3,6 +3,7 @@
 import {
   BarChart,
   Bar,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -10,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { ProvinceChartItem } from '@/app/actions/dashboard'
+import { renderHorizontalBarValueLabel } from '@/app/components/dashboard/ChartValueLabels'
 
 type Props = {
   data: ProvinceChartItem[]
@@ -50,12 +52,15 @@ export default function ProvinceDonutChart({ data }: Props) {
         </div>
       </div>
 
-      <div style={{ height: Math.max(300, chartData.length * 44 + 40), minHeight: 300 }}>
+      <div
+        className="text-neutral-600 dark:text-neutral-300"
+        style={{ height: Math.max(300, chartData.length * 44 + 40), minHeight: 300 }}
+      >
         <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 44 + 40)}>
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 0, right: 48, left: 8, bottom: 0 }}
+            margin={{ top: 0, right: 72, left: 8, bottom: 0 }}
             barCategoryGap="25%"
             barGap={3}
           >
@@ -98,8 +103,12 @@ export default function ProvinceDonutChart({ data }: Props) {
               ]}
               cursor={{ fill: 'rgba(148,163,184,0.06)' }}
             />
-            <Bar dataKey="posts" fill="#4E79A7" radius={[0, 4, 4, 0]} name="posts" maxBarSize={16} />
-            <Bar dataKey="operators" fill="#EDC948" radius={[0, 4, 4, 0]} name="operators" maxBarSize={16} />
+            <Bar dataKey="posts" fill="#4E79A7" radius={[0, 4, 4, 0]} name="posts" maxBarSize={16}>
+              <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
+            </Bar>
+            <Bar dataKey="operators" fill="#EDC948" radius={[0, 4, 4, 0]} name="operators" maxBarSize={16}>
+              <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
