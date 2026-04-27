@@ -25,7 +25,7 @@ export default async function SecuritySettingsPage() {
           <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
           <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Security</h1>
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            Kelola blokir IP, negara yang boleh mengakses aplikasi, dan batas maksimal upload file.
+            Kelola blokir IP, negara yang boleh mengakses aplikasi, status REST API, dan batas maksimal upload file.
           </p>
         </div>
 

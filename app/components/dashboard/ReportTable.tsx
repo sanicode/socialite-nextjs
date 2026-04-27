@@ -15,7 +15,8 @@ export default function ReportTable({ data }: Props) {
 
   const columns = data.length > 0 ? Object.keys(data[0]) : []
   const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
-  const pageData = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const currentPage = Math.min(page, totalPages)
+  const pageData = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   function isUrl(value: unknown): value is string {
     if (typeof value !== 'string') return false
@@ -54,7 +55,13 @@ export default function ReportTable({ data }: Props) {
     return String(value)
   }
 
-  function renderCell(value: unknown) {
+  function getUrlLabel(column: string): string {
+    if (/^amplifikasi_\d+$/i.test(column)) return 'Lihat amplifikasi'
+    if (column.toLowerCase().endsWith('_screenshot')) return 'Lihat screenshot'
+    return 'Buka link'
+  }
+
+  function renderCell(column: string, value: unknown) {
     const text = formatCell(value)
     if (isUrl(value)) {
       return (
@@ -62,9 +69,10 @@ export default function ReportTable({ data }: Props) {
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 underline hover:opacity-80 transition truncate max-w-xs block"
+          title={value}
+          className="inline-flex max-w-40 items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
         >
-          {value}
+          <span className="truncate">{getUrlLabel(column)}</span>
         </a>
       )
     }
@@ -124,7 +132,7 @@ export default function ReportTable({ data }: Props) {
                     key={col}
                     className="px-4 py-3 text-neutral-700 dark:text-neutral-300 whitespace-nowrap"
                   >
-                    {renderCell(row[col])}
+                    {renderCell(col, row[col])}
                   </td>
                 ))}
               </tr>
@@ -136,21 +144,21 @@ export default function ReportTable({ data }: Props) {
       <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {data.length > 0
-            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, data.length)} dari ${data.length.toLocaleString('id-ID')} data`
+            ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, data.length)} dari ${data.length.toLocaleString('id-ID')} data`
             : '0 data'}
         </p>
         {totalPages > 1 && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(1)}
-              disabled={page === 1}
+              disabled={currentPage === 1}
               className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               First
             </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
+              disabled={currentPage === 1}
               className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -159,11 +167,11 @@ export default function ReportTable({ data }: Props) {
               Prev
             </button>
             <span className="text-xs text-neutral-500 dark:text-neutral-400 min-w-17.5 text-center">
-              Hal. {page} / {totalPages}
+              Hal. {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
+              disabled={currentPage === totalPages}
               className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               Next
@@ -173,7 +181,7 @@ export default function ReportTable({ data }: Props) {
             </button>
             <button
               onClick={() => setPage(totalPages)}
-              disabled={page === totalPages}
+              disabled={currentPage === totalPages}
               className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               Last

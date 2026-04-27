@@ -5,10 +5,32 @@ import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
 import { useRouter } from "next/navigation"
 
+type PostStatus = 'pending' | 'valid' | 'invalid'
+
+type SerializedMedia = {
+  model_id: string
+  file_name: string
+  custom_properties: unknown
+  order_column?: number | null
+}
+
+type SerializedPost = {
+  id: string
+  title: string | null
+  created_at: string | null
+  source_url: string | null
+  status: PostStatus
+  blog_post_categories?: { name: string } | null
+}
+
+type SerializedUser = {
+  name: string | null
+}
+
 export default function UserPostsTableClient({ posts, mediaByPostId }: {
-  posts: any[]
-  mediaByPostId: Record<string, any>
-  userData: any
+  posts: SerializedPost[]
+  mediaByPostId: Record<string, SerializedMedia>
+  userData: SerializedUser
   status: string
 }) {
   const router = useRouter()
@@ -17,7 +39,7 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
   const [modalUrl, setModalUrl] = useState<string | null>(null)
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
 
-  const handleStatusChange = (postId: string, newStatus: string) => {
+  const handleStatusChange = (postId: string, newStatus: PostStatus) => {
     setOptimisticPosts(prev => prev.filter((p) => p.id.toString() !== postId))
     startTransition(async () => {
       try {
@@ -62,9 +84,10 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                 let imageUrl = ""
                 if (media) {
                   try {
-                    const customProps = typeof media.custom_properties === 'object'
-                      ? media.custom_properties
-                      : JSON.parse(media.custom_properties || '{}')
+                    const rawCustomProps = media.custom_properties
+                    const customProps = rawCustomProps && typeof rawCustomProps === 'object'
+                      ? rawCustomProps as { source_url?: string }
+                      : JSON.parse(String(rawCustomProps ?? '{}')) as { source_url?: string }
                     imageUrl = customProps.source_url || `https://softlink.sgp1.digitaloceanspaces.com/${media.model_id}/${media.file_name}`
                   } catch {
                     imageUrl = `https://softlink.sgp1.digitaloceanspaces.com/${media.model_id}/${media.file_name}`
@@ -123,7 +146,7 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                         <select
                           className="rounded-lg border border-neutral-300 dark:border-neutral-700 px-2 py-1.5 bg-white dark:bg-neutral-800 text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900 transition"
                           value={post.status}
-                          onChange={(e) => handleStatusChange(post.id.toString(), e.target.value)}
+                          onChange={(e) => handleStatusChange(post.id.toString(), e.target.value as PostStatus)}
                         >
                           <option value="pending">Pending</option>
                           <option value="valid">Valid</option>

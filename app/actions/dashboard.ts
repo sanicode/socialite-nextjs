@@ -9,6 +9,7 @@ export type DashboardFilters = {
   provinceId?: string
   cityId?: string
   tenantId?: string
+  status?: 'valid' | 'invalid'
 }
 
 export type DashboardStats = {
@@ -35,6 +36,25 @@ export type CityChartGroup = {
 
 export type ReportRow = Record<string, unknown>
 
+const REKAPITULASI_REPORT_COLUMNS = [
+  'tanggal_pelaporan',
+  'email',
+  'nama_operator',
+  'no_hp',
+  'propinsi',
+  'kabupaten_kota',
+  'tiktok_link',
+  'instagram_link',
+  'facebook_link',
+  'tiktok_screenshot',
+  'instagram_screenshot',
+  'facebook_screenshot',
+  'amplifikasi_1',
+  'amplifikasi_2',
+  'amplifikasi_3',
+  'amplifikasi_4',
+].map((column) => `v.${column}`).join(',\n      ')
+
 const getProvincesCached = cache(async () => {
   return prisma.reg_provinces.findMany({ orderBy: { name: 'asc' } })
 })
@@ -60,6 +80,43 @@ const resolveLocationNames = cache(async (provinceId?: string, cityId?: string) 
   }
 })
 
+function buildRekapitulasiReportFilters(filters: DashboardFilters, provinceName?: string, cityName?: string) {
+  const conditions: string[] = []
+  const params: unknown[] = []
+  let idx = 1
+
+  if (filters.dateFrom) {
+    conditions.push(`tanggal_pelaporan >= $${idx}::date`)
+    params.push(filters.dateFrom)
+    idx++
+  }
+  if (filters.dateTo) {
+    conditions.push(`tanggal_pelaporan <= $${idx}::date`)
+    params.push(filters.dateTo)
+    idx++
+  }
+  if (filters.tenantId) {
+    conditions.push(`tenant_id = $${idx}`)
+    params.push(parseInt(filters.tenantId, 10))
+    idx++
+  }
+  if (provinceName) {
+    conditions.push(`propinsi = $${idx}`)
+    params.push(provinceName)
+    idx++
+  }
+  if (cityName) {
+    conditions.push(`kabupaten_kota = $${idx}`)
+    params.push(cityName)
+    idx++
+  }
+
+  return {
+    whereClause: conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '',
+    params,
+  }
+}
+
 export async function getProvinces(): Promise<{ id: number; name: string }[]> {
   const provinces = await getProvincesCached()
   return provinces.map((p) => ({ id: p.id, name: p.name }))
@@ -71,58 +128,48 @@ export async function getCities(provinceId?: string): Promise<{ id: string; name
 }
 
 export async function getDashboardStats(filters: DashboardFilters): Promise<DashboardStats> {
-  const { provinceId, cityId, dateFrom, dateTo, tenantId } = filters
+  const { tenantId } = filters
+  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
-  const { provinceName, cityName } = await resolveLocationNames(provinceId, cityId)
+  const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
+  const statusClause = filters.status
+    ? `${whereClause ? 'AND' : 'WHERE'} EXISTS (
+         SELECT 1
+         FROM blog_posts bp
+         INNER JOIN users u ON u.id = bp.user_id
+         WHERE u.email = v.email
+           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND bp.status::text = $${params.length + 1}::text
+       )`
+    : ''
+  const postResult = await prisma.$queryRawUnsafe<{ post_count: bigint }[]>(
+    `
+    SELECT COUNT(*) AS post_count
+    FROM v_rekapitulasi_pelaporan v
+    ${whereClause}
+    ${statusClause}
+    `,
+    ...params,
+    ...(filters.status ? [filters.status] : [])
+  )
 
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let idx = 1
-
-  if (dateFrom) {
-    conditions.push(`v.tanggal_pelaporan >= $${idx}::date`)
-    params.push(dateFrom)
-    idx++
-  }
-  if (dateTo) {
-    conditions.push(`v.tanggal_pelaporan <= $${idx}::date`)
-    params.push(dateTo)
-    idx++
-  }
-  if (provinceName) {
-    conditions.push(`v.propinsi = $${idx}`)
-    params.push(provinceName)
-    idx++
-  }
-  if (cityName) {
-    conditions.push(`v.kabupaten_kota = $${idx}`)
-    params.push(cityName)
-    idx++
-  }
-
-  // Tenant scoping: if tenantId is provided, we need to join with users and tenant_user to filter by tenant's users
-  // log tenantId and idx for debugging
-  console.log('Tenant ID:', tenantId, 'Param Index:', idx)
-  if (tenantId) {
-    // Scope to users belonging to this tenant via email lookup
-    conditions.push(
-      `v.email IN (SELECT u.email FROM users u JOIN tenant_user tu ON tu.user_id = u.id WHERE tu.tenant_id = $${idx})`
-    )
-    params.push(parseInt(tenantId, 10))
-    idx++
-  }
-
-  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
-
-  // Post count + verified count from view
-  const postResult = await prisma.$queryRawUnsafe<{ post_count: bigint; verified_count: bigint }[]>(
-    `SELECT
-      COUNT(*)                                                         AS post_count,
-      COUNT(CASE WHEN bp.status = 'valid' THEN 1 END)                 AS verified_count
-    FROM v_pelaporan_media_sosial v
-    LEFT JOIN blog_posts bp ON bp.slug = v.bukti_upload
-    ${whereClause}`,
-    ...params
+  const validStatusClause = `${whereClause ? 'AND' : 'WHERE'} EXISTS (
+       SELECT 1
+       FROM blog_posts bp
+       INNER JOIN users u ON u.id = bp.user_id
+       WHERE u.email = v.email
+         AND date(bp.created_at) = v.tanggal_pelaporan
+         AND bp.status::text = $${params.length + 1}::text
+     )`
+  const verifiedResult = await prisma.$queryRawUnsafe<{ verified_count: bigint }[]>(
+    `
+    SELECT COUNT(*) AS verified_count
+    FROM v_rekapitulasi_pelaporan v
+    ${whereClause}
+    ${validStatusClause}
+    `,
+    ...params,
+    'valid'
   )
 
   // User count (kuota) from v_kuota_per_kota — not filtered by date but filtered by current city of manager
@@ -156,11 +203,12 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
   )
 
   const postRow = postResult[0]
+  const verifiedRow = verifiedResult[0]
   const kuotaRow = kuotaResult[0]
   return {
     userCount: Number(kuotaRow?.user_count ?? 0),
     postCount: Number(postRow?.post_count ?? 0),
-    verifiedCount: Number(postRow?.verified_count ?? 0),
+    verifiedCount: Number(verifiedRow?.verified_count ?? 0),
   }
 }
 
@@ -194,12 +242,18 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
     params.push(parseInt(filters.cityId, 10))
     idx++
   }
+  if (filters.status) {
+    conditions.push(`bp.status = $${idx}`)
+    params.push(filters.status)
+    idx++
+  }
 
   const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
 
   const result = await prisma.$queryRawUnsafe<{ name: string; value: bigint }[]>(
     `SELECT rp.name, COUNT(bp.id) as value
-     FROM blog_posts bp
+     FROM v_pelaporan_media_sosial v
+     LEFT JOIN blog_posts bp ON bp.slug = v.bukti_upload
      INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
      INNER JOIN addresses a ON a.tenant_id = tu.tenant_id
      INNER JOIN reg_provinces rp ON rp.id = a.province_id
@@ -229,6 +283,11 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
     postParams.push(filters.dateTo)
     idx++
   }
+  if (filters.tenantId) {
+    postConditions.push(`tenant_id = $${idx}`)
+    postParams.push(parseInt(filters.tenantId, 10))
+    idx++
+  }
   if (provinceName) {
     postConditions.push(`propinsi = $${idx}`)
     postParams.push(provinceName)
@@ -239,8 +298,17 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
     postParams.push(cityName)
     idx++
   }
-
   const postWhere = postConditions.length > 0 ? 'WHERE ' + postConditions.join(' AND ') : ''
+  const statusClause = filters.status
+    ? `${postWhere ? 'AND' : 'WHERE'} EXISTS (
+         SELECT 1
+         FROM blog_posts bp
+         INNER JOIN users u ON u.id = bp.user_id
+         WHERE u.email = v.email
+           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND bp.status::text = $${postParams.length + 1}::text
+       )`
+    : ''
 
   // Operators: no date filter — kuota is total distinct operators per province
   const opConditions: string[] = []
@@ -263,10 +331,12 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
   const [postRows, opRows] = await Promise.all([
     prisma.$queryRawUnsafe<{ name: string; posts: bigint }[]>(
       `SELECT propinsi AS name, COUNT(*) AS posts
-       FROM v_pelaporan_media_sosial
+       FROM v_rekapitulasi_pelaporan v
        ${postWhere}
+       ${statusClause}
        GROUP BY propinsi`,
-      ...postParams
+      ...postParams,
+      ...(filters.status ? [filters.status] : [])
     ),
     prisma.$queryRawUnsafe<{ name: string; operators: bigint }[]>(
       `SELECT propinsi AS name, SUM(jumlah) AS operators
@@ -311,6 +381,11 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
     postParams.push(filters.dateTo)
     idx++
   }
+  if (filters.tenantId) {
+    postConditions.push(`tenant_id = $${idx}`)
+    postParams.push(parseInt(filters.tenantId, 10))
+    idx++
+  }
   if (provinceName) {
     postConditions.push(`propinsi = $${idx}`)
     postParams.push(provinceName)
@@ -321,8 +396,17 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
     postParams.push(cityName)
     idx++
   }
-
   const postWhere = postConditions.length > 0 ? 'WHERE ' + postConditions.join(' AND ') : ''
+  const statusClause = filters.status
+    ? `${postWhere ? 'AND' : 'WHERE'} EXISTS (
+         SELECT 1
+         FROM blog_posts bp
+         INNER JOIN users u ON u.id = bp.user_id
+         WHERE u.email = v.email
+           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND bp.status::text = $${postParams.length + 1}::text
+       )`
+    : ''
 
   // Operators: from v_kuota_per_kota — no date filter, kuota is capacity not activity
   const opConditions: string[] = []
@@ -345,10 +429,12 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
   const [postRows, opRows] = await Promise.all([
     prisma.$queryRawUnsafe<{ province: string; name: string; posts: bigint }[]>(
       `SELECT propinsi AS province, kabupaten_kota AS name, COUNT(*) AS posts
-       FROM v_pelaporan_media_sosial
+       FROM v_rekapitulasi_pelaporan v
        ${postWhere}
+       ${statusClause}
        GROUP BY propinsi, kabupaten_kota`,
-      ...postParams
+      ...postParams,
+      ...(filters.status ? [filters.status] : [])
     ),
     prisma.$queryRawUnsafe<{ province: string; name: string; operators: bigint }[]>(
       `SELECT propinsi AS province, kota AS name, jumlah AS operators
@@ -394,71 +480,35 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
 }
 
 export async function getReportData(filters: DashboardFilters): Promise<ReportRow[]> {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let idx = 1
-
-  if (filters.dateFrom) {
-    conditions.push(`tanggal_pelaporan >= $${idx}::date`)
-    params.push(filters.dateFrom)
-    idx++
-  }
-  if (filters.dateTo) {
-    conditions.push(`tanggal_pelaporan <= $${idx}::date`)
-    params.push(filters.dateTo)
-    idx++
-  }
-  if (filters.tenantId) {
-    // Scope to users belonging to this tenant
-    const tenantUsers = await prisma.tenant_user.findMany({
-      where: { tenant_id: BigInt(filters.tenantId) },
-      select: { user_id: true },
-    })
-    const userIds = tenantUsers.map((tu) => tu.user_id)
-    if (userIds.length > 0) {
-      const emails = await prisma.users.findMany({
-        where: { id: { in: userIds } },
-        select: { email: true },
-      })
-      const emailList = emails.map((u) => u.email)
-      if (emailList.length > 0) {
-        conditions.push(`email = ANY($${idx}::varchar[])`)
-        params.push(emailList)
-        idx++
-      }
-    } else {
-      // No users in tenant, return empty
-      return []
-    }
-  }
-  if (filters.provinceId) {
-    const { provinceName } = await resolveLocationNames(filters.provinceId)
-    if (provinceName) {
-      conditions.push(`propinsi = $${idx}`)
-      params.push(provinceName)
-      idx++
-    }
-  }
-  if (filters.cityId) {
-    const { cityName } = await resolveLocationNames(undefined, filters.cityId)
-    if (cityName) {
-      conditions.push(`kabupaten_kota = $${idx}`)
-      params.push(cityName)
-      idx++
-    }
-  }
-
-  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
+  const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
+  const statusClause = filters.status
+    ? `${whereClause ? 'AND' : 'WHERE'} EXISTS (
+         SELECT 1
+         FROM blog_posts bp
+         INNER JOIN users u ON u.id = bp.user_id
+         WHERE u.email = v.email
+           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND bp.status::text = $${params.length + 1}::text
+       )`
+    : ''
 
   const result = await prisma.$queryRawUnsafe<ReportRow[]>(
-    `SELECT * FROM v_rekapitulasi_pelaporan ${whereClause} ORDER BY tanggal_pelaporan DESC`,
-    ...params
+    `SELECT
+      ${REKAPITULASI_REPORT_COLUMNS}
+     FROM v_rekapitulasi_pelaporan v
+     ${whereClause}
+     ${statusClause}
+     ORDER BY tanggal_pelaporan DESC, nama_operator`,
+    ...params,
+    ...(filters.status ? [filters.status] : [])
   )
 
   // Serialize BigInt values to strings
   return result.map((row) => {
     const serialized: ReportRow = {}
     for (const [key, value] of Object.entries(row)) {
+      if (key === 'tenant_id') continue
       serialized[key] = typeof value === 'bigint' ? value.toString() : value
     }
     return serialized
@@ -466,61 +516,36 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
 }
 
 export async function getPostsByDate(filters: DashboardFilters): Promise<ChartItem[]> {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let idx = 1
+  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
+  const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
 
-  if (filters.dateFrom) {
-    conditions.push(`bp.created_at >= $${idx}::timestamp`)
-    params.push(filters.dateFrom)
-    idx++
-  }
-  if (filters.dateTo) {
-    conditions.push(`bp.created_at <= $${idx}::timestamp`)
-    params.push(filters.dateTo + 'T23:59:59')
-    idx++
-  }
-  if (filters.tenantId) {
-    conditions.push(`tu.tenant_id = $${idx}`)
-    params.push(parseInt(filters.tenantId, 10))
-    idx++
-  }
-  if (filters.provinceId) {
-    conditions.push(`a.province_id = $${idx}`)
-    params.push(parseInt(filters.provinceId, 10))
-    idx++
-  }
-  if (filters.cityId) {
-    conditions.push(`a.city_id = $${idx}`)
-    params.push(parseInt(filters.cityId, 10))
-    idx++
-  }
-
-  const needsGeoJoin = filters.provinceId || filters.cityId
-  const needsTenantJoin = filters.tenantId || needsGeoJoin
-
-  let joinClause = ''
-  if (needsTenantJoin) {
-    joinClause = 'INNER JOIN tenant_user tu ON tu.user_id = bp.user_id'
-    if (needsGeoJoin) {
-      joinClause += ' INNER JOIN addresses a ON a.tenant_id = tu.tenant_id'
-    }
-  }
-
-  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
-
-  const result = await prisma.$queryRawUnsafe<{ date: Date; value: bigint }[]>(
-    `SELECT DATE(bp.created_at) as date, COUNT(bp.id) as value
-     FROM blog_posts bp
-     ${joinClause}
-     ${whereClause}
-     GROUP BY DATE(bp.created_at)
-     ORDER BY date ASC`,
-    ...params
+  const statusClause = filters.status
+    ? `${whereClause ? 'AND' : 'WHERE'} EXISTS (
+         SELECT 1
+         FROM blog_posts bp
+         INNER JOIN users u ON u.id = bp.user_id
+         WHERE u.email = v.email
+           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND bp.status::text = $${params.length + 1}::text
+       )`
+    : ''
+  const result = await prisma.$queryRawUnsafe<{ date: string; value: bigint }[]>(
+    `
+    SELECT
+      to_char(tanggal_pelaporan, 'YYYY-MM-DD') AS date,
+      COUNT(*) AS value
+    FROM v_rekapitulasi_pelaporan v
+    ${whereClause}
+    ${statusClause}
+    GROUP BY tanggal_pelaporan
+    ORDER BY date ASC
+    `,
+    ...params,
+    ...(filters.status ? [filters.status] : [])
   )
 
   return result.map((r) => ({
-    name: new Date(r.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+    name: new Date(`${r.date}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
     value: Number(r.value),
   }))
 }

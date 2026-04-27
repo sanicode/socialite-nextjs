@@ -22,9 +22,38 @@ type Props = {
 
 const PAGE_SIZE = 10
 
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'valid':
+      return 'Valid'
+    case 'invalid':
+      return 'Invalid'
+    default:
+      return 'Pending'
+  }
+}
+
+function getStatusClass(status: string) {
+  if (status === 'valid') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+  if (status === 'invalid') return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+  return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+}
+
 export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default' }: Props) {
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
+  const showReadOnlyStatus = !canVerify
+  const columnCount =
+    (isAdmin ? 1 : 0) +
+    1 +
+    (showScreenshot ? 1 : 0) +
+    1 +
+    1 +
+    (showUrl ? 1 : 0) +
+    (canVerify ? 1 : 0) +
+    (isAdmin ? 2 : 0) +
+    (canVerify || showReadOnlyStatus ? 1 : 0) +
+    (isAdmin ? 1 : 0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -61,7 +90,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     params.delete('success')
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${basePath}?${nextQuery}` : basePath)
-  }, [router, searchParams, showToast])
+  }, [basePath, router, searchParams, showToast])
 
   const currentSort = searchParams.get('sort') ?? 'desc'
 
@@ -112,7 +141,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     startTransition(() => {
       router.push(`${basePath}?${params.toString()}`)
     })
-  }, [router, searchParams, startTransition])
+  }, [basePath, router, searchParams, startTransition])
 
   useEffect(() => {
     setSearchValue(searchParams.get('search') ?? '')
@@ -306,6 +335,11 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                     Verifikasi
                   </th>
                 )}
+                {showReadOnlyStatus && (
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
+                    Status
+                  </th>
+                )}
                 {isAdmin && (
                 <th className="text-right px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
                   Aksi
@@ -317,7 +351,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
               {posts.length === 0 && (
                 <tr>
                   <td
-                    colSpan={canVerify ? 10 : 6}
+                    colSpan={columnCount}
                     className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400"
                   >
                     Belum ada laporan.{' '}
@@ -471,18 +505,21 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                           })
                         }}
                         disabled={isPending}
-                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer transition disabled:opacity-50 ${
-                          post.status === 'valid'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                            : post.status === 'invalid'
-                              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                              : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                        }`}
+                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer transition disabled:opacity-50 ${getStatusClass(post.status)}`}
                       >
                         <option value="pending">Pending</option>
                         <option value="valid">Valid</option>
                         <option value="invalid">Invalid</option>
                       </select>
+                    </td>
+                  )}
+
+                  {/* Status */}
+                  {showReadOnlyStatus && (
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClass(post.status)}`}>
+                        {getStatusLabel(post.status)}
+                      </span>
                     </td>
                   )}
 

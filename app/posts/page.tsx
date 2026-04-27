@@ -6,7 +6,7 @@ import PostsTable from '@/app/components/posts/PostsTable'
 import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string }>
 
 export default async function PostsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
@@ -34,6 +34,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
     getPosts({
       search: params.search,
       categoryId: params.category,
+      status: params.status === 'pending' || params.status === 'valid' || params.status === 'invalid'
+        ? params.status
+        : undefined,
       page,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,

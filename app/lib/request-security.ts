@@ -13,6 +13,7 @@ export type SecuritySettings = {
   blockedIps: string[]
   allowedCountries: string[]
   allowUnknownCountries: boolean
+  apiEnabled: boolean
   maxUploadedFileSizeBytes: number
 }
 
@@ -35,6 +36,7 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   blockedIps: [],
   allowedCountries: [],
   allowUnknownCountries: true,
+  apiEnabled: true,
   maxUploadedFileSizeBytes: DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
 }
 
@@ -51,6 +53,7 @@ export function normalizeSecuritySettings(input: SecuritySettingsInput): Securit
     blockedIps: Array.from(new Set((input.blockedIps ?? []).map(normalizeIp).filter(Boolean))),
     allowedCountries: Array.from(new Set((input.allowedCountries ?? []).map(normalizeCountry).filter(Boolean))),
     allowUnknownCountries: input.allowUnknownCountries ?? true,
+    apiEnabled: input.apiEnabled ?? true,
     maxUploadedFileSizeBytes: normalizeUploadFileSizeBytes(input.maxUploadedFileSizeBytes),
   }
 }

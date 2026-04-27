@@ -46,7 +46,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   const appName = process.env.APP_NAME ?? 'Admin Panel'
-  const showDashboard = user.isAdmin || user.isManager
+  const showDashboard = user.isAdmin || user.isManager || user.isOperator
   const showOperators = user.isManager
   const showLaporanPerOperator = user.isAdmin || user.isManager
   const showLaporanSemua = user.isAdmin || user.isManager

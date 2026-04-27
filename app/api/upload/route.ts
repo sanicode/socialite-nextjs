@@ -7,12 +7,14 @@ import { logEvent } from '@/app/lib/logger'
 import { writeAccessLog } from '@/app/lib/access-logs'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
+import { ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const COLLECTION_NAME = 'blog-images'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireApiEnabled()
     const user = await requireUser()
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -109,6 +111,9 @@ export async function POST(request: NextRequest) {
       url: publicUrl,
     })
   } catch (error) {
+    if (error instanceof ApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     logEvent('error', 'upload.media.failed', { error })
     await writeAccessLog({
       eventType: 'upload_failed',

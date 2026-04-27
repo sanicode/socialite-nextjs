@@ -10,11 +10,11 @@ import { logEvent } from '@/app/lib/logger'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 
-export async function updatePostStatus(postId: string, status: string) {
+export async function updatePostStatus(postId: string, status: 'pending' | 'valid' | 'invalid') {
   try {
     await prisma.blog_posts.update({
       where: { id: BigInt(postId) },
-      data: { status: status as any }
+      data: { status },
     })
     
     // Opsional: Revalidate agar data di server terupdate
@@ -139,6 +139,7 @@ async function deleteMediaAssets(mediaList: Array<{ id: bigint; file_name: strin
 export async function getPosts(params: {
   search?: string
   categoryId?: string
+  status?: 'pending' | 'valid' | 'invalid'
   page?: number
   userId?: string
   tenantId?: string
@@ -147,7 +148,7 @@ export async function getPosts(params: {
   sortOrder?: 'asc' | 'desc'
   postType?: 'upload' | 'amplifikasi'
 }): Promise<{ posts: SerializedPost[]; total: number }> {
-  const { search, categoryId, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType } = params
+  const { search, categoryId, status, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType } = params
   const pageSize = 10
   const skip = (page - 1) * pageSize
 
@@ -176,6 +177,9 @@ export async function getPosts(params: {
     }),
     ...(categoryId && {
       blog_post_category_id: BigInt(categoryId),
+    }),
+    ...(status && {
+      status,
     }),
     ...((dateFrom || dateTo) && {
       created_at: {
@@ -459,7 +463,7 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
     select: { tenant_id: true },
   })
 
-  if (categoryId) {
+  if (categoryId && opts.sourceUrl !== 'amplifikasi') {
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
     const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)

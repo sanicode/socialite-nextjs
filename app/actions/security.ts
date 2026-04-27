@@ -21,6 +21,7 @@ export type SecuritySettingsState =
         blockedIpsText: string
         allowedCountriesText: string
         allowUnknownCountries: boolean
+        apiEnabled: boolean
         maxUploadedFileSizeBytes: number
       }
     }
@@ -44,6 +45,7 @@ export async function getSecuritySettingsFormState(): Promise<NonNullable<Securi
       blockedIpsText: settings.blockedIps.join('\n'),
       allowedCountriesText: settings.allowedCountries.join(', '),
       allowUnknownCountries: settings.allowUnknownCountries,
+      apiEnabled: settings.apiEnabled,
       maxUploadedFileSizeBytes: settings.maxUploadedFileSizeBytes,
     },
   }
@@ -59,6 +61,7 @@ export async function saveSecuritySettings(
     blockedIps: parseList(formData.get('blockedIps')),
     allowedCountries: parseList(formData.get('allowedCountries')),
     allowUnknownCountries: formData.get('allowUnknownCountries') === '1',
+    apiEnabled: formData.get('apiEnabled') === '1',
     maxUploadedFileSizeBytes: formData.get('maxUploadedFileSizeBytes'),
   })
 
@@ -73,6 +76,7 @@ export async function saveSecuritySettings(
         blockedIpsText: nextSettings.blockedIps.join('\n'),
         allowedCountriesText: nextSettings.allowedCountries.join(', '),
         allowUnknownCountries: nextSettings.allowUnknownCountries,
+        apiEnabled: nextSettings.apiEnabled,
         maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
       },
     }
@@ -84,6 +88,7 @@ export async function saveSecuritySettings(
     blockedIpsCount: nextSettings.blockedIps.length,
     allowedCountriesCount: nextSettings.allowedCountries.length,
     allowUnknownCountries: nextSettings.allowUnknownCountries,
+    apiEnabled: nextSettings.apiEnabled,
     maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
   })
 
@@ -96,6 +101,7 @@ export async function saveSecuritySettings(
       blockedIpsText: nextSettings.blockedIps.join('\n'),
       allowedCountriesText: nextSettings.allowedCountries.join(', '),
       allowUnknownCountries: nextSettings.allowUnknownCountries,
+      apiEnabled: nextSettings.apiEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
     },
   }

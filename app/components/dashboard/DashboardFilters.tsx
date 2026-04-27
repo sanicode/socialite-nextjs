@@ -30,6 +30,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
 
   const currentProvinceId = searchParams.get('provinceId') ?? ''
   const currentCityId = searchParams.get('cityId') ?? ''
+  const currentStatus = searchParams.get('status') ?? ''
 
   useEffect(() => {
     let cancelled = false
@@ -146,6 +147,19 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
                 : 'border-neutral-300 dark:border-neutral-700 focus:ring-neutral-900 dark:focus:ring-white'
             }`}
           />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
+          <select
+            value={currentStatus}
+            disabled={isPending}
+            onChange={(e) => updateParam('status', e.target.value)}
+            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          >
+            <option value="">Semua Status</option>
+            <option value="valid">Valid</option>
+            <option value="invalid">Invalid</option>
+          </select>
         </label>
         {isAdmin && (
           <label className="flex flex-col gap-1">

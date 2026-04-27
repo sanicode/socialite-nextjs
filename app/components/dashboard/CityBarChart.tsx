@@ -78,7 +78,7 @@ function ProvinceChart({ province, cities }: { province: string; cities: Provinc
               labelStyle={{ color: '#94a3b8', marginBottom: '3px', fontWeight: 600 }}
               formatter={(value, name) => [
                 Number(value).toLocaleString('id-ID'),
-                name === 'operators' ? 'Kuota Operator' : 'Data Masuk',
+                name === 'operators' ? 'Kuota Operator' : 'Pelapor',
               ]}
               cursor={{ fill: 'rgba(148,163,184,0.06)' }}
             />
@@ -99,7 +99,7 @@ export default function CityBarChart({ data }: Props) {
   if (data.length === 0) {
     return (
       <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5">
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Laporan per Kota</h3>
+        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4">Pelapor per Kota</h3>
         <div className="h-32 flex items-center justify-center text-neutral-400 text-sm">Belum ada data</div>
       </div>
     )
@@ -109,15 +109,15 @@ export default function CityBarChart({ data }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Laporan per Kota</h3>
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Pelapor per Kota</h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            {data.length} provinsi · diurutkan berdasarkan rasio posting per operator
+            {data.length} provinsi · diurutkan berdasarkan rasio pelapor per operator
           </p>
         </div>
         <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#4E79A7' }} />
-            Data Masuk
+            Pelapor
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#EDC948' }} />
