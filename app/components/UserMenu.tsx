@@ -47,39 +47,20 @@ export default function UserMenu({ name, email, role, tenantName }: Props) {
 
   return (
     <div className="relative" ref={ref}>
-      {/* Avatar button */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 active:bg-neutral-200 dark:active:bg-neutral-700 transition select-none"
+        aria-label="Buka menu pengguna"
+        aria-expanded={open}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-900 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
       >
-        {/* Avatar circle */}
         <span className="w-8 h-8 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-xs font-bold flex-shrink-0 select-none">
           {getInitials(name)}
         </span>
-
-        {/* Name — desktop only */}
-        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 hidden sm:block max-w-[8rem] truncate">
-          {name}
-        </span>
-
-        {/* Chevron — desktop only */}
-        <svg
-          className={`w-3.5 h-3.5 text-neutral-400 hidden sm:block transition-transform duration-150 ${
-            open ? 'rotate-180' : ''
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-        </svg>
       </button>
 
-      {/* Dropdown — rendered at viewport level via absolute positioning */}
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] w-60 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xl py-1 z-[100]">
-          {/* User info header */}
           <div className="px-4 py-3 border-b border-neutral-100 dark:border-neutral-800">
             <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
               {name}
@@ -94,7 +75,6 @@ export default function UserMenu({ name, email, role, tenantName }: Props) {
             </p>
           </div>
 
-          {/* Actions */}
           <div className="py-1">
             <button
               type="button"

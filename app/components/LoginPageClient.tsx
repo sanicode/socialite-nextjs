@@ -46,7 +46,7 @@ function LoginFormBody({
   const isLocked = countdown !== null && countdown > 0
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8 sm:px-6 lg:px-8">
       <div className="w-full max-w-md px-8 py-10 bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-800">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">

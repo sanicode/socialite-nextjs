@@ -108,7 +108,6 @@ function buildRekapitulasiReportFilters(filters: DashboardFilters, provinceName?
     params.push(cityName)
     idx++
   }
-
   return {
     whereClause: conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '',
     params,
