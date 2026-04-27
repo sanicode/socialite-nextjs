@@ -9,6 +9,7 @@ import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser }
 import { logEvent } from '@/app/lib/logger'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
+import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 
 export async function updatePostStatus(postId: string, status: 'pending' | 'valid' | 'invalid') {
   try {
@@ -484,6 +485,15 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
       return {
         message: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${category?.name ?? 'ini'}" hari ini. Setiap operator hanya diizinkan satu laporan per kategori per hari.`,
         duplicate: true,
+      }
+    }
+  }
+
+  if (opts.sourceUrl === 'amplifikasi') {
+    const amplifikasiCount = await countUserAmplifikasiToday(sessionUser.id)
+    if (amplifikasiCount >= AMPLIFIKASI_DAILY_LIMIT) {
+      return {
+        message: `Batas amplifikasi hari ini sudah tercapai. Maksimal ${AMPLIFIKASI_DAILY_LIMIT} laporan per hari.`,
       }
     }
   }

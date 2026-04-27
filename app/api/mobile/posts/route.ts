@@ -3,6 +3,7 @@ import { getPosts } from '@/app/actions/posts'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { JwtPayload } from '@/app/lib/jwt'
+import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,7 +118,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── cek duplicate: amplifikasi boleh lebih dari satu per kategori per hari ──
+    // ── amplifikasi punya batas harian terpisah; upload/default tetap dicek per kategori ──
+    if (sourceUrl === 'amplifikasi') {
+      const amplifikasiCount = await countUserAmplifikasiToday(payload.sub)
+      if (amplifikasiCount >= AMPLIFIKASI_DAILY_LIMIT) {
+        return Response.json({
+          error: `Batas amplifikasi hari ini sudah tercapai. Maksimal ${AMPLIFIKASI_DAILY_LIMIT} laporan per hari.`,
+        }, { status: 422 })
+      }
+    }
+
     if (category_id && sourceUrl !== 'amplifikasi') {
       const userId = BigInt(payload.sub)
       const now = new Date()
