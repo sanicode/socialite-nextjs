@@ -12,9 +12,18 @@ import { getSecuritySettings } from '@/app/lib/request-security'
 import { appendSuccessParam, getPathname, normalizeReturnTo } from '@/app/lib/return-to'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
+import { deleteSession } from '@/app/lib/session'
+
+async function redirectToLoginIfUnauthorized(error: unknown): Promise<never> {
+  if (error instanceof Error && error.message === 'Unauthorized') {
+    await deleteSession()
+    redirect('/login')
+  }
+  throw error
+}
 
 export async function updatePostStatus(postId: string, status: 'pending' | 'valid' | 'invalid') {
-  await requireManagerOrAdmin()
+  await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
   try {
     await prisma.blog_posts.update({
       where: { id: BigInt(postId) },
@@ -426,7 +435,7 @@ type PostVariantOpts = {
 }
 
 async function processCreate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
-  const sessionUser = assertNotManagerOnly(await requireUser())
+  const sessionUser = assertNotManagerOnly(await requireUser().catch(redirectToLoginIfUnauthorized))
 
   const rawTitle = (formData.get('title') as string)?.trim()
   const title = rawTitle || '-'
@@ -531,7 +540,7 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 }
 
 async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
-  const sessionUser = await requireUser()
+  const sessionUser = await requireUser().catch(redirectToLoginIfUnauthorized)
 
   const id = formData.get('id') as string
   if (!id || !/^\d+$/.test(id)) {
@@ -656,7 +665,7 @@ export async function updateAmplifikasi(_state: PostFormState, formData: FormDat
 }
 
 export async function deletePost(id: string): Promise<void> {
-  const sessionUser = assertAdmin(await requireUser())
+  const sessionUser = assertAdmin(await requireUser().catch(redirectToLoginIfUnauthorized))
 
   const mediaList = await prisma.media.findMany({
     where: { model_type: 'App\\Models\\BlogPost', model_id: BigInt(id), collection_name: 'blog-images' },
@@ -677,7 +686,7 @@ export async function deletePost(id: string): Promise<void> {
 export async function bulkDeletePosts(ids: string[]): Promise<void> {
   if (ids.length === 0) return
 
-  const sessionUser = assertAdmin(await requireUser())
+  const sessionUser = assertAdmin(await requireUser().catch(redirectToLoginIfUnauthorized))
 
   const bigIds = ids.map((id) => BigInt(id))
 
@@ -698,7 +707,7 @@ export async function bulkDeletePosts(ids: string[]): Promise<void> {
 }
 
 export async function togglePublish(id: string, currentStatus: boolean): Promise<void> {
-  const sessionUser = assertAdmin(await requireManagerOrAdmin())
+  const sessionUser = assertAdmin(await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized))
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
@@ -716,7 +725,7 @@ export async function togglePublish(id: string, currentStatus: boolean): Promise
 }
 
 export async function updateStatus(id: string, status: 'pending' | 'valid' | 'invalid'): Promise<void> {
-  const sessionUser = await requireManagerOrAdmin()
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
