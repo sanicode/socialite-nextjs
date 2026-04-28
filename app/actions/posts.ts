@@ -9,10 +9,12 @@ import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser }
 import { logEvent } from '@/app/lib/logger'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSecuritySettings } from '@/app/lib/request-security'
+import { appendSuccessParam, getPathname, normalizeReturnTo } from '@/app/lib/return-to'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 
 export async function updatePostStatus(postId: string, status: 'pending' | 'valid' | 'invalid') {
+  await requireManagerOrAdmin()
   try {
     await prisma.blog_posts.update({
       where: { id: BigInt(postId) },
@@ -542,6 +544,7 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
   const oldMediaId = formData.get('old_media_id') as string | null
+  const returnTo = normalizeReturnTo(formData.get('return_to') as string | null, opts.redirectBase)
   const screenshot = formData.get('screenshot') as File | null
   const hasNewScreenshot = screenshot && screenshot.size > 0
   const { maxUploadedFileSizeBytes } = await getSecuritySettings()
@@ -615,7 +618,11 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
 
   logEvent('info', 'posts.update', { postId: id, userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })
   revalidatePath(opts.redirectBase)
-  redirect(`${opts.redirectBase}?success=updated`)
+  const returnPath = getPathname(returnTo)
+  if (returnPath !== opts.redirectBase) {
+    revalidatePath(returnPath)
+  }
+  redirect(appendSuccessParam(returnTo, 'updated'))
 }
 
 function revalidatePosts() {

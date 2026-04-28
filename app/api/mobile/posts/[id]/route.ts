@@ -59,16 +59,20 @@ export async function PUT(request: Request, { params }: Ctx) {
     const payload = requireJwt(request)
     const { id } = await params
 
-    // Manager-only cannot edit posts
-    if (payload.roles.includes('manager') && !payload.roles.includes('admin')) {
-      throw new ApiError(403, 'Manager tidak dapat mengedit laporan')
-    }
-
     const post = await prisma.blog_posts.findUnique({
       where: { id: BigInt(id) },
       select: { id: true, user_id: true, tenant_id: true, source_url: true },
     })
     if (!post) return Response.json({ error: 'Laporan tidak ditemukan' }, { status: 404 })
+
+    const existingMedia = await prisma.media.findFirst({
+      where: {
+        model_type: 'App\\Models\\BlogPost',
+        model_id: BigInt(id),
+        collection_name: 'blog-images',
+      },
+      select: { id: true },
+    })
 
     const canEdit = await canUserEditPost(
       { id: payload.sub, roles: payload.roles },
@@ -95,9 +99,13 @@ export async function PUT(request: Request, { params }: Ctx) {
     const errors: Record<string, string> = {}
     const sourceUrl = post.source_url
     const requireTitle = sourceUrl !== 'amplifikasi'
+    const requireScreenshot = sourceUrl !== 'upload'
 
     if (!category_id) errors.category_id = 'Kategori wajib dipilih.'
     if (requireTitle && !title) errors.title = 'Link upload tidak boleh kosong.'
+    if (requireScreenshot && !media_id && !existingMedia) {
+      errors.media_id = 'Bukti screenshot wajib diupload.'
+    }
 
     if (Object.keys(errors).length > 0) {
       return Response.json({ errors }, { status: 422 })

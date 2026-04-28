@@ -14,6 +14,7 @@ type Props = {
   maxUploadFileSizeBytes: number
   variant?: 'default' | 'upload' | 'amplifikasi'
   basePath?: string
+  returnTo?: string
 }
 
 const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; label: string }> = {
@@ -57,10 +58,11 @@ const ALERT_ICON = {
   ),
 }
 
-export default function PostForm({ action, post, categories, maxUploadFileSizeBytes, variant = 'default', basePath = '/posts' }: Props) {
+export default function PostForm({ action, post, categories, maxUploadFileSizeBytes, variant = 'default', basePath = '/posts', returnTo }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
   const [state, formAction, pending] = useActionState(action, undefined)
+  const backHref = returnTo ?? basePath
 
   const showUrl        = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
@@ -143,6 +145,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
 
       {post && <input type="hidden" name="id" value={post.id} />}
       {post?.thumbnail?.id && <input type="hidden" name="old_media_id" value={post.thumbnail.id} />}
+      {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
       <input type="hidden" name="is_published" value="0" />
       <input type="hidden" name="body" value="-" />
       {!showUrl && <input type="hidden" name="title" value="-" />}
@@ -261,7 +264,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
             </button>
             <button
               type="button"
-              onClick={() => router.push(basePath)}
+              onClick={() => router.push(backHref)}
               className="w-full py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
             >
               Batal

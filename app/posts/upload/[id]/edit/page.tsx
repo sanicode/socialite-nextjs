@@ -1,18 +1,24 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPostById, getCategories, updateUpload } from '@/app/actions/posts'
 import PostForm from '@/app/components/posts/PostForm'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSessionUser } from '@/app/lib/session'
+import { normalizeReturnTo, refererToReturnTo } from '@/app/lib/return-to'
 
 type Params = Promise<{ id: string }>
+type SearchParams = Promise<{ returnTo?: string }>
 
-export default async function EditUploadPage({ params }: { params: Params }) {
+export default async function EditUploadPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const { id } = await params
+  const { returnTo } = await searchParams
+  const headerStore = await headers()
+  const refererReturnTo = refererToReturnTo(headerStore.get('referer'))
   const [post, categories, securitySettings] = await Promise.all([
     getPostById(id),
     getCategories(),
@@ -28,12 +34,14 @@ export default async function EditUploadPage({ params }: { params: Params }) {
     if (!canEdit) redirect('/posts/upload')
   }
 
+  const backHref = normalizeReturnTo(returnTo ?? refererReturnTo, '/posts/upload')
+
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link
-            href="/posts/upload"
+            href={backHref}
             className="text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition"
           >
             ← Kembali
@@ -50,6 +58,7 @@ export default async function EditUploadPage({ params }: { params: Params }) {
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
             variant="upload"
             basePath="/posts/upload"
+            returnTo={backHref}
           />
         </div>
       </div>

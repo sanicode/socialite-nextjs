@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useTransition, useState, useEffect, useCallback, useRef } from 'react'
+import { useTransition, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
@@ -63,6 +63,18 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
+  const currentReturnTo = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('success')
+    const query = params.toString()
+    return query ? `${basePath}?${query}` : basePath
+  }, [basePath, searchParams])
+
+  const buildEditHref = useCallback((postId: string) => {
+    const params = new URLSearchParams()
+    params.set('returnTo', currentReturnTo)
+    return `${basePath}/${postId}/edit?${params.toString()}`
+  }, [basePath, currentReturnTo])
 
   const closeModal = useCallback(() => setModal(null), [])
 
@@ -528,7 +540,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <Link
-                        href={`${basePath}/${post.id}/edit`}
+                        href={buildEditHref(post.id)}
                         className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
                       >
                         Edit
