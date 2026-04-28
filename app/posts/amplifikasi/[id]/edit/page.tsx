@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getPostById, getCategories, updateAmplifikasi } from '@/app/actions/posts'
 import PostForm from '@/app/components/posts/PostForm'
 import { getSecuritySettings } from '@/app/lib/request-security'
+import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSessionUser } from '@/app/lib/session'
 
 type Params = Promise<{ id: string }>
@@ -10,9 +11,6 @@ type Params = Promise<{ id: string }>
 export default async function EditAmplifikasiPage({ params }: { params: Params }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const isAdmin = user.roles.includes('admin')
-  const isManager = user.roles.includes('manager')
-  if (isManager && !isAdmin) redirect('/posts/amplifikasi')
 
   const { id } = await params
   const [post, categories, securitySettings] = await Promise.all([
@@ -22,6 +20,13 @@ export default async function EditAmplifikasiPage({ params }: { params: Params }
   ])
 
   if (!post) notFound()
+  if (!user.roles.includes('admin')) {
+    const canEdit = await canUserEditPost(user, {
+      userId: post.user?.id ?? null,
+      tenantId: post.tenant_id ?? null,
+    })
+    if (!canEdit) redirect('/posts/amplifikasi')
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">

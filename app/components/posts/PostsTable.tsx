@@ -53,7 +53,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     (canVerify ? 1 : 0) +
     (isAdmin ? 2 : 0) +
     (canVerify || showReadOnlyStatus ? 1 : 0) +
-    (isAdmin ? 1 : 0)
+    (canVerify ? 1 : 0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -524,23 +524,15 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   )}
 
                   {/* Actions */}
-                  {(isAdmin) && (
+                  {canVerify && (
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {canVerify && !isAdmin ? (
-                        <span className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-600 cursor-not-allowed">
-                          Edit
-                        </span>
-                      ) : (
-                        (isAdmin || canVerify) && (
-                        <Link
-                          href={`${basePath}/${post.id}/edit`}
-                          className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-                        >
-                          Edit
-                        </Link>
-                        )
-                      )}
+                      <Link
+                        href={`${basePath}/${post.id}/edit`}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                      >
+                        Edit
+                      </Link>
                       {isAdmin && (
                         <button
                           onClick={() => handleDelete(post.id)}

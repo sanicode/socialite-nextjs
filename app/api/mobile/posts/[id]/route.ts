@@ -3,6 +3,7 @@ import { getPostById } from '@/app/actions/posts'
 import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3 } from '@/app/lib/s3'
 import { logEvent } from '@/app/lib/logger'
+import { canUserEditPost } from '@/app/lib/post-edit-access'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -65,14 +66,19 @@ export async function PUT(request: Request, { params }: Ctx) {
 
     const post = await prisma.blog_posts.findUnique({
       where: { id: BigInt(id) },
-      select: { id: true, user_id: true, source_url: true },
+      select: { id: true, user_id: true, tenant_id: true, source_url: true },
     })
     if (!post) return Response.json({ error: 'Laporan tidak ditemukan' }, { status: 404 })
 
-    // Operator hanya bisa edit post miliknya sendiri
-    const isOperator = !payload.roles.includes('admin') && !payload.roles.includes('manager')
-    if (isOperator && post.user_id.toString() !== payload.sub) {
-      throw new ApiError(403, 'Anda tidak memiliki akses ke laporan ini')
+    const canEdit = await canUserEditPost(
+      { id: payload.sub, roles: payload.roles },
+      {
+        userId: post.user_id.toString(),
+        tenantId: post.tenant_id?.toString() ?? null,
+      }
+    )
+    if (!canEdit) {
+      throw new ApiError(403, 'Anda tidak memiliki akses untuk mengedit laporan ini')
     }
 
     const body = await request.json()

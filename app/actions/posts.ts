@@ -7,6 +7,7 @@ import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3, getMediaUrl } from '@/app/lib/s3'
 import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
+import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
@@ -65,6 +66,7 @@ export type SerializedPost = {
   province: string | null
   city: string | null
   source_url: string | null
+  tenant_id: string | null
 }
 
 export type SerializedCategory = {
@@ -287,6 +289,7 @@ export async function getPosts(params: {
           : null,
         province: address?.province_id ? provinceMap.get(address.province_id) ?? null : null,
         city: address?.city_id ? cityMap.get(address.city_id) ?? null : null,
+        tenant_id: p.tenant_id?.toString() ?? null,
       }
     }),
     total,
@@ -358,6 +361,7 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
     province: provinceName,
     city: cityName,
     source_url: post.source_url ?? null,
+    tenant_id: post.tenant_id?.toString() ?? null,
   }
 }
 
@@ -525,9 +529,12 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 }
 
 async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
-  const sessionUser = assertNotManagerOnly(await requireUser())
+  const sessionUser = await requireUser()
 
   const id = formData.get('id') as string
+  if (!id || !/^\d+$/.test(id)) {
+    return { message: 'ID laporan tidak valid.' }
+  }
   const rawTitle = (formData.get('title') as string)?.trim()
   const title = rawTitle || '-'
   const body = (formData.get('body') as string)?.trim()
@@ -557,6 +564,19 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
 
   if (Object.keys(errors).length > 0) return { errors }
 
+  const existingPost = await getPostById(id)
+  if (!existingPost) {
+    return { message: 'Laporan tidak ditemukan.' }
+  }
+
+  const canEdit = await canUserEditPost(sessionUser, {
+    userId: existingPost.user?.id ?? null,
+    tenantId: existingPost.tenant_id ?? null,
+  })
+  if (!canEdit) {
+    return { message: 'Anda tidak memiliki akses untuk mengedit laporan ini.' }
+  }
+
   if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
@@ -568,11 +588,6 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
     }
   }
 
-  const currentPost = await prisma.blog_posts.findUnique({
-    where: { id: BigInt(id) },
-    select: { is_published: true },
-  })
-
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
@@ -581,7 +596,7 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
       body: body || '-',
       description,
       is_published: isPublished,
-      published_at: isPublished && !currentPost?.is_published ? new Date() : isPublished ? undefined : null,
+      published_at: isPublished && !existingPost.is_published ? new Date() : isPublished ? undefined : null,
       blog_post_category_id: categoryId ? BigInt(categoryId) : null,
       updated_at: new Date(),
     },
