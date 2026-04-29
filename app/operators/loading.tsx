@@ -16,14 +16,17 @@ export default function OperatorsLoading() {
         </div>
 
         {/* Filter */}
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
           <Skeleton className="h-10 rounded-lg" />
           <Skeleton className="h-10 rounded-lg" />
-          <Skeleton className="h-10 rounded-lg" />
-          <div className="flex gap-3 sm:col-span-3">
+          <div className="flex gap-3 sm:col-span-2">
             <Skeleton className="h-10 w-20 rounded-lg" />
             <Skeleton className="h-10 w-20 rounded-lg" />
           </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-full rounded-lg sm:max-w-xs" />
         </div>
 
         {/* Table */}

@@ -27,6 +27,12 @@ type SerializedUser = {
   name: string | null
 }
 
+function getStatusClass(status: PostStatus) {
+  if (status === 'valid') return 'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (status === 'invalid') return 'border-red-200 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300'
+  return 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+}
+
 export default function UserPostsTableClient({ posts, mediaByPostId }: {
   posts: SerializedPost[]
   mediaByPostId: Record<string, SerializedMedia>
@@ -138,19 +144,30 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                         {post.blog_post_categories?.name ?? '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs truncate">
-                      {post.title ?? '-'}
+                    <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs">
+                      {post.source_url === 'upload' && post.title ? (
+                        <a
+                          href={post.title}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        >
+                          Buka
+                        </a>
+                      ) : (
+                        <span className="block truncate">{post.title ?? '-'}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">
                         <select
-                          className="rounded-lg border border-neutral-300 dark:border-neutral-700 px-2 py-1.5 bg-white dark:bg-neutral-800 text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900 transition"
+                          className={`rounded-lg border px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${getStatusClass(post.status)}`}
                           value={post.status}
                           onChange={(e) => handleStatusChange(post.id.toString(), e.target.value as PostStatus)}
                         >
-                          <option value="pending">Pending</option>
-                          <option value="valid">Valid</option>
-                          <option value="invalid">Invalid</option>
+                          <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="pending">Pending</option>
+                          <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="valid">Valid</option>
+                          <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="invalid">Invalid</option>
                         </select>
                       </div>
                     </td>

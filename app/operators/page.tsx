@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getOperators } from '@/app/actions/operators'
 import OperatorsTable from '@/app/components/operators/OperatorsTable'
+import TableSearchForm from '@/app/components/TableSearchForm'
 
 type SearchParams = Promise<{
   page?: string
@@ -53,29 +54,23 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
         </div>
 
         {/* Filter */}
-        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <input
-            type="search"
-            name="search"
-            defaultValue={params.search ?? ''}
-            placeholder="Cari nama..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
+        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
+          {params.search && <input type="hidden" name="search" value={params.search} />}
           <input
             type="search"
             name="email"
             defaultValue={params.email ?? ''}
-            placeholder="Cari email..."
+            placeholder="Email..."
             className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
           />
           <input
             type="search"
             name="phone"
             defaultValue={params.phone ?? ''}
-            placeholder="Cari nomor telp..."
+            placeholder="Nomor telp..."
             className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
           />
-          <div className="flex items-center gap-3 sm:col-span-3">
+          <div className="flex items-center gap-3 sm:col-span-2">
             <button
               type="submit"
               className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
@@ -90,6 +85,16 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
             </Link>
           </div>
         </form>
+
+        <TableSearchForm
+          action="/operators"
+          defaultValue={params.search}
+          placeholder="Cari nama..."
+          hiddenParams={{
+            email: params.email,
+            phone: params.phone,
+          }}
+        />
 
         <OperatorsTable operators={operators} />
 

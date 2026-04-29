@@ -26,7 +26,6 @@ export default function LogsLoading() {
 
         {/* Filter bar */}
         <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 dark:border-neutral-800 dark:bg-neutral-900">
-          <Skeleton className="h-10 rounded-lg xl:col-span-2" />
           <Skeleton className="h-10 rounded-lg" />
           <Skeleton className="h-10 rounded-lg" />
           <Skeleton className="h-10 rounded-lg" />
@@ -38,6 +37,10 @@ export default function LogsLoading() {
             <Skeleton className="h-10 w-20 rounded-lg" />
             <Skeleton className="h-10 w-20 rounded-lg" />
           </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-full rounded-lg sm:max-w-xs" />
         </div>
 
         {/* Table */}

@@ -19,6 +19,12 @@ export async function GET(request: Request, { params }: Ctx) {
       where: { tenant_id: BigInt(id) },
       orderBy: { id: 'asc' },
     })
+    const city = address?.city_id
+      ? await prisma.reg_cities.findUnique({
+          where: { id: BigInt(address.city_id) },
+          select: { province_id: true },
+        })
+      : null
 
     return Response.json({
       id: tenant.id.toString(),
@@ -30,7 +36,7 @@ export async function GET(request: Request, { params }: Ctx) {
         city: address?.city ?? null,
         state: address?.state ?? null,
         zip: address?.zip ?? null,
-        province_id: address?.province_id ?? null,
+        province_id: city?.province_id ?? null,
         city_id: address?.city_id ?? null,
       },
     })
@@ -58,13 +64,21 @@ export async function PUT(request: Request, { params }: Ctx) {
       data: { name, domain, updated_at: new Date() },
     })
 
+    const cityId = body.address?.city_id ?? null
+    const city = cityId
+      ? await prisma.reg_cities.findUnique({
+          where: { id: BigInt(cityId) },
+          select: { province_id: true },
+        })
+      : null
+
     const address = {
       address_line_1: (body.address?.address_line_1 ?? '').trim() || null,
       city: (body.address?.city ?? '').trim() || null,
       state: (body.address?.state ?? '').trim() || null,
       zip: (body.address?.zip ?? '').trim() || null,
-      province_id: body.address?.province_id ?? null,
-      city_id: body.address?.city_id ?? null,
+      province_id: city?.province_id ?? null,
+      city_id: cityId,
     }
 
     const addressId = body.address?.id

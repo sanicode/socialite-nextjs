@@ -5,6 +5,7 @@ import { getUsers } from '@/app/actions/users'
 import UsersTable from '@/app/components/settings/UsersTable'
 import AddUserButton from '@/app/components/settings/AddUserButton'
 import ImportUsersButton from '@/app/components/settings/ImportUsersButton'
+import TableSearchForm from '@/app/components/TableSearchForm'
 
 type SearchParams = Promise<{
   page?: string
@@ -69,52 +70,52 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
         </div>
 
         {/* Filter */}
-        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <input
-            type="search"
-            name="search"
-            defaultValue={params.search ?? ''}
-            placeholder="Cari nama atau email..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white sm:col-span-2 xl:col-span-2"
-          />
-          <select
-            name="status"
-            defaultValue={params.status ?? ''}
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          >
-            <option value="">Semua status</option>
-            <option value="active">Aktif</option>
-            <option value="blocked">Diblokir</option>
-          </select>
-          <select
-            name="loginSecurity"
-            defaultValue={params.loginSecurity ?? ''}
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          >
-            <option value="">Semua kondisi login</option>
-            <option value="has_attempts">Ada login attempts</option>
-            <option value="under_attack">Sedang diserang ({'>'}10/jam)</option>
-            <option value="rate_limited">Sedang kena rate limit</option>
-          </select>
-          <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-4">
-            <span className="min-w-[7.5rem] text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              Terakhir Aktif
-            </span>
+        <form className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 dark:border-neutral-800 dark:bg-neutral-900">
+          {params.search && <input type="hidden" name="search" value={params.search} />}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
+            <select
+              name="status"
+              defaultValue={params.status ?? ''}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            >
+              <option value="">Semua status</option>
+              <option value="active">Aktif</option>
+              <option value="blocked">Diblokir</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Kondisi Login</span>
+            <select
+              name="loginSecurity"
+              defaultValue={params.loginSecurity ?? ''}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            >
+              <option value="">Semua kondisi login</option>
+              <option value="has_attempts">Ada login attempts</option>
+              <option value="under_attack">Sedang diserang ({'>'}10/jam)</option>
+              <option value="rate_limited">Sedang kena rate limit</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
             <input
               type="date"
               name="dateFrom"
               defaultValue={params.dateFrom ?? ''}
-              className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
             />
-            <span className="text-neutral-400 dark:text-neutral-500">–</span>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
             <input
               type="date"
               name="dateTo"
               defaultValue={params.dateTo ?? ''}
-              className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
             />
-          </div>
-          <div className="flex items-center gap-3 sm:col-span-2 xl:col-span-4">
+          </label>
+          <div className="flex items-center gap-3 sm:col-span-2 xl:col-span-1">
             <button
               type="submit"
               className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
@@ -129,6 +130,20 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
             </Link>
           </div>
         </form>
+
+        <TableSearchForm
+          action="/settings/users"
+          defaultValue={params.search}
+          placeholder="Cari nama atau email..."
+          hiddenParams={{
+            status: params.status,
+            loginSecurity: params.loginSecurity,
+            dateFrom: params.dateFrom,
+            dateTo: params.dateTo,
+            sortBy: params.sortBy,
+            sortDir: params.sortDir,
+          }}
+        />
 
         <UsersTable
           users={users}

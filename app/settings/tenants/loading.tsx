@@ -16,17 +16,19 @@ export default function TenantsLoading() {
         </div>
 
         {/* Filter */}
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
-          <Skeleton className="h-10 rounded-lg" />
-          <Skeleton className="h-10 rounded-lg" />
-          <div className="flex gap-3 sm:col-span-2">
+        <div className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-16 rounded" />
+            <Skeleton className="h-10 rounded-lg" />
+          </div>
+          <div className="flex gap-3 sm:col-span-2 lg:col-span-1">
             <Skeleton className="h-10 w-20 rounded-lg" />
             <Skeleton className="h-10 w-20 rounded-lg" />
           </div>
         </div>
 
         <div className="flex justify-end">
-          <Skeleton className="h-10 w-36 rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg sm:max-w-xs" />
         </div>
 
         {/* Table */}

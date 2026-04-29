@@ -213,12 +213,10 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const params = await searchParams
 
-  const today = new Date().toISOString().slice(0, 10)
-  const defaultFromDate = new Date()
-  defaultFromDate.setMonth(defaultFromDate.getMonth() - 1)
-  const defaultFrom = defaultFromDate.toISOString().slice(0, 10)
+  const today = getJakartaDateString()
+  const defaultFrom = today
 
-  // Default to 1 month range if no date params supplied
+  // Default to today's Jakarta date if no date params supplied
   const rawFrom = params.dateFrom ?? defaultFrom
   const rawTo = params.dateTo ?? today
 

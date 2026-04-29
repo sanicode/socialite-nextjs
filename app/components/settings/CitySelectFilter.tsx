@@ -8,9 +8,10 @@ type City = { id: string; name: string }
 type Props = {
   defaultCityId?: string
   defaultCityName?: string
+  label?: string
 }
 
-export default function CitySelectFilter({ defaultCityId, defaultCityName }: Props) {
+export default function CitySelectFilter({ defaultCityId, defaultCityName, label = 'Kota' }: Props) {
   const [selected, setSelected] = useState<City | null>(
     defaultCityId && defaultCityName
       ? { id: defaultCityId, name: defaultCityName }
@@ -20,7 +21,7 @@ export default function CitySelectFilter({ defaultCityId, defaultCityName }: Pro
   const [results, setResults] = useState<City[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLLabelElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const search = useCallback(async (q: string) => {
@@ -72,7 +73,9 @@ export default function CitySelectFilter({ defaultCityId, defaultCityName }: Pro
     'w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white'
 
   return (
-    <div ref={containerRef} className="relative">
+    <label ref={containerRef} className="relative flex flex-col gap-1">
+      <span className="text-xs text-neutral-500 dark:text-neutral-400">{label}</span>
+
       {/* Hidden input submitted with form */}
       <input type="hidden" name="cityId" value={selected?.id ?? ''} />
 
@@ -140,6 +143,6 @@ export default function CitySelectFilter({ defaultCityId, defaultCityName }: Pro
           Kota tidak ditemukan.
         </div>
       )}
-    </div>
+    </label>
   )
 }

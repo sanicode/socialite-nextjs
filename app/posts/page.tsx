@@ -2,11 +2,21 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getPosts, getCategories } from '@/app/actions/posts'
+import { getProvinces } from '@/app/actions/dashboard'
 import PostsTable from '@/app/components/posts/PostsTable'
 import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string; provinceId?: string; cityId?: string }>
+
+function getJakartaDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
 
 export default async function PostsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
@@ -19,6 +29,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
   if (isOperator) redirect('/posts/upload')
   const canVerify = isAdmin || isManager
   const sortOrder = (params.sort === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
+  const today = getJakartaDateString()
+  const dateFrom = params.dateFrom ?? today
+  const dateTo = params.dateTo ?? today
 
   // Manager: scope to their tenant
   let tenantId: string | undefined
@@ -30,7 +43,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
     tenantId = tu?.tenant_id?.toString()
   }
 
-  const [{ posts, total }, categories] = await Promise.all([
+  const [{ posts, total }, categories, provinces] = await Promise.all([
     getPosts({
       search: params.search,
       categoryId: params.category,
@@ -40,12 +53,15 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
       page,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
+      dateFrom,
+      dateTo,
       sortOrder,
       postType: (params.jenis === 'upload' || params.jenis === 'amplifikasi') ? params.jenis : undefined,
+      provinceId: isAdmin ? params.provinceId : undefined,
+      cityId: isAdmin ? params.cityId : undefined,
     }),
     getCategories(),
+    isAdmin ? getProvinces() : Promise.resolve([]),
   ])
 
   return (
@@ -79,7 +95,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
             </div>
           }
         >
-          <PostsTable posts={posts} total={total} categories={categories} page={page} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" />
+          <PostsTable posts={posts} total={total} categories={categories} page={page} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} />
         </Suspense>
       </div>
     </div>

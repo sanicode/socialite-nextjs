@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
 import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
+import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
 import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 
@@ -18,6 +19,9 @@ type Props = {
   canVerify: boolean
   basePath?: string
   variant?: 'default' | 'upload' | 'amplifikasi'
+  provinces?: { id: number; name: string }[]
+  defaultDateFrom?: string
+  defaultDateTo?: string
 }
 
 const PAGE_SIZE = 10
@@ -39,7 +43,7 @@ function getStatusClass(status: string) {
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
 }
 
-export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default' }: Props) {
+export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default', provinces, defaultDateFrom = '', defaultDateTo = '' }: Props) {
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
   const showReadOnlyStatus = !canVerify
@@ -63,6 +67,26 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([])
+  const currentProvinceId = searchParams.get('provinceId') ?? ''
+  const currentCityId = searchParams.get('cityId') ?? ''
+  const showRegionFilter = isAdmin && !!provinces
+
+  useEffect(() => {
+    if (!showRegionFilter) return
+    let cancelled = false
+    async function load() {
+      if (!currentProvinceId) {
+        if (!cancelled) setCities([])
+        return
+      }
+      const next = await getCities(currentProvinceId)
+      if (!cancelled) setCities(next)
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [currentProvinceId, showRegionFilter])
+
   const currentReturnTo = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('success')
@@ -155,6 +179,17 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
     })
   }, [basePath, router, searchParams, startTransition])
 
+  const handleProvinceChange = useCallback((value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set('provinceId', value)
+    else params.delete('provinceId')
+    params.delete('cityId')
+    params.delete('page')
+    startTransition(() => {
+      router.push(`${basePath}?${params.toString()}`)
+    })
+  }, [basePath, router, searchParams, startTransition])
+
   useEffect(() => {
     setSearchValue(searchParams.get('search') ?? '')
   }, [searchParams])
@@ -195,43 +230,65 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
-        
-        <input
-          type="search"
-          placeholder="Cari..."
-          value={searchValue}
-          disabled={isPending}
-          onChange={(e) => setSearchValue(e.target.value)}
-          className="flex-1 min-w-[180px] px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-        />
-
+      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-6">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
             type="date"
-            defaultValue={searchParams.get('dateFrom') ?? ''}
+            defaultValue={searchParams.get('dateFrom') ?? defaultDateFrom}
             disabled={isPending}
             onChange={(e) => updateParam('dateFrom', e.target.value)}
-            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
           <input
             type="date"
-            defaultValue={searchParams.get('dateTo') ?? ''}
+            defaultValue={searchParams.get('dateTo') ?? defaultDateTo}
             disabled={isPending}
             onChange={(e) => updateParam('dateTo', e.target.value)}
-            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
-        </label>        
+        </label>
+        {showRegionFilter && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Propinsi</span>
+            <select
+              value={currentProvinceId}
+              disabled={isPending}
+              onChange={(e) => handleProvinceChange(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            >
+              <option value="">Semua Propinsi</option>
+              {provinces!.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {showRegionFilter && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota</span>
+            <select
+              value={currentCityId}
+              disabled={!currentProvinceId || isPending}
+              onChange={(e) => updateParam('cityId', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:opacity-50"
+            >
+              <option value="">Semua Kota</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {variant === 'default' && (
           <select
             defaultValue={searchParams.get('jenis') ?? ''}
             disabled={isPending}
             onChange={(e) => updateParam('jenis', e.target.value)}
-            className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
             <option value="">Semua jenis</option>
             <option value="upload">Upload</option>
@@ -242,7 +299,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           defaultValue={searchParams.get('category') ?? ''}
           disabled={isPending}
           onChange={(e) => updateParam('category', e.target.value)}
-          className="sm:w-48 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
         >
           <option value="">Semua Media Sosial</option>
           {categories.map((cat) => (
@@ -270,10 +327,21 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
             onClick={() => setSelectedIds(new Set())}
             className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition"
           >
-            Batal
-          </button>
-        </div>
+          Batal
+        </button>
+      </div>
       )}
+
+      <div className="flex justify-end">
+        <input
+          type="search"
+          placeholder="Cari..."
+          value={searchValue}
+          disabled={isPending}
+          onChange={(e) => setSearchValue(e.target.value)}
+          className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
+        />
+      </div>
 
       {/* Table */}
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
@@ -463,13 +531,26 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   {/* Link Upload */}
                   {showUrl && (
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
-                        className="font-medium text-neutral-900 dark:text-white line-clamp-1 font-mono text-left hover:underline cursor-pointer"
-                      >
-                        {post.title}
-                      </button>
+                      {post.source_url === 'upload' && post.title ? (
+                        <a
+                          href={post.title}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        >
+                          Buka
+                        </a>
+                      ) : post.title ? (
+                        <button
+                          type="button"
+                          onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
+                          className="font-medium text-neutral-900 dark:text-white line-clamp-1 font-mono text-left hover:underline cursor-pointer"
+                        >
+                          {post.title}
+                        </button>
+                      ) : (
+                        <span className="text-neutral-400 text-xs">—</span>
+                      )}
                     </td>
                   )}
 

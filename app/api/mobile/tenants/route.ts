@@ -115,13 +115,21 @@ export async function POST(request: Request) {
       if (existing) throw new ApiError(409, 'Domain sudah digunakan tenant lain.')
     }
 
+    const cityId = body.address?.city_id ?? null
+    const city = cityId
+      ? await prisma.reg_cities.findUnique({
+          where: { id: BigInt(cityId) },
+          select: { province_id: true },
+        })
+      : null
+
     const address = {
       address_line_1: (body.address?.address_line_1 ?? '').trim() || null,
       city: (body.address?.city ?? '').trim() || null,
       state: (body.address?.state ?? '').trim() || null,
       zip: (body.address?.zip ?? '').trim() || null,
-      province_id: body.address?.province_id ?? null,
-      city_id: body.address?.city_id ?? null,
+      province_id: city?.province_id ?? null,
+      city_id: cityId,
     }
 
     const tenant = await prisma.$transaction(async (tx) => {

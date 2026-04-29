@@ -243,6 +243,12 @@ export async function getTenantDetail(tenantId: string): Promise<TenantDetail | 
     where: { tenant_id: BigInt(tenantId) },
     orderBy: { id: 'asc' },
   })
+  const city = address?.city_id
+    ? await prisma.reg_cities.findUnique({
+        where: { id: BigInt(address.city_id) },
+        select: { province_id: true },
+      })
+    : null
 
   return {
     id: tenant.id.toString(),
@@ -254,7 +260,7 @@ export async function getTenantDetail(tenantId: string): Promise<TenantDetail | 
       city: address?.city ?? null,
       state: address?.state ?? null,
       zip: address?.zip ?? null,
-      province_id: address?.province_id ?? null,
+      province_id: city?.province_id ?? null,
       city_id: address?.city_id ?? null,
     },
   }
@@ -731,19 +737,26 @@ export async function getRegCityById(cityId: string): Promise<string | null> {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-function cleanTenantFormData(data: TenantFormData) {
+async function cleanTenantFormData(data: TenantFormData) {
   const name = data.name.trim()
   if (!name) throw new Error('Nama tenant tidak boleh kosong')
 
   const domain = data.domain?.trim() || null
   const { id: addressId, ...addressFields } = data.address
+  const cityId = addressFields.city_id ?? null
+  const city = cityId
+    ? await prisma.reg_cities.findUnique({
+        where: { id: BigInt(cityId) },
+        select: { province_id: true },
+      })
+    : null
   const address = {
     address_line_1: addressFields.address_line_1?.trim() || null,
     city: addressFields.city?.trim() || null,
     state: addressFields.state?.trim() || null,
     zip: addressFields.zip?.trim() || null,
-    province_id: addressFields.province_id ?? null,
-    city_id: addressFields.city_id ?? null,
+    province_id: city?.province_id ?? null,
+    city_id: cityId,
   }
 
   return { name, domain, addressId, address }
@@ -752,7 +765,7 @@ function cleanTenantFormData(data: TenantFormData) {
 export async function createTenant(data: TenantFormData): Promise<void> {
   const admin = await requireAdmin()
 
-  const { name, domain, address } = cleanTenantFormData(data)
+  const { name, domain, address } = await cleanTenantFormData(data)
 
   if (domain) {
     const existing = await prisma.tenants.findUnique({ where: { domain } })
@@ -793,7 +806,7 @@ export async function updateTenant(
 ): Promise<void> {
   const admin = await requireAdmin()
 
-  const { name, domain, addressId, address } = cleanTenantFormData(data)
+  const { name, domain, addressId, address } = await cleanTenantFormData(data)
 
   await prisma.tenants.update({
     where: { id: BigInt(tenantId) },

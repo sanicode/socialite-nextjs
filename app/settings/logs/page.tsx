@@ -6,6 +6,7 @@ import { isAccessLoggingEnabled } from '@/app/actions/logs'
 import AccessLogsTable from '@/app/components/settings/AccessLogsTable'
 import LogsToggle from '@/app/components/settings/LogsToggle'
 import LogsTruncateButton from '@/app/components/settings/LogsTruncateButton'
+import TableSearchForm from '@/app/components/TableSearchForm'
 
 type SearchParams = Promise<{
   page?: string
@@ -74,13 +75,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
         </div>
 
         <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 dark:border-neutral-800 dark:bg-neutral-900">
-          <input
-            type="search"
-            name="search"
-            defaultValue={params.search ?? ''}
-            placeholder="Cari IP, email, agent..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white xl:col-span-2"
-          />
+          {params.search && <input type="hidden" name="search" value={params.search} />}
           <input
             type="text"
             name="eventType"
@@ -131,6 +126,19 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
             </Link>
           </div>
         </form>
+
+        <TableSearchForm
+          action="/settings/logs"
+          defaultValue={params.search}
+          placeholder="Cari IP, email, agent..."
+          hiddenParams={{
+            eventType: params.eventType,
+            country: params.country,
+            path: params.path,
+            dateFrom: params.dateFrom,
+            dateTo: params.dateTo,
+          }}
+        />
 
         <AccessLogsTable logs={rows} />
 
@@ -192,4 +200,3 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
     </div>
   )
 }
-

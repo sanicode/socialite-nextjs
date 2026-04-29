@@ -230,7 +230,7 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
     idx++
   }
   if (filters.provinceId) {
-    conditions.push(`a.province_id = $${idx}`)
+    conditions.push(`rc.province_id = $${idx}`)
     params.push(parseInt(filters.provinceId, 10))
     idx++
   }
@@ -253,7 +253,8 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
      LEFT JOIN blog_posts bp ON bp.slug = v.bukti_upload
      INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
      INNER JOIN addresses a ON a.tenant_id = tu.tenant_id
-     INNER JOIN reg_provinces rp ON rp.id = a.province_id
+     INNER JOIN reg_cities rc ON rc.id = a.city_id
+     INNER JOIN reg_provinces rp ON rp.id = rc.province_id
      ${whereClause}
      GROUP BY rp.id, rp.name
      ORDER BY value DESC`,

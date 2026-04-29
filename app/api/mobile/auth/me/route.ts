@@ -38,7 +38,7 @@ export async function GET(request: Request) {
           prisma.addresses.findFirst({
             where: { tenant_id: tenantUser.tenants.id },
             orderBy: { id: 'asc' },
-            select: { city_id: true, province_id: true, city: true, state: true },
+            select: { city_id: true, city: true, state: true },
           }),
           prisma.model_has_roles.findFirst({
             where: {
@@ -65,11 +65,6 @@ export async function GET(request: Request) {
           select: { name: true },
         })
       }
-    } else if (tenantAddress?.province_id != null) {
-      province = await prisma.reg_provinces.findUnique({
-        where: { id: tenantAddress.province_id },
-        select: { name: true },
-      })
     }
 
     return Response.json({

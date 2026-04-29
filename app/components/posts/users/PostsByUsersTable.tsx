@@ -65,69 +65,71 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
-            {COLUMNS.map(({ key, label, align }) => (
-              <th
-                key={key}
-                className={`px-4 py-3 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide text-${align}`}
-              >
-                <button
-                  onClick={() => handleSort(key)}
-                  className={`inline-flex items-center gap-1 hover:text-neutral-900 dark:hover:text-white transition ${align === 'right' ? 'flex-row-reverse w-full justify-start' : ''}`}
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+              {COLUMNS.map(({ key, label, align }) => (
+                <th
+                  key={key}
+                  className={`px-4 py-3 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide text-${align}`}
                 >
-                  {label}
-                  <SortIcon col={key} />
-                </button>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-4 py-10 text-center text-neutral-400 dark:text-neutral-500">
-                Tidak ada data
-              </td>
+                  <button
+                    onClick={() => handleSort(key)}
+                    className={`inline-flex items-center gap-1 hover:text-neutral-900 dark:hover:text-white transition ${align === 'right' ? 'flex-row-reverse w-full justify-start' : ''}`}
+                  >
+                    {label}
+                    <SortIcon col={key} />
+                  </button>
+                </th>
+              ))}
             </tr>
-          ) : (
-            rows.map((row, i) => (
-              <tr key={i} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
-                <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.provinsi ?? '-'}</td>
-                <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.kabupaten_kota ?? '-'}</td>
-                <td className="px-4 py-3 font-medium text-neutral-900 dark:text-white">{row.operator}</td>
-                <td className="px-4 py-3 text-neutral-500 dark:text-neutral-400">{row.email}</td>
-                <td className="px-4 py-3 text-right">
-                  <a
-                    href={`/posts/users/${row.user_id}/pending`}
-                    className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition"
-                  >
-                    {row.pending_posts}
-                  </a>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <a
-                    href={`/posts/users/${row.user_id}/valid`}
-                    className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition"
-                  >
-                    {row.valid_posts}
-                  </a>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <a
-                    href={`/posts/users/${row.user_id}/invalid`}
-                    className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
-                  >
-                    {row.invalid_posts}
-                  </a>
+          </thead>
+          <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-neutral-400 dark:text-neutral-500">
+                  Tidak ada data
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              rows.map((row, i) => (
+                <tr key={i} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
+                  <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.provinsi ?? '-'}</td>
+                  <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.kabupaten_kota ?? '-'}</td>
+                  <td className="px-4 py-3 font-medium text-neutral-900 dark:text-white">{row.operator}</td>
+                  <td className="px-4 py-3 text-neutral-500 dark:text-neutral-400">{row.email}</td>
+                  <td className="px-4 py-3 text-right">
+                    <a
+                      href={`/posts/users/${row.user_id}/pending`}
+                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition"
+                    >
+                      {row.pending_posts}
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <a
+                      href={`/posts/users/${row.user_id}/valid`}
+                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition"
+                    >
+                      {row.valid_posts}
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <a
+                      href={`/posts/users/${row.user_id}/invalid`}
+                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
+                    >
+                      {row.invalid_posts}
+                    </a>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -91,6 +91,10 @@ const getCategoriesCached = cache(async () => {
   })
 })
 
+function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
+  return new Date(`${dateString}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+07:00`)
+}
+
 const PLATFORM_PATTERNS: Record<string, { pattern: RegExp; label: string }> = {
   tiktok:    { pattern: /tiktok\.com/i,                       label: 'TikTok' },
   instagram: { pattern: /instagram\.com/i,                    label: 'Instagram' },
@@ -161,8 +165,10 @@ export async function getPosts(params: {
   dateTo?: string
   sortOrder?: 'asc' | 'desc'
   postType?: 'upload' | 'amplifikasi'
+  provinceId?: string
+  cityId?: string
 }): Promise<{ posts: SerializedPost[]; total: number }> {
-  const { search, categoryId, status, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType } = params
+  const { search, categoryId, status, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, provinceId, cityId } = params
   const pageSize = 10
   const skip = (page - 1) * pageSize
 
@@ -178,8 +184,47 @@ export async function getPosts(params: {
     userIdFilter = { user_id: BigInt(userId) }
   }
 
+  // Province/city scoping via addresses → tenant_id
+  let provinceCityTenantFilter: { tenant_id: { in: bigint[] } } | undefined
+  if (provinceId || cityId) {
+    const conditions: string[] = ['a.tenant_id IS NOT NULL']
+    const queryParams: unknown[] = []
+    let idx = 1
+
+    if (provinceId) {
+      conditions.push(`c.province_id = $${idx}`)
+      queryParams.push(parseInt(provinceId, 10))
+      idx++
+    }
+
+    if (cityId) {
+      conditions.push(`a.city_id = $${idx}`)
+      queryParams.push(parseInt(cityId, 10))
+    }
+
+    const addressMatches = await prisma.$queryRawUnsafe<{ tenant_id: bigint | null }[]>(
+      `SELECT a.tenant_id
+       FROM addresses a
+       INNER JOIN reg_cities c ON c.id = a.city_id
+       WHERE ${conditions.join(' AND ')}`,
+      ...queryParams
+    )
+    const matchingTenantIds = Array.from(
+      new Set(
+        addressMatches
+          .map((a) => a.tenant_id)
+          .filter((id): id is bigint => id !== null)
+      )
+    )
+    if (matchingTenantIds.length === 0) {
+      return { posts: [], total: 0 }
+    }
+    provinceCityTenantFilter = { tenant_id: { in: matchingTenantIds } }
+  }
+
   const where = {
     ...userIdFilter,
+    ...provinceCityTenantFilter,
     ...(search && {
       OR: [
         { title: { contains: search, mode: 'insensitive' as const } },
@@ -197,8 +242,8 @@ export async function getPosts(params: {
     }),
     ...((dateFrom || dateTo) && {
       created_at: {
-        ...(dateFrom && { gte: new Date(dateFrom) }),
-        ...(dateTo && { lte: new Date(dateTo + 'T23:59:59') }),
+        ...(dateFrom && { gte: getJakartaDateBounds(dateFrom, false) }),
+        ...(dateTo && { lte: getJakartaDateBounds(dateTo, true) }),
       },
     }),
     ...(postType ? { source_url: postType } : {}),
@@ -244,24 +289,26 @@ export async function getPosts(params: {
   const addressList = tenantIds.length
     ? await prisma.addresses.findMany({
         where: { tenant_id: { in: tenantIds } },
-        select: { tenant_id: true, province_id: true, city_id: true },
+        select: { tenant_id: true, city_id: true },
       })
     : []
 
-  const provinceIds = [...new Set(addressList.map((a) => a.province_id).filter((id): id is number => id !== null))]
   const cityIds = [...new Set(addressList.map((a) => a.city_id).filter((id): id is number => id !== null))]
 
-  const [provinces, cities] = await Promise.all([
-    provinceIds.length
-      ? prisma.reg_provinces.findMany({ where: { id: { in: provinceIds } } })
-      : [],
-    cityIds.length
-      ? prisma.reg_cities.findMany({ where: { id: { in: cityIds.map((id) => BigInt(id)) } } })
-      : [],
-  ])
+  const cities = cityIds.length
+    ? await prisma.reg_cities.findMany({
+        where: { id: { in: cityIds.map((id) => BigInt(id)) } },
+        select: { id: true, name: true, province_id: true },
+      })
+    : []
+
+  const provinceIds = [...new Set(cities.map((city) => city.province_id))]
+  const provinces = provinceIds.length
+    ? await prisma.reg_provinces.findMany({ where: { id: { in: provinceIds } } })
+    : []
 
   const provinceMap = new Map(provinces.map((p) => [p.id, p.name]))
-  const cityMap = new Map(cities.map((c) => [Number(c.id), c.name]))
+  const cityMap = new Map(cities.map((c) => [Number(c.id), c]))
   const addressByTenantId = new Map(addressList.map((a) => [a.tenant_id?.toString(), a]))
 
   return {
@@ -298,8 +345,8 @@ export async function getPosts(params: {
         user: p.users_blog_posts_user_idTousers
           ? { id: p.users_blog_posts_user_idTousers.id.toString(), name: p.users_blog_posts_user_idTousers.name }
           : null,
-        province: address?.province_id ? provinceMap.get(address.province_id) ?? null : null,
-        city: address?.city_id ? cityMap.get(address.city_id) ?? null : null,
+        province: address?.city_id ? provinceMap.get(cityMap.get(address.city_id)?.province_id ?? 0) ?? null : null,
+        city: address?.city_id ? cityMap.get(address.city_id)?.name ?? null : null,
         tenant_id: p.tenant_id?.toString() ?? null,
       }
     }),
@@ -332,15 +379,18 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
   if (tenantUser) {
     const address = await prisma.addresses.findFirst({
       where: { tenant_id: tenantUser.tenant_id },
-      select: { province_id: true, city_id: true },
+      select: { city_id: true },
     })
-    if (address?.province_id) {
-      const prov = await prisma.reg_provinces.findUnique({ where: { id: address.province_id } })
-      provinceName = prov?.name ?? null
-    }
     if (address?.city_id) {
-      const city = await prisma.reg_cities.findUnique({ where: { id: BigInt(address.city_id) } })
+      const city = await prisma.reg_cities.findUnique({
+        where: { id: BigInt(address.city_id) },
+        select: { name: true, province_id: true },
+      })
       cityName = city?.name ?? null
+      if (city) {
+        const prov = await prisma.reg_provinces.findUnique({ where: { id: city.province_id } })
+        provinceName = prov?.name ?? null
+      }
     }
   }
 
