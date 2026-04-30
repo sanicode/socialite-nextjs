@@ -6,14 +6,14 @@ import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
+import { detectAllowedImage } from '@/app/lib/file-validation'
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const COLLECTION_NAME = 'blog-images'
 
 export async function POST(request: NextRequest) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
     const reportingWindowDecision = await getNonAdminReportingWindowDecision(payload.roles)
     if (!reportingWindowDecision.allowed) {
       throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.')
@@ -26,12 +26,6 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
     }
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.' },
-        { status: 400 }
-      )
-    }
     if (file.size > maxUploadedFileSizeBytes) {
       return NextResponse.json(
         { error: `Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).` },
@@ -40,6 +34,13 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
+    const detectedFile = detectAllowedImage(buffer)
+    if (!detectedFile) {
+      return NextResponse.json(
+        { error: 'Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.' },
+        { status: 400 }
+      )
+    }
     const uuid = randomUUID()
 
     const media = await prisma.media.create({
@@ -50,25 +51,25 @@ export async function POST(request: NextRequest) {
         collection_name: COLLECTION_NAME,
         name: file.name,
         file_name: 'pending',
-        mime_type: file.type,
+        mime_type: detectedFile.mime,
         disk: 's3',
         conversions_disk: 's3',
         size: BigInt(file.size),
         manipulations: {},
-        custom_properties: {},
+        custom_properties: { uploaded_by: payload.sub },
         generated_conversions: {},
         responsive_images: {},
       },
     })
 
     const hash = randomBytes(16).toString('hex')
-    const ext = file.name.split('.').pop() ?? 'jpg'
+    const ext = detectedFile.ext
     const fileName = `${COLLECTION_NAME}-${hash}.${ext}`
     const objectKey = `${media.id}/${fileName}`
     const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
 
     try {
-      await uploadToS3(buffer, objectKey, file.type)
+      await uploadToS3(buffer, objectKey, detectedFile.mime)
     } catch (err) {
       await prisma.media.delete({ where: { id: media.id } })
       throw err
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       where: { id: media.id },
       data: {
         file_name: fileName,
-        custom_properties: { source_url: publicUrl, object_key: objectKey },
+        custom_properties: { source_url: publicUrl, object_key: objectKey, uploaded_by: payload.sub },
       },
     })
 

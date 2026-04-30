@@ -320,22 +320,20 @@ export default function PostsTable({
             </select>
           </label>
         )}
-        {variant === 'default' && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
-            <select
-              defaultValue={searchParams.get('status') ?? ''}
-              disabled={isPending}
-              onChange={(e) => updateParam('status', e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-            >
-              <option value="">Semua status</option>
-              <option value="pending">Pending</option>
-              <option value="valid">Valid</option>
-              <option value="invalid">Invalid</option>
-            </select>
-          </label>
-        )}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
+          <select
+            defaultValue={searchParams.get('status') ?? ''}
+            disabled={isPending}
+            onChange={(e) => updateParam('status', e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          >
+            <option value="">Semua status</option>
+            <option value="pending">Pending</option>
+            <option value="valid">Valid</option>
+            <option value="invalid">Invalid</option>
+          </select>
+        </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Media Sosial</span>
           <select

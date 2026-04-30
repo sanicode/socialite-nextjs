@@ -8,6 +8,7 @@ import UserPostsTableClient from './UserPostsTableClient'
 import UserPostsFilterClient from './UserPostsFilterClient'
 import AppAlert from '@/app/components/AppAlert'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
+import { canActorAccessTenant } from '@/app/lib/tenant-access'
 
 type SearchParams = Promise<{
   jenis?: string
@@ -39,6 +40,15 @@ export default async function UserPostsByStatusPage({
   const userData = await prisma.users.findUnique({ where: { id: BigInt(userId) } })
   if (!userData) {
     return <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6 text-neutral-500">User tidak ditemukan</div>
+  }
+
+  if (!user.roles.includes('admin')) {
+    const targetTenantUser = await prisma.tenant_user.findFirst({
+      where: { user_id: userData.id },
+      select: { tenant_id: true },
+    })
+    const canAccessTarget = await canActorAccessTenant(user, targetTenantUser?.tenant_id.toString() ?? null)
+    if (!canAccessTarget) redirect('/posts/users')
   }
 
   const categories = await prisma.blog_post_categories.findMany({ orderBy: { name: 'asc' } })

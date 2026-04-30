@@ -5,7 +5,7 @@ import { logEvent } from '@/app/lib/logger'
 export async function PATCH(request: Request) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
 
     if (typeof body.enabled !== 'boolean') {

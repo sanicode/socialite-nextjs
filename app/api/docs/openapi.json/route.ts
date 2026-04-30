@@ -1,4 +1,6 @@
-export const dynamic = 'force-static'
+import { getSessionUser } from '@/app/lib/session'
+
+export const dynamic = 'force-dynamic'
 
 const successResponse = {
   type: 'object',
@@ -268,7 +270,7 @@ const spec: OpenApiSpec = {
           is_published: { type: 'boolean', default: false },
           media_id: {
             type: 'string',
-            description: 'ID media dari `/mobile/upload` atau `/upload`.',
+            description: 'ID media pending dari `/mobile/upload`. Media harus milik user pemilik token.',
           },
           post_type: {
             type: 'string',
@@ -285,7 +287,7 @@ const spec: OpenApiSpec = {
             properties: {
               old_media_id: {
                 type: 'string',
-                description: 'ID media lama yang akan diganti (opsional).',
+                description: 'Legacy/opsional. Server tidak mempercayai ID bebas dari klien; media lama diambil dari post yang sedang diedit.',
               },
             },
           },
@@ -599,7 +601,7 @@ const spec: OpenApiSpec = {
       post: {
         tags: ['Upload'],
         summary: 'Upload screenshot ke S3 (JWT)',
-        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post.',
+        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post. Server memvalidasi magic bytes file dan menandai media pending dengan pemilik token.',
         requestBody: {
           required: true,
           content: {
@@ -701,7 +703,7 @@ const spec: OpenApiSpec = {
       get: {
         tags: ['Posts'],
         summary: 'List laporan',
-        description: 'Operator hanya melihat laporan miliknya. Admin/manager bisa filter by `userId` atau `tenantId`.',
+        description: 'Operator hanya melihat laporan miliknya. Manager otomatis dibatasi ke tenant miliknya. Admin bisa filter by `userId` atau `tenantId`.',
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'search', in: 'query', schema: { type: 'string' } },
@@ -711,8 +713,8 @@ const spec: OpenApiSpec = {
           { name: 'sortOrder', in: 'query', schema: { type: 'string', enum: ['asc', 'desc'], default: 'desc' } },
           { name: 'dateFrom', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'dateTo', in: 'query', schema: { type: 'string', format: 'date' } },
-          { name: 'userId', in: 'query', schema: { type: 'string' }, description: 'Admin/manager only' },
-          { name: 'tenantId', in: 'query', schema: { type: 'string' }, description: 'Admin/manager only' },
+          { name: 'userId', in: 'query', schema: { type: 'string' }, description: 'Admin atau manager dalam tenant yang sama' },
+          { name: 'tenantId', in: 'query', schema: { type: 'string' }, description: 'Admin bebas; manager hanya tenant miliknya' },
         ],
         responses: {
           '200': {
@@ -737,7 +739,7 @@ const spec: OpenApiSpec = {
         tags: ['Posts'],
         summary: 'Buat laporan baru',
         description:
-          'Upload screenshot terlebih dahulu via `/mobile/upload`, lalu kirim `media_id`.\n\n' +
+          'Upload screenshot terlebih dahulu via `/mobile/upload`, lalu kirim `media_id` milik token yang sama.\n\n' +
           '- **upload**: wajib `title` (URL), `media_id` opsional\n' +
           '- **amplifikasi**: `title` opsional, `media_id` wajib\n' +
           '- **default** (tanpa `post_type`): wajib `title` dan `media_id`\n\n' +
@@ -930,6 +932,7 @@ const spec: OpenApiSpec = {
       patch: {
         tags: ['Posts'],
         summary: 'Ubah status laporan (admin/manager)',
+        description: 'Admin dapat mengubah semua status. Manager hanya dapat mengubah status laporan tenant miliknya dan tunduk pada jam validasi manager.',
         requestBody: {
           required: true,
           content: {
@@ -1727,8 +1730,9 @@ spec.components.schemas.SuccessResponse = successResponse
 spec.components.schemas.IdResponse = idResponse
 spec.components.schemas.DeleteResponse = deleteResponse
 
-export function GET() {
-  return Response.json(spec, {
-    headers: { 'Access-Control-Allow-Origin': '*' },
-  })
+export async function GET() {
+  const user = await getSessionUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user.roles.includes('admin')) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  return Response.json(spec)
 }

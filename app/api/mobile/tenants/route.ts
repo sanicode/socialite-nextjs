@@ -8,7 +8,7 @@ import { logEvent } from '@/app/lib/logger'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const { searchParams } = new URL(request.url)
 
     const page     = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
@@ -47,18 +47,30 @@ export async function GET(request: Request) {
       }
     })()
 
-    const roleCountSql = (roleName: string) => `
-      (SELECT COUNT(DISTINCT tu.id)
-       FROM tenant_user tu
-       WHERE tu.tenant_id = t.id
-         AND EXISTS (
-           SELECT 1 FROM model_has_roles mhr
-           JOIN roles r ON r.id = mhr.role_id
-           WHERE r.name = '${roleName}'
-             AND mhr.model_type = 'App\\\\Models\\\\TenantUser'
-             AND mhr.model_id = tu.id
-         )
-      )`
+    const roleCountSql = {
+      manager: `(SELECT COUNT(DISTINCT tu.id)
+        FROM tenant_user tu
+        WHERE tu.tenant_id = t.id
+          AND EXISTS (
+            SELECT 1 FROM model_has_roles mhr
+            JOIN roles r ON r.id = mhr.role_id
+            WHERE r.name = 'manager'
+              AND mhr.model_type = 'App\\\\Models\\\\TenantUser'
+              AND mhr.model_id = tu.id
+          )
+        )`,
+      operator: `(SELECT COUNT(DISTINCT tu.id)
+        FROM tenant_user tu
+        WHERE tu.tenant_id = t.id
+          AND EXISTS (
+            SELECT 1 FROM model_has_roles mhr
+            JOIN roles r ON r.id = mhr.role_id
+            WHERE r.name = 'operator'
+              AND mhr.model_type = 'App\\\\Models\\\\TenantUser'
+              AND mhr.model_id = tu.id
+          )
+        )`,
+    }
 
     const [rows, countResult] = await Promise.all([
       prisma.$queryRawUnsafe<{
@@ -68,8 +80,8 @@ export async function GET(request: Request) {
         `SELECT
            t.id, t.name, t.domain,
            (SELECT rc.name FROM addresses a2 JOIN reg_cities rc ON rc.id = a2.city_id WHERE a2.tenant_id = t.id ORDER BY a2.id LIMIT 1) AS city,
-           ${roleCountSql('manager')}  AS manager_count,
-           ${roleCountSql('operator')} AS operator_count
+           ${roleCountSql.manager}  AS manager_count,
+           ${roleCountSql.operator} AS operator_count
          FROM tenants t
          ${where}
          ORDER BY ${orderBy}
@@ -103,7 +115,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
 
     const name = (body.name ?? '').trim()

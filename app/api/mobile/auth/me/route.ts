@@ -7,7 +7,7 @@ const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
 
     const user = await prisma.users.findUnique({
       where: { id: BigInt(payload.sub) },

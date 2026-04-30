@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function GET(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const { id } = await params
 
     const tenant = await prisma.tenants.findUnique({ where: { id: BigInt(id) } })
@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: Ctx) {
 export async function PUT(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { id } = await params
     const body = await request.json()
 
@@ -105,7 +105,7 @@ export async function PUT(request: Request, { params }: Ctx) {
 export async function DELETE(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { id } = await params
 
     const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(

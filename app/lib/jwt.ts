@@ -1,6 +1,6 @@
 import crypto from 'crypto'
+import { getSessionSecret } from '@/app/lib/env'
 
-const JWT_SECRET = process.env.SESSION_SECRET ?? 'fallback-secret-change-me'
 const EXPIRES_IN = 60 * 60 * 24 * 7 // 7 days
 
 function base64url(input: string | Buffer): string {
@@ -24,11 +24,12 @@ export type JwtPayload = {
 export function signJwt(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
   const now = Math.floor(Date.now() / 1000)
   const full: JwtPayload = { ...payload, iat: now, exp: now + EXPIRES_IN }
+  const secret = getSessionSecret()
 
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const body   = base64url(JSON.stringify(full))
   const sig    = base64url(
-    crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest()
+    crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest()
   )
 
   return `${header}.${body}.${sig}`
@@ -38,9 +39,10 @@ export function verifyJwt(token: string): JwtPayload | null {
   try {
     const [header, body, sig] = token.split('.')
     if (!header || !body || !sig) return null
+    const secret = getSessionSecret()
 
     const expected = base64url(
-      crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest()
+      crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest()
     )
     if (expected !== sig) return null
 

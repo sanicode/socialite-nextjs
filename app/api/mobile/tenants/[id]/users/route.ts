@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function GET(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const { id } = await params
 
     const rows = await prisma.$queryRawUnsafe<{
@@ -51,7 +51,7 @@ export async function GET(request: Request, { params }: Ctx) {
 export async function POST(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { id: tenantId } = await params
     const body = await request.json()
 

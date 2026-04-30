@@ -9,7 +9,16 @@ import { prisma } from '@/app/lib/prisma'
 import { parseTablePageSize } from '@/app/lib/table-pagination'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; reportingWindow?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; status?: string; reportingWindow?: string }>
+
+function getJakartaDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
 
 export default async function UploadPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
@@ -24,6 +33,9 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
   const reportingWindowTitle = isManager && !isAdmin ? 'Validasi Pelaporan Ditutup' : 'Jam Pelaporan Ditutup'
+  const today = getJakartaDateString()
+  const dateFrom = params.dateFrom ?? today
+  const dateTo = params.dateTo ?? today
 
   let tenantId: string | undefined
   if (isManager && !isAdmin && sessionUser) {
@@ -38,12 +50,15 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
     getPosts({
       search: params.search,
       categoryId: params.category,
+      status: params.status === 'pending' || params.status === 'valid' || params.status === 'invalid'
+        ? params.status
+        : undefined,
       page,
       pageSize,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
+      dateFrom,
+      dateTo,
       sortOrder,
       postType: 'upload',
     }),
@@ -97,6 +112,8 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
             canVerify={canVerify}
             basePath="/posts/upload"
             variant="upload"
+            defaultDateFrom={dateFrom}
+            defaultDateTo={dateTo}
             createDisabled={reportingWindowClosed}
             createDisabledMessage={reportingWindowDecision.message}
             actionsDisabled={reportingWindowClosed}

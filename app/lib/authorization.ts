@@ -1,5 +1,32 @@
 import { getSessionUser, type SessionUser } from '@/app/lib/session'
 import { getRequestSecurityDecision } from '@/app/lib/request-security'
+import { headers } from 'next/headers'
+import { verifyJwt } from '@/app/lib/jwt'
+import { prisma } from '@/app/lib/prisma'
+import { getUserRoles } from '@/app/lib/permissions'
+
+async function getBearerSessionUser(): Promise<SessionUser | null> {
+  const headerStore = await headers()
+  const auth = headerStore.get('Authorization')
+  if (!auth?.startsWith('Bearer ')) return null
+  const payload = verifyJwt(auth.slice(7))
+  if (!payload) return null
+
+  const user = await prisma.users.findUnique({
+    where: { id: BigInt(payload.sub) },
+    select: { id: true, name: true, email: true, is_admin: true, is_blocked: true },
+  })
+  if (!user || user.is_blocked) return null
+
+  const roles = await getUserRoles(payload.sub)
+  return {
+    id: user.id.toString(),
+    name: user.name,
+    email: user.email,
+    is_admin: user.is_admin,
+    roles,
+  }
+}
 
 export async function requireUser(): Promise<SessionUser> {
   const decision = await getRequestSecurityDecision()
@@ -7,7 +34,7 @@ export async function requireUser(): Promise<SessionUser> {
     throw new Error(decision.message ?? 'Access denied')
   }
 
-  const user = await getSessionUser()
+  const user = (await getSessionUser()) ?? (await getBearerSessionUser())
   if (!user) {
     throw new Error('Unauthorized')
   }

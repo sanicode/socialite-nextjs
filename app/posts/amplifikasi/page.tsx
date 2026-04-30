@@ -9,7 +9,16 @@ import { prisma } from '@/app/lib/prisma'
 import { parseTablePageSize } from '@/app/lib/table-pagination'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; reportingWindow?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; status?: string; reportingWindow?: string }>
+
+function getJakartaDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
 
 export default async function AmplifikasiPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
@@ -24,6 +33,9 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
   const reportingWindowTitle = isManager && !isAdmin ? 'Validasi Pelaporan Ditutup' : 'Jam Pelaporan Ditutup'
+  const today = getJakartaDateString()
+  const dateFrom = params.dateFrom ?? today
+  const dateTo = params.dateTo ?? today
 
   let tenantId: string | undefined
   if (isManager && !isAdmin && sessionUser) {
@@ -38,12 +50,15 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
     getPosts({
       search: params.search,
       categoryId: params.category,
+      status: params.status === 'pending' || params.status === 'valid' || params.status === 'invalid'
+        ? params.status
+        : undefined,
       page,
       pageSize,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
+      dateFrom,
+      dateTo,
       sortOrder,
       postType: 'amplifikasi',
     }),
@@ -55,7 +70,7 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Pelaporan mplifikasi</h1>
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Pelaporan Amplifikasi</h1>
             <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{total} laporan terdaftar</p>
           </div>
           {(!isManager || isAdmin) && (
@@ -97,6 +112,8 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
             canVerify={canVerify}
             basePath="/posts/amplifikasi"
             variant="amplifikasi"
+            defaultDateFrom={dateFrom}
+            defaultDateTo={dateTo}
             createDisabled={reportingWindowClosed}
             createDisabledMessage={reportingWindowDecision.message}
             actionsDisabled={reportingWindowClosed}

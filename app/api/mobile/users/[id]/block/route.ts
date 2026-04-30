@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function PATCH(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { id } = await params
     const body = await request.json()
 

@@ -11,7 +11,7 @@ const MODEL_TYPE_USER = 'App\\Models\\User'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const { searchParams } = new URL(request.url)
 
     const page     = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
@@ -178,7 +178,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
 
     const name  = (body.name ?? '').trim()

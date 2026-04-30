@@ -1,16 +1,25 @@
 import { requireJwtRole, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
+import { getUserTenantIds } from '@/app/lib/tenant-access'
+import type { JwtPayload } from '@/app/lib/jwt'
 
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
 
-async function getCallerTenantId(userId: string): Promise<bigint> {
-  const tu = await prisma.tenant_user.findFirst({
-    where: { user_id: BigInt(userId) },
-    select: { tenant_id: true },
-  })
-  if (!tu) throw new ApiError(403, 'User tidak terdaftar di tenant manapun.')
-  return tu.tenant_id
+async function getCallerTenantId(payload: JwtPayload, requestedTenantId?: string | null): Promise<bigint> {
+  if (payload.roles.includes('admin')) {
+    if (!requestedTenantId) throw new ApiError(422, 'tenantId wajib diisi untuk admin.')
+    return BigInt(requestedTenantId)
+  }
+
+  const tenantIds = await getUserTenantIds(payload.sub)
+  if (tenantIds.length === 0) throw new ApiError(403, 'User tidak terdaftar di tenant manapun.')
+  if (requestedTenantId) {
+    if (!tenantIds.includes(requestedTenantId)) throw new ApiError(403, 'Akses tenant ditolak.')
+    return BigInt(requestedTenantId)
+  }
+  if (tenantIds.length > 1) throw new ApiError(422, 'tenantId wajib diisi untuk manager multi-tenant.')
+  return BigInt(tenantIds[0])
 }
 
 // ── GET /api/mobile/operators ─────────────────────────────────────────────────
@@ -18,7 +27,7 @@ async function getCallerTenantId(userId: string): Promise<bigint> {
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwtRole(request, 'admin', 'manager')
+    const payload = await requireJwtRole(request, 'admin', 'manager')
     const { searchParams } = new URL(request.url)
 
     const page     = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
@@ -28,7 +37,7 @@ export async function GET(request: Request) {
     const email    = searchParams.get('email') ?? undefined
     const phone    = searchParams.get('phone') ?? undefined
 
-    const tenantId = await getCallerTenantId(payload.sub)
+    const tenantId = await getCallerTenantId(payload, searchParams.get('tenantId'))
 
     const conditions: string[] = [
       `tu.tenant_id = $1`,
@@ -90,12 +99,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwtRole(request, 'admin', 'manager')
+    const payload = await requireJwtRole(request, 'admin', 'manager')
     const body = await request.json()
 
     if (!body.user_id) throw new ApiError(422, 'user_id wajib diisi.')
 
-    const tenantId = await getCallerTenantId(payload.sub)
+    const tenantId = await getCallerTenantId(payload, typeof body.tenantId === 'string' ? body.tenantId : null)
 
     const existing = await prisma.tenant_user.findFirst({
       where: { tenant_id: tenantId, user_id: BigInt(body.user_id) },

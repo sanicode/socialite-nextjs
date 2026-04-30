@@ -5,6 +5,7 @@ import { requireManagerOrAdmin } from '@/app/lib/authorization'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { TablePageSize } from '@/app/lib/table-pagination'
+import { canActorAccessTenant } from '@/app/lib/tenant-access'
 
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
 
@@ -177,6 +178,14 @@ export async function attachOperator(userId: string): Promise<void> {
 
 export async function detachOperator(tenantUserId: string): Promise<void> {
   const user = await requireManagerOrAdmin()
+
+  const target = await prisma.tenant_user.findUnique({
+    where: { id: BigInt(tenantUserId) },
+    select: { tenant_id: true },
+  })
+  if (!target) throw new Error('Operator tidak ditemukan.')
+  const canAccessTenant = await canActorAccessTenant(user, target.tenant_id.toString())
+  if (!canAccessTenant) throw new Error('Anda tidak memiliki akses untuk melepas operator ini.')
 
   await prisma.model_has_roles.deleteMany({
     where: { model_type: MODEL_TYPE_TENANT_USER, model_id: BigInt(tenantUserId) },

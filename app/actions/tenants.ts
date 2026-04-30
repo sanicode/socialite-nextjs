@@ -175,27 +175,40 @@ export async function getTenants(params: {
 
   // ── Correlated subqueries for role counts ─────────────────────────────────
   // Spatie standard: model_type = 'App\Models\TenantUser', model_id = tenant_user.id
-  const roleCountSql = (roleName: string) => `
-    (SELECT COUNT(DISTINCT tu.id)
-     FROM tenant_user tu
-     WHERE tu.tenant_id = t.id
-       AND EXISTS (
-         SELECT 1
-         FROM model_has_roles mhr
-         JOIN roles r ON r.id = mhr.role_id
-         WHERE r.name = '${roleName}'
-           AND mhr.model_type = 'App\\Models\\TenantUser'
-           AND mhr.model_id = tu.id
-       )
-    )`
+  const roleCountSql = {
+    manager: `(SELECT COUNT(DISTINCT tu.id)
+      FROM tenant_user tu
+      WHERE tu.tenant_id = t.id
+        AND EXISTS (
+          SELECT 1
+          FROM model_has_roles mhr
+          JOIN roles r ON r.id = mhr.role_id
+          WHERE r.name = 'manager'
+            AND mhr.model_type = 'App\\Models\\TenantUser'
+            AND mhr.model_id = tu.id
+        )
+      )`,
+    operator: `(SELECT COUNT(DISTINCT tu.id)
+      FROM tenant_user tu
+      WHERE tu.tenant_id = t.id
+        AND EXISTS (
+          SELECT 1
+          FROM model_has_roles mhr
+          JOIN roles r ON r.id = mhr.role_id
+          WHERE r.name = 'operator'
+            AND mhr.model_type = 'App\\Models\\TenantUser'
+            AND mhr.model_id = tu.id
+        )
+      )`,
+  }
 
   const tenantRowsSql = `SELECT
          t.id,
          t.name,
          t.domain,
          (SELECT rc.name FROM addresses a2 JOIN reg_cities rc ON rc.id = a2.city_id WHERE a2.tenant_id = t.id ORDER BY a2.id LIMIT 1) AS city,
-         ${roleCountSql('manager')}  AS manager_count,
-         ${roleCountSql('operator')} AS operator_count
+         ${roleCountSql.manager}  AS manager_count,
+         ${roleCountSql.operator} AS operator_count
        FROM tenants t
        ${where}
        ORDER BY ${orderBy}

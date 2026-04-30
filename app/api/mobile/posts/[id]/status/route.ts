@@ -2,13 +2,14 @@ import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
+import { canActorValidatePost } from '@/app/lib/tenant-access'
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function PATCH(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
     const { id } = await params
 
     if (!payload.roles.includes('admin') && !payload.roles.includes('manager')) {
@@ -29,9 +30,14 @@ export async function PATCH(request: Request, { params }: Ctx) {
 
     const post = await prisma.blog_posts.findUnique({
       where: { id: BigInt(id) },
-      select: { id: true },
+      select: { id: true, user_id: true, tenant_id: true },
     })
     if (!post) return Response.json({ error: 'Laporan tidak ditemukan' }, { status: 404 })
+    const canValidate = await canActorValidatePost(payload, {
+      userId: post.user_id.toString(),
+      tenantId: post.tenant_id?.toString() ?? null,
+    })
+    if (!canValidate) throw new ApiError(403, 'Anda tidak memiliki akses untuk mengubah status laporan ini')
 
     await prisma.blog_posts.update({
       where: { id: BigInt(id) },

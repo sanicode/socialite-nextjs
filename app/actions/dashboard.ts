@@ -2,6 +2,9 @@
 
 import { cache } from 'react'
 import { prisma } from '@/app/lib/prisma'
+import { requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
+import type { SessionUser } from '@/app/lib/session'
+import { getUserTenantIds } from '@/app/lib/tenant-access'
 
 export type DashboardFilters = {
   dateFrom?: string
@@ -114,17 +117,32 @@ function buildRekapitulasiReportFilters(filters: DashboardFilters, provinceName?
   }
 }
 
+async function scopeDashboardFilters(user: SessionUser, filters: DashboardFilters): Promise<DashboardFilters> {
+  if (user.roles.includes('admin')) return filters
+
+  const tenantIds = await getUserTenantIds(user.id)
+  if (tenantIds.length === 0) throw new Error('Akses tenant tidak ditemukan')
+  if (filters.tenantId && !tenantIds.includes(filters.tenantId)) {
+    throw new Error('Akses tenant ditolak')
+  }
+  return { ...filters, tenantId: filters.tenantId ?? tenantIds[0] }
+}
+
 export async function getProvinces(): Promise<{ id: number; name: string }[]> {
+  await requireUser()
   const provinces = await getProvincesCached()
   return provinces.map((p) => ({ id: p.id, name: p.name }))
 }
 
 export async function getCities(provinceId?: string): Promise<{ id: string; name: string }[]> {
+  await requireUser()
   const cities = await getCitiesCached(provinceId)
   return cities.map((c) => ({ id: c.id.toString(), name: c.name }))
 }
 
 export async function getDashboardStats(filters: DashboardFilters): Promise<DashboardStats> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const { tenantId } = filters
   const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
@@ -210,6 +228,8 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
 }
 
 export async function getPostsByProvince(filters: DashboardFilters): Promise<ChartItem[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const conditions: string[] = []
   const params: unknown[] = []
   let idx = 1
@@ -265,6 +285,8 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
 }
 
 export async function getProvinceChartData(filters: DashboardFilters): Promise<ProvinceChartItem[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
   const postConditions: string[] = []
@@ -363,6 +385,8 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
 }
 
 export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<CityChartGroup[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
 
   const postConditions: string[] = []
@@ -478,6 +502,8 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
 }
 
 export async function getReportData(filters: DashboardFilters): Promise<ReportRow[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
   const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
   const statusClause = filters.status
@@ -514,6 +540,8 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
 }
 
 export async function getPostsByDate(filters: DashboardFilters): Promise<ChartItem[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
   const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
   const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
 

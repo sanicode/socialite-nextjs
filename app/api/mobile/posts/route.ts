@@ -1,10 +1,11 @@
 import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
-import { getPosts } from '@/app/actions/posts'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { JwtPayload } from '@/app/lib/jwt'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
+import { getUserTenantIds } from '@/app/lib/tenant-access'
+import { queryPosts } from '@/app/lib/posts-query'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ function isOperatorJwt(payload: JwtPayload) {
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
     const { searchParams } = new URL(request.url)
 
     const page       = Number(searchParams.get('page') ?? '1')
@@ -58,10 +59,22 @@ export async function GET(request: Request) {
     const ptParam    = searchParams.get('postType')
     const postType   = ptParam === 'upload' || ptParam === 'amplifikasi' ? ptParam : undefined
 
-    const userId   = isOperatorJwt(payload) ? payload.sub : (searchParams.get('userId') ?? undefined)
-    const tenantId = searchParams.get('tenantId') ?? undefined
+    let userId = isOperatorJwt(payload) ? payload.sub : (searchParams.get('userId') ?? undefined)
+    let tenantId = payload.roles.includes('admin') ? (searchParams.get('tenantId') ?? undefined) : undefined
+    let tenantIds: string[] | undefined
 
-    const result = await getPosts({ search, categoryId, status, page, userId, tenantId, dateFrom, dateTo, sortOrder, postType })
+    if (payload.roles.includes('manager') && !payload.roles.includes('admin')) {
+      const managerTenantIds = await getUserTenantIds(payload.sub)
+      if (managerTenantIds.length === 0) throw new ApiError(403, 'Akses tenant tidak ditemukan')
+      const requestedTenantId = searchParams.get('tenantId')
+      if (requestedTenantId && !managerTenantIds.includes(requestedTenantId)) {
+        throw new ApiError(403, 'Akses tenant ditolak')
+      }
+      tenantIds = requestedTenantId ? [requestedTenantId] : managerTenantIds
+      tenantId = undefined
+    }
+
+    const result = await queryPosts({ search, categoryId, status, page, userId, tenantId, tenantIds, dateFrom, dateTo, sortOrder, postType })
     return Response.json(result)
   } catch (error) {
     return apiError(error)
@@ -73,7 +86,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
 
     // Manager-only cannot create posts
     if (payload.roles.includes('manager') && !payload.roles.includes('admin')) {
@@ -186,6 +199,19 @@ export async function POST(request: Request) {
 
     // ── link media ──
     if (media_id) {
+      const media = await prisma.media.findUnique({
+        where: { id: BigInt(media_id) },
+        select: { id: true, model_id: true, collection_name: true, custom_properties: true },
+      })
+      const props = media?.custom_properties as Record<string, unknown> | null
+      if (
+        !media ||
+        media.collection_name !== 'blog-images' ||
+        media.model_id !== BigInt(0) ||
+        props?.uploaded_by !== payload.sub
+      ) {
+        throw new ApiError(403, 'Media upload tidak valid')
+      }
       await prisma.media.update({
         where: { id: BigInt(media_id) },
         data: { model_id: post.id },

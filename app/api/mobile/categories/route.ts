@@ -1,12 +1,12 @@
 import { requireJwt, apiError, requireApiEnabled } from '@/app/lib/api-auth'
-import { getCategories } from '@/app/actions/posts'
+import { prisma } from '@/app/lib/prisma'
 
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwt(request)
-    const categories = await getCategories()
-    return Response.json(categories)
+    await requireJwt(request)
+    const categories = await prisma.blog_post_categories.findMany({ orderBy: { name: 'asc' } })
+    return Response.json(categories.map((category) => ({ id: category.id.toString(), name: category.name })))
   } catch (error) {
     return apiError(error)
   }

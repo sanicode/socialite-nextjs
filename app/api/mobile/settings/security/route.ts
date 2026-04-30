@@ -11,7 +11,7 @@ import { logEvent } from '@/app/lib/logger'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const settings = await getSecuritySettings()
     return Response.json(settings)
   } catch (error) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
 
     const nextSettings = normalizeSecuritySettings({

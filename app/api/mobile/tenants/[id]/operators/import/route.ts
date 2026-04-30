@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function POST(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { id: tenantId } = await params
     const body = await request.json()
     if (!body.text || typeof body.text !== 'string') throw new ApiError(400, 'Field "text" wajib diisi.')

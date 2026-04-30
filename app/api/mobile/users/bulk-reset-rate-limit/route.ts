@@ -5,7 +5,7 @@ import { logEvent } from '@/app/lib/logger'
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
 
     const { emails } = body

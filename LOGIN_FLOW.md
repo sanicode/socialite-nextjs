@@ -12,6 +12,7 @@ Login aplikasi ini berbasis:
 - request security policy berbasis IP dan country dari config database
 - audit trail keamanan di tabel `access_logs`
 - authorization pasca-login melalui role yang di-resolve dari `model_has_roles`, `roles`, dan `tenant_user`
+- JWT mobile yang selalu memeriksa ulang user aktif dan role terbaru dari database
 
 Implementasi utama berada di:
 
@@ -22,6 +23,8 @@ Implementasi utama berada di:
 - `app/lib/access-logs.ts`
 - `app/lib/permissions.ts`
 - `app/lib/authorization.ts`
+- `app/lib/api-auth.ts`
+- `app/lib/jwt.ts`
 
 ## Daftar Tabel yang Berhubungan dengan Login Flow
 
@@ -192,7 +195,7 @@ Konfigurasi cookie saat ini:
 - `sameSite: 'lax'`
 - `path: '/'`
 - `secure: true` hanya di production
-- `maxAge: 7 hari`
+- `maxAge: 1 jam`
 
 Jika cookie tidak valid atau signature rusak, session dianggap tidak ada.
 
@@ -205,7 +208,8 @@ Function `getSessionUser()` melakukan:
 1. baca cookie `sid`
 2. verifikasi signature
 3. ambil user dari tabel `users`
-4. panggil `getUserRoles(userId)`
+4. tolak session jika user sudah diblokir
+5. panggil `getUserRoles(userId)` agar role selalu terbaru
 
 `getUserRoles(userId)` mengumpulkan role dari dua sumber:
 
@@ -219,6 +223,34 @@ Lalu helper authorization dipakai:
 - `requireManagerOrAdmin()`
 
 Artinya, login sukses belum otomatis berarti semua endpoint bisa diakses. User tetap harus lolos authorization sesuai fitur.
+
+## Mobile Login dan JWT
+
+Mobile login berada di `POST /api/mobile/auth/login`.
+
+Flow mobile sengaja dibuat konsisten dengan web login:
+
+1. API mobile harus aktif lewat security settings.
+2. Request security policy IP/country dicek.
+3. Input `email` dan `password` divalidasi.
+4. IP login dibaca dari header request.
+5. `checkRateLimit(email, ip)` memeriksa tiga tier rate limit.
+6. User dicari di tabel `users`.
+7. User blocked dan password salah sama-sama dicatat sebagai kegagalan login.
+8. Login sukses menghapus hanya Tier 1 (`email|ip`).
+9. Role terbaru diambil dengan `getUserRoles(userId)`.
+10. JWT dibuat memakai `SESSION_SECRET`.
+11. Access log ditulis untuk `login_success`, `login_failed`, `login_blocked`, dan `login_rate_limited`.
+
+Setiap endpoint mobile yang memakai `requireJwt()` melakukan:
+
+- validasi Bearer token
+- verifikasi signature dan expiry JWT
+- query ulang user dari database
+- menolak token jika user tidak ditemukan atau `is_blocked = true`
+- resolve ulang role dari database
+
+Dengan cara ini, token lama tidak tetap membawa role lama setelah role user berubah, dan akun yang diblokir tidak bisa terus memakai token aktif.
 
 ## Tabel-Tabel yang Berhubungan dengan Login
 

@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string; tenantUserId: string }> }
 export async function DELETE(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const admin = requireJwtRole(request, 'admin')
+    const admin = await requireJwtRole(request, 'admin')
     const { tenantUserId } = await params
 
     await prisma.model_has_roles.deleteMany({

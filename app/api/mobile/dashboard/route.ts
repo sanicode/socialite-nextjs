@@ -7,11 +7,12 @@ import {
   getPostsByDate,
   type DashboardFilters,
 } from '@/app/actions/dashboard'
+import { getUserTenantIds } from '@/app/lib/tenant-access'
 
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
 
     if (!payload.roles.includes('admin') && !payload.roles.includes('manager')) {
       throw new ApiError(403, 'Hanya admin atau manager yang dapat mengakses dashboard')
@@ -31,12 +32,12 @@ export async function GET(request: Request) {
 
     // Manager hanya bisa melihat tenant miliknya
     if (payload.roles.includes('manager') && !payload.roles.includes('admin')) {
-      const { prisma } = await import('@/app/lib/prisma')
-      const tu = await prisma.tenant_user.findFirst({
-        where: { user_id: BigInt(payload.sub) },
-        select: { tenant_id: true },
-      })
-      if (tu) filters.tenantId = tu.tenant_id.toString()
+      const tenantIds = await getUserTenantIds(payload.sub)
+      if (tenantIds.length === 0) throw new ApiError(403, 'Akses tenant tidak ditemukan')
+      if (filters.tenantId && !tenantIds.includes(filters.tenantId)) {
+        throw new ApiError(403, 'Akses tenant ditolak')
+      }
+      filters.tenantId = filters.tenantId ?? tenantIds[0]
     }
 
     const [stats, byProvince, provinceChart, topCities, postsByDate] = await Promise.all([

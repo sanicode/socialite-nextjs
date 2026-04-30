@@ -12,7 +12,7 @@ function getS3Key(media: { file_name: string; custom_properties: unknown }): str
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
 
     if (!payload.roles.includes('admin')) {
       throw new ApiError(403, 'Hanya admin yang dapat menghapus laporan secara massal')

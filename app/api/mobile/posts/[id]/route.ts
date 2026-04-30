@@ -1,10 +1,11 @@
 import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
-import { getPostById } from '@/app/actions/posts'
 import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3 } from '@/app/lib/s3'
 import { logEvent } from '@/app/lib/logger'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
+import { canActorReadPost } from '@/app/lib/tenant-access'
+import { queryPostById } from '@/app/lib/posts-query'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -19,10 +20,15 @@ function getS3Key(media: { file_name: string; custom_properties: unknown }): str
 export async function GET(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    requireJwt(request)
+    const payload = await requireJwt(request)
     const { id } = await params
-    const post = await getPostById(id)
+    const post = await queryPostById(id)
     if (!post) return Response.json({ error: 'Laporan tidak ditemukan' }, { status: 404 })
+    const canRead = await canActorReadPost(payload, {
+      userId: post.user?.id ?? null,
+      tenantId: post.tenant_id,
+    })
+    if (!canRead) throw new ApiError(403, 'Anda tidak memiliki akses untuk membaca laporan ini')
     return Response.json(post)
   } catch (error) {
     return apiError(error)
@@ -57,7 +63,7 @@ function generateSlug(title: string): string {
 export async function PUT(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
     const { id } = await params
 
     const post = await prisma.blog_posts.findUnique({
@@ -99,7 +105,6 @@ export async function PUT(request: Request, { params }: Ctx) {
       description,
       is_published,
       media_id,
-      old_media_id,
     } = body
 
     const errors: Record<string, string> = {}
@@ -151,11 +156,24 @@ export async function PUT(request: Request, { params }: Ctx) {
 
     // Ganti media jika ada upload baru
     if (media_id) {
-      if (old_media_id) {
-        const oldMedia = await prisma.media.findUnique({ where: { id: BigInt(old_media_id) } })
+      const newMedia = await prisma.media.findUnique({
+        where: { id: BigInt(media_id) },
+        select: { id: true, model_id: true, collection_name: true, custom_properties: true },
+      })
+      const props = newMedia?.custom_properties as Record<string, unknown> | null
+      if (
+        !newMedia ||
+        newMedia.collection_name !== 'blog-images' ||
+        newMedia.model_id !== BigInt(0) ||
+        props?.uploaded_by !== payload.sub
+      ) {
+        throw new ApiError(403, 'Media upload tidak valid')
+      }
+      if (existingMedia) {
+        const oldMedia = await prisma.media.findUnique({ where: { id: existingMedia.id } })
         if (oldMedia) {
           await deleteFromS3(getS3Key(oldMedia)).catch(() => {})
-          await prisma.media.delete({ where: { id: BigInt(old_media_id) } })
+          await prisma.media.delete({ where: { id: existingMedia.id } })
         }
       }
       await prisma.media.update({
@@ -176,7 +194,7 @@ export async function PUT(request: Request, { params }: Ctx) {
 export async function DELETE(request: Request, { params }: Ctx) {
   try {
     await requireApiEnabled()
-    const payload = requireJwt(request)
+    const payload = await requireJwt(request)
     const { id } = await params
 
     if (!payload.roles.includes('admin')) {

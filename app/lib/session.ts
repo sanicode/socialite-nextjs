@@ -59,9 +59,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   const user = await prisma.users.findUnique({
     where: { id: BigInt(userId) },
-    select: { id: true, name: true, email: true, is_admin: true },
+    select: { id: true, name: true, email: true, is_admin: true, is_blocked: true },
   })
-  if (!user) return null
+  if (!user || user.is_blocked) return null
 
   const roles = await getUserRoles(userId)
 

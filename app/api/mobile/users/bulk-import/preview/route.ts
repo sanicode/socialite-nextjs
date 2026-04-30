@@ -129,7 +129,7 @@ export async function buildBulkUserImportPreview(rawText: string) {
 export async function POST(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const body = await request.json()
     if (!body.text || typeof body.text !== 'string') {
       throw new ApiError(400, 'Field "text" wajib diisi.')

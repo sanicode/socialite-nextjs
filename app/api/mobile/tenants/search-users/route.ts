@@ -4,7 +4,7 @@ import { prisma } from '@/app/lib/prisma'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const { searchParams } = new URL(request.url)
 
     const query    = searchParams.get('q') ?? ''

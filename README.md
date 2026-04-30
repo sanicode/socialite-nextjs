@@ -2,6 +2,8 @@
 
 Aplikasi pelaporan media sosial berbasis Next.js App Router untuk operator, manager, dan admin. Terhubung ke PostgreSQL melalui Prisma, menyimpan screenshot ke S3-compatible storage, dilengkapi brute-force protection, access logging, IP/country security policy, dan REST API untuk mobile.
 
+Perubahan terbaru dicatat di [CHANGELOG.md](CHANGELOG.md).
+
 ## Stack
 
 - Next.js App Router (React 19)
@@ -31,6 +33,7 @@ app/
   posts/            Halaman laporan: semua, upload, amplifikasi, per-operator
   operators/        Halaman manajemen operator (admin/manager)
   dashboard/        Dashboard ringkasan
+  summary/          Halaman rekap admin dengan tab Summary dan Analytics
 prisma/
   schema.prisma     Sumber schema database
 ```
@@ -51,14 +54,15 @@ Operator tidak bisa mengakses `/posts` (redirect ke `/posts/upload`), tidak munc
 |------|-------|------------|
 | `/login` | Public | Form login dengan rate limiting |
 | `/dashboard` | Manager, Admin | Ringkasan statistik dan rekapitulasi |
+| `/summary` | Admin | Rekap harian dengan tab Summary/Analytics, chart, export PDF dan Excel |
 | `/posts` | Manager, Admin | Semua laporan (semua operator) |
-| `/posts/upload` | Semua | Laporan jenis Upload |
-| `/posts/amplifikasi` | Semua | Laporan jenis Amplifikasi |
+| `/posts/upload` | Semua | Laporan jenis Upload; default tanggal hari ini; filter status |
+| `/posts/amplifikasi` | Semua | Laporan jenis Amplifikasi; default tanggal hari ini; filter status |
 | `/posts/users` | Manager, Admin | Rekap per-operator (sortable, filterable) |
 | `/posts/users/[userId]/[status]` | Manager, Admin | Detail laporan per operator |
 | `/operators` | Manager, Admin | Manajemen akun operator |
 | `/settings/users` | Admin | Manajemen user (block/unblock, reset rate limit) |
-| `/settings/security` | Admin | Konfigurasi IP blocklist & country allowlist |
+| `/settings/security` | Admin | Konfigurasi IP blocklist, country allowlist, ukuran upload, jam pelaporan operator, dan jam validasi manager |
 | `/settings/logs` | Admin | Access log audit trail |
 | `/settings/tenants` | Admin | Manajemen tenant |
 
@@ -79,21 +83,35 @@ Detail lengkap: [LOGIN_FLOW.md](LOGIN_FLOW.md)
 ### Login (mobile — JWT)
 
 1. `POST /api/mobile/auth/login` dengan body `{ email, password }`
-2. Validasi sama seperti web (password bcrypt), tapi tanpa rate limit mobile saat ini
+2. Request security policy dan rate limit 3-tier dicek seperti web login
 3. Response: `{ token, user: { id, name, email, is_admin, roles } }`
 4. Token JWT HS256, expiry 7 hari, signed dengan `SESSION_SECRET`
 5. Request selanjutnya: `Authorization: Bearer <token>`
+6. Setiap request JWT memeriksa ulang user aktif dan role terbaru dari database
 
 ### Submit Laporan
 
 1. User pilih kategori, isi link, upload screenshot
-2. Validasi di client dan server (format URL per platform, duplicate harian)
+2. Validasi di client dan server (format URL per platform, duplicate harian, magic bytes file upload)
 3. Post disimpan ke `blog_posts`, screenshot diunggah ke S3, metadata ke `media`
+4. Operator hanya dapat submit/edit di rentang jam operator yang diatur admin
 
 ### Verifikasi Laporan
 
 1. Admin/manager mengubah status (pending → valid/invalid)
 2. Setiap mutasi wajib lolos `requireManagerOrAdmin()` di server action
+3. Manager hanya dapat memvalidasi laporan tenant miliknya dan hanya pada rentang jam validasi manager
+4. Admin tidak terkena pembatasan jam validasi
+
+### Filter dan Pagination Tabel
+
+- Semua table page memakai pagination server-side berbasis URL.
+- Pilihan jumlah data per halaman: `5`, `10`, `20`, `50`, `all`.
+- Search berada di atas tabel mengikuti pola DataTables.
+- Filter tanggal memakai `dateFrom` dan `dateTo`.
+- `/dashboard`, `/posts`, `/posts/upload`, `/posts/amplifikasi`, dan `/posts/users` default ke tanggal hari ini di timezone `Asia/Jakarta`.
+- `/posts`, `/posts/upload`, dan `/posts/amplifikasi` memiliki filter status `pending`, `valid`, `invalid`.
+- Filter provinsi/kota membaca provinsi dari relasi `city_id` pada `addresses`.
 
 ### Dashboard
 
@@ -103,6 +121,20 @@ Membaca dari SQL views:
 - `v_rekapitulasi_pelaporan`
 
 Export ke Excel dengan hyperlink aktif via SheetJS.
+
+### Summary
+
+Halaman `/summary` adalah halaman admin terpisah dari `/dashboard`.
+
+Fitur:
+
+- Layout aplikasi lengkap: sidebar, header, dan content area normal.
+- Sidebar menu `Summary` tampil untuk admin, sementara menu `Dashboard` tetap dipertahankan.
+- Sidebar dapat dicollapse.
+- Tab `Summary` berisi rekap harian dan chart di bagian bawah.
+- Tab `Analytics` berisi tampilan analitik sesuai dokumen rujukan.
+- Export tersedia dalam PDF dan Excel.
+- File PDF/Excel hanya berisi data laporan, tanpa card UI.
 
 ## REST API Mobile
 
@@ -134,9 +166,13 @@ Response: object user sama seperti di atas (tanpa token).
 
 ### `GET /api/mobile/posts`
 
-Query params: `page`, `search`, `categoryId`, `dateFrom`, `dateTo`, `sortOrder`, `postType` (upload|amplifikasi), `userId`, `tenantId`
+Query params: `page`, `search`, `categoryId`, `status`, `dateFrom`, `dateTo`, `sortOrder`, `postType` (upload|amplifikasi), `userId`, `tenantId`
 
-Operator otomatis hanya melihat laporan miliknya sendiri (filter by JWT sub).
+Scoping:
+
+- Operator otomatis hanya melihat laporan miliknya sendiri (filter by JWT sub).
+- Manager otomatis dibatasi ke tenant miliknya; `tenantId` arbitrary ditolak.
+- Admin dapat memakai filter `userId` dan `tenantId`.
 
 Response:
 ```json
@@ -159,6 +195,9 @@ Response: `[{ "id": "1", "name": "Instagram" }, ...]`
 | `login-rate-limit.ts` | Rate limit 3-tier berbasis database |
 | `request-security.ts` | IP blocklist & country allowlist |
 | `access-logs.ts` | Tulis event keamanan ke tabel `access_logs` |
+| `tenant-access.ts` | Helper authorization tenant/post untuk admin, manager, operator |
+| `posts-query.ts` | Query data posts yang dipakai server action dan REST API mobile |
+| `file-validation.ts` | Deteksi magic bytes upload gambar aman |
 | `s3.ts` | Upload, delete, URL media di S3 |
 | `prisma.ts` | Singleton Prisma client |
 
@@ -168,7 +207,9 @@ Response: `[{ "id": "1", "name": "Instagram" }, ...]`
 - Setiap `page.tsx` wajib cek `getSessionUser()` + redirect jika tidak auth
 - Filter tabel: gunakan `force-dynamic` + `key` prop pada client component + `router.push` di `startTransition`
 - Sort tabel: gunakan `useRouter` + `startTransition`, bukan `<Link>`
-- Pagination: URL-based, page size 20 (tabel management) atau 50 (log), selalu preserve filter params
+- Pagination: URL-based, page size dapat dipilih `5`, `10`, `20`, `50`, atau `all`, selalu preserve filter params
+- Upload file wajib divalidasi dari isi file, bukan dari header/nama file dari klien
+- Media upload pending wajib divalidasi ownership sebelum dipakai sebagai `media_id`
 
 ## Environment Variables
 
@@ -218,4 +259,6 @@ Fitur mobile saat ini:
 - Test dashboard untuk admin dan manager
 - Test upload screenshot (URL media harus benar)
 - Test API mobile: login, get posts, get categories
+- Test pembatasan jam operator dan manager
+- Test export Summary PDF dan Excel
 - Cek access logs tercatat dengan benar di `/settings/logs`

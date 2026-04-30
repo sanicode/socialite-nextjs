@@ -4,7 +4,7 @@ import { prisma } from '@/app/lib/prisma'
 export async function GET(request: Request) {
   try {
     await requireApiEnabled()
-    requireJwtRole(request, 'admin')
+    await requireJwtRole(request, 'admin')
     const roles = await prisma.roles.findMany({
       where: { tenant_id: null },
       orderBy: { name: 'asc' },

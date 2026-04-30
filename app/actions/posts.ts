@@ -14,6 +14,9 @@ import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { deleteSession } from '@/app/lib/session'
 import type { TablePageSize } from '@/app/lib/table-pagination'
+import { canActorReadPost, canActorValidatePost, getUserTenantIds } from '@/app/lib/tenant-access'
+import { detectAllowedImage } from '@/app/lib/file-validation'
+import { queryPostById, queryPosts } from '@/app/lib/posts-query'
 import {
   getNonAdminReportingWindowDecision,
   getOperatorReportingWindowDecision,
@@ -34,6 +37,17 @@ export async function updatePostStatus(postId: string, status: 'pending' | 'vali
     throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
   }
   try {
+    const post = await prisma.blog_posts.findUnique({
+      where: { id: BigInt(postId) },
+      select: { user_id: true, tenant_id: true },
+    })
+    if (!post) throw new Error('Laporan tidak ditemukan')
+    const canValidate = await canActorValidatePost(sessionUser, {
+      userId: post.user_id.toString(),
+      tenantId: post.tenant_id?.toString() ?? null,
+    })
+    if (!canValidate) throw new Error('Anda tidak memiliki akses untuk mengubah status laporan ini')
+
     await prisma.blog_posts.update({
       where: { id: BigInt(postId) },
       data: { status },
@@ -171,6 +185,7 @@ export async function getPosts(params: {
   pageSize?: TablePageSize
   userId?: string
   tenantId?: string
+  tenantIds?: string[]
   dateFrom?: string
   dateTo?: string
   sortOrder?: 'asc' | 'desc'
@@ -178,20 +193,41 @@ export async function getPosts(params: {
   provinceId?: string
   cityId?: string
 }): Promise<{ posts: SerializedPost[]; total: number }> {
+  const sessionUser = await requireUser()
+  const scopedParams = { ...params }
+  if (sessionUser.roles.includes('admin')) {
+    return queryPosts(scopedParams) as Promise<{ posts: SerializedPost[]; total: number }>
+  }
+  if (sessionUser.roles.includes('manager')) {
+    const tenantIds = await getUserTenantIds(sessionUser.id)
+    if (tenantIds.length === 0) return { posts: [], total: 0 }
+    if (scopedParams.tenantId && !tenantIds.includes(scopedParams.tenantId)) {
+      return { posts: [], total: 0 }
+    }
+    scopedParams.tenantIds = scopedParams.tenantId ? [scopedParams.tenantId] : tenantIds
+    delete scopedParams.tenantId
+    return queryPosts(scopedParams) as Promise<{ posts: SerializedPost[]; total: number }>
+  }
+  scopedParams.userId = sessionUser.id
+  delete scopedParams.tenantId
+  delete scopedParams.tenantIds
+  return queryPosts(scopedParams) as Promise<{ posts: SerializedPost[]; total: number }>
+
   const { search, categoryId, status, page = 1, pageSize = 10, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, provinceId, cityId } = params
-  const skip = pageSize === 'all' ? undefined : (page - 1) * pageSize
-  const take = pageSize === 'all' ? undefined : pageSize
+  const numericPageSize = pageSize === 'all' ? undefined : pageSize
+  const skip = numericPageSize === undefined ? undefined : (page - 1) * Number(numericPageSize)
+  const take = numericPageSize === undefined ? undefined : Number(numericPageSize)
 
   // Resolve user IDs for tenant scoping (manager sees all tenant members' posts)
   let userIdFilter: { user_id: bigint } | { user_id: { in: bigint[] } } | undefined
   if (tenantId) {
     const tenantUsers = await prisma.tenant_user.findMany({
-      where: { tenant_id: BigInt(tenantId) },
+      where: { tenant_id: BigInt(tenantId!) },
       select: { user_id: true },
     })
     userIdFilter = { user_id: { in: tenantUsers.map((tu) => tu.user_id) } }
   } else if (userId) {
-    userIdFilter = { user_id: BigInt(userId) }
+    userIdFilter = { user_id: BigInt(userId!) }
   }
 
   // Province/city scoping via addresses → tenant_id
@@ -203,13 +239,13 @@ export async function getPosts(params: {
 
     if (provinceId) {
       conditions.push(`c.province_id = $${idx}`)
-      queryParams.push(parseInt(provinceId, 10))
+      queryParams.push(parseInt(provinceId!, 10))
       idx++
     }
 
     if (cityId) {
       conditions.push(`a.city_id = $${idx}`)
-      queryParams.push(parseInt(cityId, 10))
+      queryParams.push(parseInt(cityId!, 10))
     }
 
     const addressMatches = await prisma.$queryRawUnsafe<{ tenant_id: bigint | null }[]>(
@@ -245,15 +281,15 @@ export async function getPosts(params: {
       ],
     }),
     ...(categoryId && {
-      blog_post_category_id: BigInt(categoryId),
+      blog_post_category_id: BigInt(categoryId!),
     }),
     ...(status && {
       status,
     }),
     ...((dateFrom || dateTo) && {
       created_at: {
-        ...(dateFrom && { gte: getJakartaDateBounds(dateFrom, false) }),
-        ...(dateTo && { lte: getJakartaDateBounds(dateTo, true) }),
+        ...(dateFrom && { gte: getJakartaDateBounds(dateFrom!, false) }),
+        ...(dateTo && { lte: getJakartaDateBounds(dateTo!, true) }),
       },
     }),
     ...(postType ? { source_url: postType } : {}),
@@ -365,87 +401,35 @@ export async function getPosts(params: {
 }
 
 export async function getCategories(): Promise<SerializedCategory[]> {
+  await requireUser()
   const cats = await getCategoriesCached()
   return cats.map((c) => ({ id: c.id.toString(), name: c.name }))
 }
 
 export async function getPostById(id: string): Promise<SerializedPost | null> {
-  const post = await prisma.blog_posts.findUnique({
-    where: { id: BigInt(id) },
-    include: { blog_post_categories: true, users_blog_posts_user_idTousers: { select: { id: true, name: true } } },
+  const sessionUser = await requireUser()
+  const result = await queryPostById(id)
+  if (!result) return null
+  const canRead = await canActorReadPost(sessionUser, {
+    userId: result.user?.id ?? null,
+    tenantId: result.tenant_id,
   })
-  if (!post) return null
-
-  const media = await prisma.media.findFirst({
-    where: { model_type: 'App\\Models\\BlogPost', model_id: post.id, collection_name: 'blog-images' },
-  })
-
-  let provinceName: string | null = null
-  let cityName: string | null = null
-  const tenantUser = await prisma.tenant_user.findFirst({
-    where: { user_id: post.user_id },
-    select: { tenant_id: true },
-  })
-  if (tenantUser) {
-    const address = await prisma.addresses.findFirst({
-      where: { tenant_id: tenantUser.tenant_id },
-      select: { city_id: true },
-    })
-    if (address?.city_id) {
-      const city = await prisma.reg_cities.findUnique({
-        where: { id: BigInt(address.city_id) },
-        select: { name: true, province_id: true },
-      })
-      cityName = city?.name ?? null
-      if (city) {
-        const prov = await prisma.reg_provinces.findUnique({ where: { id: city.province_id } })
-        provinceName = prov?.name ?? null
-      }
-    }
-  }
-
-  return {
-    id: post.id.toString(),
-    title: post.title,
-    slug: post.slug,
-    body: post.body,
-    description: post.description ?? null,
-    status: post.status ?? 'pending',
-    is_published: post.is_published,
-    published_at: post.published_at?.toISOString() ?? null,
-    blog_post_category_id: post.blog_post_category_id?.toString() ?? null,
-    created_at: post.created_at?.toISOString() ?? null,
-    category: post.blog_post_categories
-      ? { id: post.blog_post_categories.id.toString(), name: post.blog_post_categories.name }
-      : null,
-    thumbnail: media
-      ? {
-          id: media.id.toString(),
-          uuid: media.uuid ?? null,
-          file_name: media.file_name,
-          url: getMediaUrl(getS3Key(media)),
-        }
-      : null,
-    user: post.users_blog_posts_user_idTousers
-      ? { id: post.users_blog_posts_user_idTousers.id.toString(), name: post.users_blog_posts_user_idTousers.name }
-      : null,
-    province: provinceName,
-    city: cityName,
-    source_url: post.source_url ?? null,
-    tenant_id: post.tenant_id?.toString() ?? null,
-  }
+  if (!canRead) return null
+  return result as SerializedPost
 }
-
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
   const { randomBytes, randomUUID } = await import('crypto')
   const { uploadToS3 } = await import('@/app/lib/s3')
 
   const buffer = Buffer.from(await file.arrayBuffer())
+  const detectedFile = detectAllowedImage(buffer)
+  if (!detectedFile) {
+    throw new Error('Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.')
+  }
   const uuid = randomUUID()
   const hash = randomBytes(16).toString('hex')
-  const ext = file.name.split('.').pop() ?? 'jpg'
+  const ext = detectedFile.ext
   const fileName = `blog-images-${hash}.${ext}`
 
   const media = await prisma.media.create({
@@ -456,12 +440,12 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
       collection_name: 'blog-images',
       name: file.name,
       file_name: 'pending',
-      mime_type: file.type,
+      mime_type: detectedFile.mime,
       disk: 's3',
       conversions_disk: 's3',
       size: BigInt(file.size),
       manipulations: {},
-      custom_properties: {},
+      custom_properties: { uploaded_by: 'web' },
       generated_conversions: {},
       responsive_images: {},
     },
@@ -471,7 +455,7 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
   const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
 
   try {
-    await uploadToS3(buffer, objectKey, file.type)
+    await uploadToS3(buffer, objectKey, detectedFile.mime)
   } catch (err) {
     await prisma.media.delete({ where: { id: media.id } })
     throw err
@@ -517,10 +501,13 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
   if (opts.requireScreenshot) {
     if (!screenshot || screenshot.size === 0) {
       errors.screenshot = ['Bukti screenshot wajib diupload.']
-    } else if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
-      errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
     } else if (screenshot.size > maxUploadedFileSizeBytes) {
       errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+    } else {
+      const detectedFile = detectAllowedImage(Buffer.from(await screenshot.arrayBuffer()))
+      if (!detectedFile) {
+        errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+      }
     }
   }
 
@@ -634,10 +621,13 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
     if (!oldMediaId && (!screenshot || screenshot.size === 0)) {
       errors.screenshot = ['Bukti screenshot wajib diupload.']
     } else if (hasNewScreenshot) {
-      if (!ALLOWED_IMAGE_TYPES.includes(screenshot.type)) {
-        errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
-      } else if (screenshot.size > maxUploadedFileSizeBytes) {
+      if (screenshot.size > maxUploadedFileSizeBytes) {
         errors.screenshot = [`Ukuran file terlalu besar (maks ${formatUploadFileSize(maxUploadedFileSizeBytes)}).`]
+      } else {
+        const detectedFile = detectAllowedImage(Buffer.from(await screenshot.arrayBuffer()))
+        if (!detectedFile) {
+          errors.screenshot = ['Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.']
+        }
       }
     }
   }
@@ -683,12 +673,17 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
   })
 
   if (opts.requireScreenshot && hasNewScreenshot) {
-    if (oldMediaId) {
-      const oldMedia = await prisma.media.findUnique({ where: { id: BigInt(oldMediaId) } })
-      if (oldMedia) {
-        await deleteFromS3(getS3Key(oldMedia)).catch(() => {})
-        await prisma.media.delete({ where: { id: BigInt(oldMediaId) } })
-      }
+    const oldMedia = await prisma.media.findFirst({
+      where: {
+        model_type: 'App\\Models\\BlogPost',
+        model_id: BigInt(id),
+        collection_name: 'blog-images',
+        ...(oldMediaId ? { id: BigInt(oldMediaId) } : {}),
+      },
+    })
+    if (oldMedia) {
+      await deleteFromS3(getS3Key(oldMedia)).catch(() => {})
+      await prisma.media.delete({ where: { id: oldMedia.id } })
     }
     await uploadScreenshot(screenshot, BigInt(id))
   }
@@ -713,22 +708,28 @@ const UPLOAD_OPTS: PostVariantOpts  = { requireTitle: true, requireScreenshot: f
 const AMPLIF_OPTS: PostVariantOpts  = { requireTitle: false, requireScreenshot: true, validateUrl: false, sourceUrl: 'amplifikasi', redirectBase: '/posts/amplifikasi' }
 
 export async function createPost(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processCreate(formData, DEFAULT_OPTS)
 }
 export async function createUpload(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processCreate(formData, UPLOAD_OPTS)
 }
 export async function createAmplifikasi(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processCreate(formData, AMPLIF_OPTS)
 }
 
 export async function updatePost(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processUpdate(formData, DEFAULT_OPTS)
 }
 export async function updateUpload(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processUpdate(formData, UPLOAD_OPTS)
 }
 export async function updateAmplifikasi(_state: PostFormState, formData: FormData): Promise<PostFormState> {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
   return processUpdate(formData, AMPLIF_OPTS)
 }
 
@@ -752,9 +753,8 @@ export async function deletePost(id: string): Promise<void> {
 }
 
 export async function bulkDeletePosts(ids: string[]): Promise<void> {
-  if (ids.length === 0) return
-
   const sessionUser = assertAdmin(await requireUser().catch(redirectToLoginIfUnauthorized))
+  if (ids.length === 0) return
 
   const bigIds = ids.map((id) => BigInt(id))
 
@@ -798,6 +798,17 @@ export async function updateStatus(id: string, status: 'pending' | 'valid' | 'in
   if (!reportingWindowDecision.allowed) {
     throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
   }
+  const post = await prisma.blog_posts.findUnique({
+    where: { id: BigInt(id) },
+    select: { user_id: true, tenant_id: true },
+  })
+  if (!post) throw new Error('Laporan tidak ditemukan')
+  const canValidate = await canActorValidatePost(sessionUser, {
+    userId: post.user_id.toString(),
+    tenantId: post.tenant_id?.toString() ?? null,
+  })
+  if (!canValidate) throw new Error('Anda tidak memiliki akses untuk mengubah status laporan ini')
+
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
