@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes, randomUUID } from 'crypto'
-import { uploadToS3 } from '@/app/lib/s3'
+import { randomUUID } from 'crypto'
+import { buildReportObjectKey, type ReportObjectKeyKind, uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
 import { requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
@@ -10,8 +10,13 @@ import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { detectAllowedImage } from '@/app/lib/file-validation'
+import { getReportLocationByUserId } from '@/app/lib/report-location'
 
 const COLLECTION_NAME = 'blog-images'
+
+function normalizeReportKind(value: FormDataEntryValue | null): ReportObjectKeyKind {
+  return value === 'upload' || value === 'amplifikasi' || value === 'default' ? value : 'pending'
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +29,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const reportKind = normalizeReportKind(formData.get('post_type') ?? formData.get('postType'))
     const { maxUploadedFileSizeBytes } = await getSecuritySettings()
 
     if (!file) {
@@ -67,11 +73,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 2. Generate filename matching Laravel Spatie pattern: {collection}-{hash}.{ext}
-    const hash = randomBytes(16).toString('hex')
     const ext = detectedFile.ext
-    const fileName = `${COLLECTION_NAME}-${hash}.${ext}`
-    const objectKey = `${media.id}/${fileName}`
+    const location = await getReportLocationByUserId(user.id)
+    const { fileName, objectKey } = buildReportObjectKey(ext, reportKind, location)
     const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
 
     // 3. Upload to S3
@@ -107,6 +111,7 @@ export async function POST(request: NextRequest) {
       details: {
         mediaId: media.id.toString(),
         collection: COLLECTION_NAME,
+        reportKind,
       },
     })
 

@@ -5,6 +5,7 @@ import {
   getProvinceChartData,
   getTopCitiesByPosts,
   getPostsByDate,
+  getOperatorReportSummary,
   type DashboardFilters,
 } from '@/app/actions/dashboard'
 import { getUserTenantIds } from '@/app/lib/tenant-access'
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
       provinceId: searchParams.get('provinceId') ?? undefined,
       cityId:     searchParams.get('cityId')     ?? undefined,
       tenantId:   searchParams.get('tenantId')   ?? undefined,
-      status:     statusParam === 'valid' || statusParam === 'invalid' ? statusParam : undefined,
+      status:     statusParam === 'pending' || statusParam === 'valid' || statusParam === 'invalid' ? statusParam : undefined,
     }
 
     // Manager hanya bisa melihat tenant miliknya
@@ -40,15 +41,16 @@ export async function GET(request: Request) {
       filters.tenantId = filters.tenantId ?? tenantIds[0]
     }
 
-    const [stats, byProvince, provinceChart, topCities, postsByDate] = await Promise.all([
+    const [stats, byProvince, provinceChart, topCities, postsByDate, operatorReportSummary] = await Promise.all([
       getDashboardStats(filters),
       getPostsByProvince(filters),
       getProvinceChartData(filters),
       getTopCitiesByPosts(filters),
       getPostsByDate(filters),
+      getOperatorReportSummary(filters),
     ])
 
-    return Response.json({ stats, byProvince, provinceChart, topCities, postsByDate })
+    return Response.json({ stats, byProvince, provinceChart, topCities, postsByDate, operatorReportSummary })
   } catch (error) {
     return apiError(error)
   }

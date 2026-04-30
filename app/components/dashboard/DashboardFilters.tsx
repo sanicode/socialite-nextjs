@@ -158,6 +158,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
             <option value="">Semua Status</option>
+            <option value="pending">Pending</option>
             <option value="valid">Valid</option>
             <option value="invalid">Invalid</option>
           </select>

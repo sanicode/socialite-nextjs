@@ -17,6 +17,7 @@ import type { TablePageSize } from '@/app/lib/table-pagination'
 import { canActorReadPost, canActorValidatePost, getUserTenantIds } from '@/app/lib/tenant-access'
 import { detectAllowedImage } from '@/app/lib/file-validation'
 import { queryPostById, queryPosts } from '@/app/lib/posts-query'
+import { getReportLocationByTenantId, type ReportObjectLocation } from '@/app/lib/report-location'
 import {
   getNonAdminReportingWindowDecision,
   getOperatorReportingWindowDecision,
@@ -418,9 +419,15 @@ export async function getPostById(id: string): Promise<SerializedPost | null> {
   return result as SerializedPost
 }
 
-async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
-  const { randomBytes, randomUUID } = await import('crypto')
-  const { uploadToS3 } = await import('@/app/lib/s3')
+async function uploadScreenshot(
+  file: File,
+  postId: bigint,
+  reportKind: 'default' | 'upload' | 'amplifikasi',
+  uploadedBy: string,
+  location: ReportObjectLocation,
+): Promise<void> {
+  const { randomUUID } = await import('crypto')
+  const { buildReportObjectKey, uploadToS3 } = await import('@/app/lib/s3')
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const detectedFile = detectAllowedImage(buffer)
@@ -428,9 +435,8 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
     throw new Error('Tipe file tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.')
   }
   const uuid = randomUUID()
-  const hash = randomBytes(16).toString('hex')
   const ext = detectedFile.ext
-  const fileName = `blog-images-${hash}.${ext}`
+  const { fileName, objectKey } = buildReportObjectKey(ext, reportKind, location)
 
   const media = await prisma.media.create({
     data: {
@@ -445,13 +451,12 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
       conversions_disk: 's3',
       size: BigInt(file.size),
       manipulations: {},
-      custom_properties: { uploaded_by: 'web' },
+      custom_properties: { uploaded_by: uploadedBy },
       generated_conversions: {},
       responsive_images: {},
     },
   })
 
-  const objectKey = `${media.id}/${fileName}`
   const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
 
   try {
@@ -465,7 +470,7 @@ async function uploadScreenshot(file: File, postId: bigint): Promise<void> {
     where: { id: media.id },
     data: {
       file_name: fileName,
-      custom_properties: { source_url: publicUrl, object_key: objectKey },
+      custom_properties: { source_url: publicUrl, object_key: objectKey, uploaded_by: uploadedBy },
     },
   })
 }
@@ -582,7 +587,8 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
   })
 
   if (opts.requireScreenshot && screenshot && screenshot.size > 0) {
-    await uploadScreenshot(screenshot, post.id)
+    const location = await getReportLocationByTenantId(post.tenant_id)
+    await uploadScreenshot(screenshot, post.id, opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default', sessionUser.id, location)
   }
 
   logEvent('info', 'posts.create', { postId: post.id.toString(), userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })
@@ -685,7 +691,8 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
       await deleteFromS3(getS3Key(oldMedia)).catch(() => {})
       await prisma.media.delete({ where: { id: oldMedia.id } })
     }
-    await uploadScreenshot(screenshot, BigInt(id))
+    const location = await getReportLocationByTenantId(existingPost.tenant_id)
+    await uploadScreenshot(screenshot, BigInt(id), opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default', sessionUser.id, location)
   }
 
   logEvent('info', 'posts.update', { postId: id, userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })

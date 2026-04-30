@@ -204,7 +204,7 @@ const spec: OpenApiSpec = {
         properties: {
           id: { type: 'string', example: '88' },
           uuid: { type: 'string', nullable: true, example: 'f7d5f5d0-7ac0-4c52-8a57-8d1a9b2d7d8e' },
-          fileName: { type: 'string', example: 'blog-images-8f9c1c4c0d8a7d4b.png' },
+          fileName: { type: 'string', example: '8f9c1c4c0d8a7d4b.png' },
           url: { type: 'string', format: 'uri', example: 'https://cdn.example.com/88/blog-images-8f9c1c4c0d8a7d4b.png' },
         },
       },
@@ -601,7 +601,7 @@ const spec: OpenApiSpec = {
       post: {
         tags: ['Upload'],
         summary: 'Upload screenshot ke S3 (JWT)',
-        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post. Server memvalidasi magic bytes file dan menandai media pending dengan pemilik token.',
+        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post. Server memvalidasi magic bytes file dan menandai media pending dengan pemilik token. Object key baru memakai format `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{post_type|pending}/random.ext`.',
         requestBody: {
           required: true,
           content: {
@@ -1059,7 +1059,7 @@ const spec: OpenApiSpec = {
           { name: 'dateTo', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'provinceId', in: 'query', schema: { type: 'string' } },
           { name: 'cityId', in: 'query', schema: { type: 'string' } },
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['valid', 'invalid'] }, description: 'Filter status laporan' },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'valid', 'invalid'] }, description: 'Filter status laporan' },
           { name: 'tenantId', in: 'query', schema: { type: 'string' }, description: 'Admin only' },
         ],
         responses: {
@@ -1099,7 +1099,7 @@ const spec: OpenApiSpec = {
           { name: 'dateTo', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'provinceId', in: 'query', schema: { type: 'string' } },
           { name: 'cityId', in: 'query', schema: { type: 'string' } },
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['valid', 'invalid'] }, description: 'Filter status laporan' },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'valid', 'invalid'] }, description: 'Filter status laporan' },
           { name: 'tenantId', in: 'query', schema: { type: 'string' }, description: 'Admin only' },
         ],
         responses: {

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       provinceId: searchParams.get('provinceId') ?? undefined,
       cityId:     searchParams.get('cityId')     ?? undefined,
       tenantId:   searchParams.get('tenantId')   ?? undefined,
-      status:     statusParam === 'valid' || statusParam === 'invalid' ? statusParam : undefined,
+      status:     statusParam === 'pending' || statusParam === 'valid' || statusParam === 'invalid' ? statusParam : undefined,
     }
 
     // Manager hanya bisa melihat tenant miliknya

@@ -96,6 +96,22 @@ Detail lengkap: [LOGIN_FLOW.md](LOGIN_FLOW.md)
 3. Post disimpan ke `blog_posts`, screenshot diunggah ke S3, metadata ke `media`
 4. Operator hanya dapat submit/edit di rentang jam operator yang diatur admin
 
+Format object key S3 untuk upload baru:
+
+```text
+reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/random.ext
+```
+
+Contoh:
+
+```text
+reports/2026/04/30/jawa-timur/surabaya/upload/a8f3c9d1e2b4.jpg
+reports/2026/04/30/jawa-tengah/semarang/amplifikasi/f91c7a0b3d2e.png
+reports/2026/04/30/dki-jakarta/kota-adm-jakarta-selatan/default/7c1e9b0d42aa.webp
+```
+
+Nama provinsi/kota diubah menjadi slug aman untuk path S3. Jika data lokasi belum lengkap, aplikasi memakai fallback `unknown-province/unknown-city`. Upload pending melalui `/api/upload` dan `/api/mobile/upload` memakai folder `pending` jika request belum mengirim `post_type`/`postType`. Path final disimpan di `media.custom_properties.object_key`, sehingga file lama dengan format lama tetap bisa dibaca dan dihapus.
+
 ### Verifikasi Laporan
 
 1. Admin/manager mengubah status (pending → valid/invalid)
@@ -121,6 +137,8 @@ Membaca dari SQL views:
 - `v_rekapitulasi_pelaporan`
 
 Export ke Excel dengan hyperlink aktif via SheetJS.
+
+Dashboard admin dan manager menampilkan 3 card operator: Total Operator, Sudah Lapor, dan Belum Lapor. Card Sudah Lapor dan Belum Lapor dapat diklik untuk membuka dialog tabel operator sesuai filter tanggal, status, provinsi, kota, serta tenant.
 
 ### Summary
 

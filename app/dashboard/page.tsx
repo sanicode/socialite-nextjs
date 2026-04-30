@@ -4,7 +4,7 @@ import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
 import {
   getProvinces,
-  getDashboardStats,
+  getOperatorReportSummary,
   getProvinceChartData,
   getTopCitiesByPosts,
   getReportData,
@@ -239,7 +239,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     provinceId: params.provinceId,
     cityId: params.cityId,
     tenantId,
-    status: (params.status === 'valid' || params.status === 'invalid' ? params.status : undefined) as
+    status: (params.status === 'pending' || params.status === 'valid' || params.status === 'invalid' ? params.status : undefined) as
+      | 'pending'
       | 'valid'
       | 'invalid'
       | undefined,
@@ -247,9 +248,9 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const canSeeRecap = isAdmin || isManager
 
-  const [provinces, stats, provinceData, cityData, reportData, dailyData] = await Promise.all([
+  const [provinces, operatorReportSummary, provinceData, cityData, reportData, dailyData] = await Promise.all([
     getProvinces(),
-    getDashboardStats(filters),
+    getOperatorReportSummary(filters),
     isAdmin ? getProvinceChartData(filters) : Promise.resolve([]),
     isAdmin ? getTopCitiesByPosts(filters) : Promise.resolve([] as Awaited<ReturnType<typeof getTopCitiesByPosts>>),
     canSeeRecap ? getReportData(filters) : Promise.resolve([]),
@@ -275,7 +276,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           />
         </Suspense>
 
-        <StatCards stats={stats} />
+        <StatCards summary={operatorReportSummary} />
 
         {isAdmin && (
           <>

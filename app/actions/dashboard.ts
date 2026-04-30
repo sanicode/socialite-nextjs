@@ -12,7 +12,7 @@ export type DashboardFilters = {
   provinceId?: string
   cityId?: string
   tenantId?: string
-  status?: 'valid' | 'invalid'
+  status?: 'pending' | 'valid' | 'invalid'
 }
 
 export type DashboardStats = {
@@ -37,7 +37,32 @@ export type CityChartGroup = {
   cities: ProvinceChartItem[]
 }
 
+export type OperatorReportRow = {
+  tenantUserId: string
+  userId: string
+  name: string
+  email: string
+  phoneNumber: string | null
+  province: string | null
+  city: string | null
+  uploadCount: number
+  amplifikasiCount: number
+  missingUpload: boolean
+  missingAmplifikasi: boolean
+  hasReported: boolean
+}
+
+export type OperatorReportSummary = {
+  totalOperators: number
+  reportedOperators: number
+  missingOperators: number
+  reportedRows: OperatorReportRow[]
+  missingRows: OperatorReportRow[]
+}
+
 export type ReportRow = Record<string, unknown>
+
+const BLOG_POST_JAKARTA_DATE_SQL = `date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
 
 const REKAPITULASI_REPORT_COLUMNS = [
   'tanggal_pelaporan',
@@ -55,6 +80,50 @@ const REKAPITULASI_REPORT_COLUMNS = [
   'amplifikasi_3',
   'amplifikasi_4',
 ].map((column) => `v.${column}`).join(',\n      ')
+
+function buildBlogPostReportFilters(filters: DashboardFilters) {
+  const conditions: string[] = [
+    `bp.source_url IN ('upload', 'amplifikasi')`,
+  ]
+  const params: unknown[] = []
+  let idx = 1
+
+  if (filters.dateFrom) {
+    conditions.push(`${BLOG_POST_JAKARTA_DATE_SQL} >= $${idx}::date`)
+    params.push(filters.dateFrom)
+    idx++
+  }
+  if (filters.dateTo) {
+    conditions.push(`${BLOG_POST_JAKARTA_DATE_SQL} <= $${idx}::date`)
+    params.push(filters.dateTo)
+    idx++
+  }
+  if (filters.tenantId) {
+    conditions.push(`bp.tenant_id = $${idx}::bigint`)
+    params.push(filters.tenantId)
+    idx++
+  }
+  if (filters.provinceId) {
+    conditions.push(`rc.province_id = $${idx}::int`)
+    params.push(filters.provinceId)
+    idx++
+  }
+  if (filters.cityId) {
+    conditions.push(`addr.city_id = $${idx}::int`)
+    params.push(filters.cityId)
+    idx++
+  }
+  if (filters.status) {
+    conditions.push(`bp.status::text = $${idx}::text`)
+    params.push(filters.status)
+    idx++
+  }
+
+  return {
+    whereClause: `WHERE ${conditions.join(' AND ')}`,
+    params,
+  }
+}
 
 const getProvincesCached = cache(async () => {
   return prisma.reg_provinces.findMany({ orderBy: { name: 'asc' } })
@@ -153,7 +222,7 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
          FROM blog_posts bp
          INNER JOIN users u ON u.id = bp.user_id
          WHERE u.email = v.email
-           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND ${BLOG_POST_JAKARTA_DATE_SQL} = v.tanggal_pelaporan
            AND bp.status::text = $${params.length + 1}::text
        )`
     : ''
@@ -173,7 +242,7 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
        FROM blog_posts bp
        INNER JOIN users u ON u.id = bp.user_id
        WHERE u.email = v.email
-         AND date(bp.created_at) = v.tanggal_pelaporan
+         AND ${BLOG_POST_JAKARTA_DATE_SQL} = v.tanggal_pelaporan
          AND bp.status::text = $${params.length + 1}::text
      )`
   const verifiedResult = await prisma.$queryRawUnsafe<{ verified_count: bigint }[]>(
@@ -325,7 +394,7 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
          FROM blog_posts bp
          INNER JOIN users u ON u.id = bp.user_id
          WHERE u.email = v.email
-           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND ${BLOG_POST_JAKARTA_DATE_SQL} = v.tanggal_pelaporan
            AND bp.status::text = $${postParams.length + 1}::text
        )`
     : ''
@@ -425,7 +494,7 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
          FROM blog_posts bp
          INNER JOIN users u ON u.id = bp.user_id
          WHERE u.email = v.email
-           AND date(bp.created_at) = v.tanggal_pelaporan
+           AND ${BLOG_POST_JAKARTA_DATE_SQL} = v.tanggal_pelaporan
            AND bp.status::text = $${postParams.length + 1}::text
        )`
     : ''
@@ -504,28 +573,77 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
 export async function getReportData(filters: DashboardFilters): Promise<ReportRow[]> {
   const user = await requireManagerOrAdmin()
   filters = await scopeDashboardFilters(user, filters)
-  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
-  const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
-  const statusClause = filters.status
-    ? `${whereClause ? 'AND' : 'WHERE'} EXISTS (
-         SELECT 1
-         FROM blog_posts bp
-         INNER JOIN users u ON u.id = bp.user_id
-         WHERE u.email = v.email
-           AND date(bp.created_at) = v.tanggal_pelaporan
-           AND bp.status::text = $${params.length + 1}::text
-       )`
-    : ''
+  const { whereClause, params } = buildBlogPostReportFilters(filters)
 
   const result = await prisma.$queryRawUnsafe<ReportRow[]>(
-    `SELECT
-      ${REKAPITULASI_REPORT_COLUMNS}
-     FROM v_rekapitulasi_pelaporan v
-     ${whereClause}
-     ${statusClause}
-     ORDER BY tanggal_pelaporan DESC, nama_operator`,
-    ...params,
-    ...(filters.status ? [filters.status] : [])
+    `
+    WITH report_posts AS (
+      SELECT
+        ${BLOG_POST_JAKARTA_DATE_SQL} AS tanggal_pelaporan,
+        u.email,
+        u.name AS nama_operator,
+        u.phone_number AS no_hp,
+        rp.name AS propinsi,
+        rc.name AS kabupaten_kota,
+        bp.id,
+        bp.title,
+        bp.source_url,
+        bp.created_at,
+        lower(COALESCE(c.name, '')) AS category_name,
+        m.custom_properties ->> 'source_url' AS media_url
+      FROM blog_posts bp
+      INNER JOIN users u ON u.id = bp.user_id
+      INNER JOIN tenant_user tu
+        ON tu.user_id = bp.user_id
+       AND tu.tenant_id = bp.tenant_id
+      LEFT JOIN LATERAL (
+        SELECT a.city_id
+        FROM addresses a
+        WHERE a.tenant_id = tu.tenant_id
+        ORDER BY a.id ASC
+        LIMIT 1
+      ) addr ON true
+      LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+      LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+      LEFT JOIN blog_post_categories c ON c.id = bp.blog_post_category_id
+      LEFT JOIN media m
+        ON m.model_type = 'App\\Models\\BlogPost'
+       AND m.model_id = bp.id
+       AND m.collection_name = 'blog-images'
+      ${whereClause}
+    ),
+    numbered AS (
+      SELECT
+        *,
+        CASE
+          WHEN source_url = 'amplifikasi' THEN COUNT(*) FILTER (WHERE source_url = 'amplifikasi') OVER (
+            PARTITION BY tanggal_pelaporan, email
+            ORDER BY created_at ASC NULLS LAST, id ASC
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          )
+        END AS amplifikasi_index
+      FROM report_posts
+    )
+    SELECT
+      tanggal_pelaporan,
+      email,
+      nama_operator,
+      no_hp,
+      propinsi,
+      kabupaten_kota,
+      MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%tiktok%') AS tiktok_link,
+      MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%instagram%') AS instagram_link,
+      MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%facebook%') AS facebook_link,
+      MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%youtube%') AS youtube_link,
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 1) AS amplifikasi_1,
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 2) AS amplifikasi_2,
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 3) AS amplifikasi_3,
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4
+    FROM numbered
+    GROUP BY tanggal_pelaporan, email, nama_operator, no_hp, propinsi, kabupaten_kota
+    ORDER BY tanggal_pelaporan DESC, nama_operator
+    `,
+    ...params
   )
 
   // Serialize BigInt values to strings
@@ -542,36 +660,182 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
 export async function getPostsByDate(filters: DashboardFilters): Promise<ChartItem[]> {
   const user = await requireManagerOrAdmin()
   filters = await scopeDashboardFilters(user, filters)
-  const { provinceName, cityName } = await resolveLocationNames(filters.provinceId, filters.cityId)
-  const { whereClause, params } = buildRekapitulasiReportFilters(filters, provinceName, cityName)
-
-  const statusClause = filters.status
-    ? `${whereClause ? 'AND' : 'WHERE'} EXISTS (
-         SELECT 1
-         FROM blog_posts bp
-         INNER JOIN users u ON u.id = bp.user_id
-         WHERE u.email = v.email
-           AND date(bp.created_at) = v.tanggal_pelaporan
-           AND bp.status::text = $${params.length + 1}::text
-       )`
-    : ''
+  const { whereClause, params } = buildBlogPostReportFilters(filters)
   const result = await prisma.$queryRawUnsafe<{ date: string; value: bigint }[]>(
     `
     SELECT
-      to_char(tanggal_pelaporan, 'YYYY-MM-DD') AS date,
-      COUNT(*) AS value
-    FROM v_rekapitulasi_pelaporan v
+      to_char(${BLOG_POST_JAKARTA_DATE_SQL}, 'YYYY-MM-DD') AS date,
+      COUNT(DISTINCT (bp.user_id, bp.tenant_id, ${BLOG_POST_JAKARTA_DATE_SQL})) AS value
+    FROM blog_posts bp
+    INNER JOIN tenant_user tu
+      ON tu.user_id = bp.user_id
+     AND tu.tenant_id = bp.tenant_id
+    LEFT JOIN LATERAL (
+      SELECT a.city_id
+      FROM addresses a
+      WHERE a.tenant_id = tu.tenant_id
+      ORDER BY a.id ASC
+      LIMIT 1
+    ) addr ON true
+    LEFT JOIN reg_cities rc ON rc.id = addr.city_id
     ${whereClause}
-    ${statusClause}
-    GROUP BY tanggal_pelaporan
+    GROUP BY ${BLOG_POST_JAKARTA_DATE_SQL}
     ORDER BY date ASC
     `,
-    ...params,
-    ...(filters.status ? [filters.status] : [])
+    ...params
   )
 
   return result.map((r) => ({
     name: new Date(`${r.date}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
     value: Number(r.value),
   }))
+}
+
+export async function getOperatorReportSummary(filters: DashboardFilters): Promise<OperatorReportSummary> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
+
+  const operatorConditions: string[] = [
+    `mhr.model_type = 'App\\Models\\TenantUser'`,
+    `mhr.model_id = tu.id`,
+    `r.name = 'operator'`,
+    `COALESCE(u.is_blocked, false) = false`,
+  ]
+  const postConditions: string[] = []
+  const params: unknown[] = []
+  let idx = 1
+
+  if (filters.tenantId) {
+    operatorConditions.push(`tu.tenant_id = $${idx}::bigint`)
+    params.push(filters.tenantId)
+    idx++
+  }
+  if (filters.provinceId) {
+    operatorConditions.push(`rc.province_id = $${idx}::int`)
+    params.push(filters.provinceId)
+    idx++
+  }
+  if (filters.cityId) {
+    operatorConditions.push(`addr.city_id = $${idx}::int`)
+    params.push(filters.cityId)
+    idx++
+  }
+  if (filters.dateFrom) {
+    postConditions.push(`date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') >= $${idx}::date`)
+    params.push(filters.dateFrom)
+    idx++
+  }
+  if (filters.dateTo) {
+    postConditions.push(`date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') <= $${idx}::date`)
+    params.push(filters.dateTo)
+    idx++
+  }
+  if (filters.status) {
+    postConditions.push(`bp.status::text = $${idx}::text`)
+    params.push(filters.status)
+    idx++
+  }
+
+  const postWhere = postConditions.length > 0 ? `AND ${postConditions.join(' AND ')}` : ''
+
+  const rows = await prisma.$queryRawUnsafe<{
+    tenant_user_id: bigint
+    user_id: bigint
+    name: string
+    email: string
+    phone_number: string | null
+    province: string | null
+    city: string | null
+    upload_count: bigint
+    amplifikasi_count: bigint
+  }[]>(
+    `
+    WITH operator_scope AS (
+      SELECT DISTINCT
+        tu.id AS tenant_user_id,
+        tu.user_id,
+        tu.tenant_id,
+        u.name,
+        u.email,
+        u.phone_number,
+        rp.name AS province,
+        rc.name AS city
+      FROM tenant_user tu
+      INNER JOIN users u ON u.id = tu.user_id
+      INNER JOIN model_has_roles mhr ON mhr.model_id = tu.id
+      INNER JOIN roles r ON r.id = mhr.role_id
+      LEFT JOIN LATERAL (
+        SELECT a.city_id
+        FROM addresses a
+        WHERE a.tenant_id = tu.tenant_id
+        ORDER BY a.id ASC
+        LIMIT 1
+      ) addr ON true
+      LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+      LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+      WHERE ${operatorConditions.join(' AND ')}
+    ),
+    post_counts AS (
+      SELECT
+        bp.user_id,
+        bp.tenant_id,
+        COUNT(*) FILTER (WHERE bp.source_url = 'upload') AS upload_count,
+        COUNT(*) FILTER (WHERE bp.source_url = 'amplifikasi') AS amplifikasi_count
+      FROM blog_posts bp
+      INNER JOIN operator_scope os
+        ON os.user_id = bp.user_id
+       AND os.tenant_id = bp.tenant_id
+      WHERE bp.source_url IN ('upload', 'amplifikasi')
+      ${postWhere}
+      GROUP BY bp.user_id, bp.tenant_id
+    )
+    SELECT
+      os.tenant_user_id,
+      os.user_id,
+      os.name,
+      os.email,
+      os.phone_number,
+      os.province,
+      os.city,
+      COALESCE(pc.upload_count, 0)::bigint AS upload_count,
+      COALESCE(pc.amplifikasi_count, 0)::bigint AS amplifikasi_count
+    FROM operator_scope os
+    LEFT JOIN post_counts pc
+      ON pc.user_id = os.user_id
+     AND pc.tenant_id = os.tenant_id
+    ORDER BY os.province NULLS LAST, os.city NULLS LAST, os.name ASC
+    `,
+    ...params
+  )
+
+  const allRows = rows.map((row) => {
+    const uploadCount = Number(row.upload_count)
+    const amplifikasiCount = Number(row.amplifikasi_count)
+    const hasReported = uploadCount > 0 && amplifikasiCount > 0
+    return {
+      tenantUserId: row.tenant_user_id.toString(),
+      userId: row.user_id.toString(),
+      name: row.name,
+      email: row.email,
+      phoneNumber: row.phone_number,
+      province: row.province,
+      city: row.city,
+      uploadCount,
+      amplifikasiCount,
+      missingUpload: uploadCount === 0,
+      missingAmplifikasi: amplifikasiCount === 0,
+      hasReported,
+    }
+  })
+
+  const reportedRows = allRows.filter((row) => row.hasReported)
+  const missingRows = allRows.filter((row) => !row.hasReported)
+
+  return {
+    totalOperators: allRows.length,
+    reportedOperators: reportedRows.length,
+    missingOperators: missingRows.length,
+    reportedRows,
+    missingRows,
+  }
 }

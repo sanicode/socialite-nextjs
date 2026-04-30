@@ -16,6 +16,7 @@
 - Authorization tenant diperketat untuk list/detail/update status post, detach operator, dashboard/report mobile, dan halaman `/posts/users/[userId]/[status]`.
 - Manager multi-tenant harus memilih `tenantId` pada endpoint operator mobile yang membutuhkan konteks tenant eksplisit.
 - Query role count tenant tidak lagi menyusun nama role dari interpolasi string dinamis.
+- Upload baru ke S3 memakai object key berbasis tanggal dan lokasi untuk memudahkan backup: `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/random.ext`.
 
 ### Reporting Hours
 
@@ -28,6 +29,7 @@
 ### Posts And Reporting Tables
 
 - `/dashboard`, `/posts`, dan `/posts/users` default memfilter data tanggal hari ini.
+- Dashboard admin dan manager menampilkan 3 card operator: Total Operator, Sudah Lapor, dan Belum Lapor. Card Sudah/Belum Lapor dapat diklik untuk membuka dialog tabel operator sesuai filter aktif.
 - `/posts/upload` dan `/posts/amplifikasi` default memfilter `dateFrom` dan `dateTo` ke tanggal hari ini berdasarkan timezone `Asia/Jakarta`.
 - `/posts`, `/posts/upload`, dan `/posts/amplifikasi` memiliki filter status `pending`, `valid`, dan `invalid`.
 - Filter provinsi/kota pada laporan memakai provinsi dari relasi `city_id` pada `addresses`.
@@ -36,6 +38,8 @@
 - Filter table dirapikan agar sejajar pada halaman posts, per-operator, Settings Users, dan Settings Tenants.
 - Kolom `Link Upload` untuk jenis post `upload` menampilkan tombol `Buka`, bukan URL mentah.
 - Dropdown status diberi warna sesuai konteks status.
+- Screenshot laporan yang diunggah langsung dari form server action masuk ke folder jenis laporan: `default`, `upload`, atau `amplifikasi`.
+- Upload pending melalui `/api/upload` dan `/api/mobile/upload` masuk ke folder `pending` kecuali client mengirim `post_type`/`postType`.
 
 ### Summary
 
