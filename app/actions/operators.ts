@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireManagerOrAdmin } from '@/app/lib/authorization'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
+import type { TablePageSize } from '@/app/lib/table-pagination'
 
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
 
@@ -32,7 +33,7 @@ async function getManagerTenantId(userId: string): Promise<bigint> {
 
 export async function getOperators(params: {
   page?: number
-  pageSize?: number
+  pageSize?: TablePageSize
   search?: string
   email?: string
   phone?: string
@@ -43,7 +44,7 @@ export async function getOperators(params: {
 
   const page     = params.page     ?? 1
   const pageSize = params.pageSize ?? 20
-  const offset   = (page - 1) * pageSize
+  const offset   = pageSize === 'all' ? 0 : (page - 1) * pageSize
 
   const conditions: string[] = [
     `tu.tenant_id = $1`,
@@ -72,15 +73,7 @@ export async function getOperators(params: {
 
   const where = conditions.join(' AND ')
 
-  const [rows, countResult] = await Promise.all([
-    prisma.$queryRawUnsafe<{
-      tenant_user_id: bigint
-      user_id: bigint
-      name: string
-      email: string
-      phone_number: string | null
-    }[]>(
-      `SELECT
+  const operatorsSql = `SELECT
          tu.id AS tenant_user_id,
          u.id  AS user_id,
          u.name,
@@ -92,11 +85,18 @@ export async function getOperators(params: {
        INNER JOIN roles r ON r.id = mhr.role_id
        WHERE ${where}
        ORDER BY u.name ASC
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      ...qParams,
-      pageSize,
-      offset
-    ),
+       ${pageSize === 'all' ? '' : `LIMIT $${idx} OFFSET $${idx + 1}`}`
+
+  const operatorsParams = pageSize === 'all' ? qParams : [...qParams, pageSize, offset]
+
+  const [rows, countResult] = await Promise.all([
+    prisma.$queryRawUnsafe<{
+      tenant_user_id: bigint
+      user_id: bigint
+      name: string
+      email: string
+      phone_number: string | null
+    }[]>(operatorsSql, ...operatorsParams),
     prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(DISTINCT tu.id) AS count
        FROM tenant_user tu

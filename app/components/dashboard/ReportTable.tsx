@@ -1,22 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReportRow } from '@/app/actions/dashboard'
 import * as XLSX from 'xlsx'
+import { getPageSlice, TABLE_PAGE_SIZE_OPTIONS, type TablePageSize } from '@/app/lib/table-pagination'
 
 type Props = {
   data: ReportRow[]
 }
 
-const PAGE_SIZE = 25
-
 export default function ReportTable({ data }: Props) {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<TablePageSize>(20)
 
   const columns = data.length > 0 ? Object.keys(data[0]) : []
-  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
+  const { totalPages, start, end } = getPageSlice(page, pageSize, data.length)
   const currentPage = Math.min(page, totalPages)
-  const pageData = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageData = pageSize === 'all' ? data : data.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [pageSize])
 
   function isUrl(value: unknown): value is string {
     if (typeof value !== 'string') return false
@@ -97,6 +101,23 @@ export default function ReportTable({ data }: Props) {
         </button>
       </div>
 
+      <div className="flex items-center px-5 py-3">
+        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <select
+            value={String(pageSize)}
+            onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
+          >
+            {TABLE_PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option === 'all' ? 'All' : option}
+              </option>
+            ))}
+          </select>
+          <span>entri per halaman</span>
+        </label>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -144,7 +165,7 @@ export default function ReportTable({ data }: Props) {
       <div className="px-5 py-3 border-t border-neutral-200 dark:border-neutral-800 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {data.length > 0
-            ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, data.length)} dari ${data.length.toLocaleString('id-ID')} data`
+            ? `${start}–${end} dari ${data.length.toLocaleString('id-ID')} data`
             : '0 data'}
         </p>
         {totalPages > 1 && (

@@ -5,16 +5,19 @@ import { getTenants, getProvincesForSelect, getRegCityById } from '@/app/actions
 import TenantsTable from '@/app/components/settings/TenantsTable'
 import CitySelectFilter from '@/app/components/settings/CitySelectFilter'
 import TableSearchForm from '@/app/components/TableSearchForm'
+import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
   page?: string
+  pageSize?: string
   search?: string
   cityId?: string
   sortBy?: string
   sortDir?: string
 }>
 
-const PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 20
 
 function buildTenantsHref(params: Record<string, string | undefined>) {
   const query = new URLSearchParams()
@@ -32,6 +35,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
 
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const pageSize = parseTablePageSize(params.pageSize, DEFAULT_PAGE_SIZE)
 
   const sortBy  = params.sortBy  ?? 'name'
   const sortDir = params.sortDir === 'desc' ? 'desc' : 'asc'
@@ -39,7 +43,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
   const [{ tenants, total }, provinces, selectedCityName] = await Promise.all([
     getTenants({
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       search: params.search,
       cityId: params.cityId,
       sortBy,
@@ -49,7 +53,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
     params.cityId ? getRegCityById(params.cityId) : Promise.resolve(null),
   ])
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const { totalPages, start, end } = getPageSlice(page, pageSize, total)
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -66,6 +70,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
         {/* Filter */}
         <form className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800 dark:bg-neutral-900">
           {params.search && <input type="hidden" name="search" value={params.search} />}
+          {params.pageSize && <input type="hidden" name="pageSize" value={params.pageSize} />}
           <CitySelectFilter
             defaultCityId={params.cityId}
             defaultCityName={selectedCityName ?? undefined}
@@ -86,16 +91,20 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
           </div>
         </form>
 
-        <TableSearchForm
-          action="/settings/tenants"
-          defaultValue={params.search}
-          placeholder="Cari nama atau domain..."
-          hiddenParams={{
-            cityId: params.cityId,
-            sortBy,
-            sortDir,
-          }}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TablePageSizeSelect value={pageSize} />
+          <TableSearchForm
+            action="/settings/tenants"
+            defaultValue={params.search}
+            placeholder="Cari nama atau domain..."
+            hiddenParams={{
+              pageSize: params.pageSize,
+              cityId: params.cityId,
+              sortBy,
+              sortDir,
+            }}
+          />
+        </div>
 
         <TenantsTable
           tenants={tenants}
@@ -109,7 +118,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Sear
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {total > 0
-              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} tenant`
+              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} tenant`
               : '0 tenant'}
           </p>
           {totalPages > 1 && (

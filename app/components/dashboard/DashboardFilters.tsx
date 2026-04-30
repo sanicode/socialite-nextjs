@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition } from 'react'
 import { getCities } from '@/app/actions/dashboard'
 import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
@@ -20,6 +20,7 @@ function addOneMonth(dateStr: string): string {
 
 export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, defaultDateTo }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
 
@@ -57,7 +58,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     params.set('dateFrom', from)
     params.set('dateTo', to)
     startTransition(() => {
-      router.push(`/dashboard?${params.toString()}`)
+      router.push(`${pathname}?${params.toString()}`)
     })
   }
 
@@ -101,7 +102,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     }
     if (key === 'provinceId') params.delete('cityId')
     startTransition(() => {
-      router.push(`/dashboard?${params.toString()}`)
+      router.push(`${pathname}?${params.toString()}`)
     })
   }
 

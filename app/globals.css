@@ -24,3 +24,93 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .h-screen,
+  .min-h-screen,
+  .overflow-hidden,
+  .overflow-auto,
+  .flex-1 {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  aside,
+  header,
+  .summary-no-print,
+  .summary-no-export {
+    display: none !important;
+  }
+
+  main,
+  .summary-page {
+    display: block !important;
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  .summary-page .max-w-7xl,
+  .summary-page .mx-auto {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .summary-page * {
+    color-adjust: exact;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .summary-page .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  .summary-page table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    page-break-inside: auto;
+    font-size: 7px !important;
+  }
+
+  .summary-page th,
+  .summary-page td {
+    padding: 2px 3px !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  .summary-page tr,
+  .summary-page svg {
+    page-break-inside: avoid;
+  }
+
+  .summary-page .rounded-2xl,
+  .summary-page .rounded-xl {
+    border-radius: 0 !important;
+  }
+
+  .summary-page .recharts-responsive-container {
+    width: 100% !important;
+    height: 300px !important;
+  }
+}

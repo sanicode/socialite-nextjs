@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import { getConfigValue } from '@/app/lib/configs'
+import type { TablePageSize } from '@/app/lib/table-pagination'
 
 export type AccessLogEntry = {
   eventType: string
@@ -153,7 +154,7 @@ export async function writeAccessLog(entry: AccessLogEntry): Promise<void> {
 
 export async function getAccessLogs(params: {
   page?: number
-  pageSize?: number
+  pageSize?: TablePageSize
   search?: string
   eventType?: string
   country?: string
@@ -163,7 +164,7 @@ export async function getAccessLogs(params: {
 }): Promise<{ rows: AccessLogRow[]; total: number }> {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 50
-  const offset = (page - 1) * pageSize
+  const offset = pageSize === 'all' ? 0 : (page - 1) * pageSize
 
   const conditions: string[] = []
   const values: unknown[] = []
@@ -212,8 +213,7 @@ export async function getAccessLogs(params: {
     ...values
   )
 
-  const rows = await prisma.$queryRawUnsafe<AccessLogRow[]>(
-    `SELECT
+  const logsSql = `SELECT
       id::text,
       created_at::text,
       event_type,
@@ -234,15 +234,14 @@ export async function getAccessLogs(params: {
      FROM access_logs
      ${whereClause}
      ORDER BY created_at DESC
-     LIMIT $${index} OFFSET $${index + 1}`,
-    ...values,
-    pageSize,
-    offset
-  )
+     ${pageSize === 'all' ? '' : `LIMIT $${index} OFFSET $${index + 1}`}`
+
+  const logsParams = pageSize === 'all' ? values : [...values, pageSize, offset]
+
+  const rows = await prisma.$queryRawUnsafe<AccessLogRow[]>(logsSql, ...logsParams)
 
   return {
     rows,
     total: Number(totalResult[0]?.count ?? 0),
   }
 }
-

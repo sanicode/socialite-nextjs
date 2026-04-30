@@ -4,12 +4,14 @@ import { getPosts, getCategories } from '@/app/actions/posts'
 import PostsTable from '@/app/components/posts/PostsTable'
 import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
+import { parseTablePageSize } from '@/app/lib/table-pagination'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string }>
 
 export default async function AmplifikasiPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const page = parseInt(params.page ?? '1', 10)
+  const pageSize = parseTablePageSize(params.pageSize, 10)
   const sessionUser = await getSessionUser()
   const isAdmin = sessionUser?.roles.includes('admin') ?? false
   const isManager = sessionUser?.roles.includes('manager') ?? false
@@ -30,6 +32,7 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
       search: params.search,
       categoryId: params.category,
       page,
+      pageSize,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
       dateFrom: params.dateFrom,
@@ -64,6 +67,7 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
             total={total}
             categories={categories}
             page={page}
+            pageSize={pageSize}
             isAdmin={isAdmin}
             canVerify={canVerify}
             basePath="/posts/amplifikasi"

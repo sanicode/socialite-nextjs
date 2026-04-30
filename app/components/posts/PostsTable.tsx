@@ -9,6 +9,8 @@ import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
 import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
 import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
+import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getPageSlice, type TablePageSize } from '@/app/lib/table-pagination'
 
 type Props = {
   posts: SerializedPost[]
@@ -22,9 +24,8 @@ type Props = {
   provinces?: { id: number; name: string }[]
   defaultDateFrom?: string
   defaultDateTo?: string
+  pageSize: TablePageSize
 }
-
-const PAGE_SIZE = 10
 
 function getStatusLabel(status: string) {
   switch (status) {
@@ -43,7 +44,7 @@ function getStatusClass(status: string) {
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
 }
 
-export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default', provinces, defaultDateFrom = '', defaultDateTo = '' }: Props) {
+export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default', provinces, defaultDateFrom = '', defaultDateTo = '', pageSize }: Props) {
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
   const showReadOnlyStatus = !canVerify
@@ -130,7 +131,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
 
   const currentSort = searchParams.get('sort') ?? 'desc'
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const { totalPages, start, end } = getPageSlice(page, pageSize, total)
 
   const allSelected = posts.length > 0 && selectedIds.size === posts.length
 
@@ -354,15 +355,18 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       </div>
       )}
 
-      <div className="flex justify-end">
-        <input
-          type="search"
-          placeholder="Cari..."
-          value={searchValue}
-          disabled={isPending}
-          onChange={(e) => setSearchValue(e.target.value)}
-          className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <TablePageSizeSelect value={pageSize} />
+        <div className="flex justify-end">
+          <input
+            type="search"
+            placeholder="Cari..."
+            value={searchValue}
+            disabled={isPending}
+            onChange={(e) => setSearchValue(e.target.value)}
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -671,7 +675,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {total > 0
-            ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} post`
+            ? `${start}–${end} dari ${total.toLocaleString('id-ID')} post`
             : '0 post'}
         </p>
         {totalPages > 1 && (

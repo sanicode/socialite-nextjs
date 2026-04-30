@@ -6,8 +6,9 @@ import { getProvinces } from '@/app/actions/dashboard'
 import PostsTable from '@/app/components/posts/PostsTable'
 import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
+import { parseTablePageSize } from '@/app/lib/table-pagination'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string; provinceId?: string; cityId?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string; provinceId?: string; cityId?: string }>
 
 function getJakartaDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -21,6 +22,7 @@ function getJakartaDateString(date = new Date()) {
 export default async function PostsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const page = parseInt(params.page ?? '1', 10)
+  const pageSize = parseTablePageSize(params.pageSize, 10)
   const sessionUser = await getSessionUser()
   if (!sessionUser) redirect('/login')
   const isAdmin = sessionUser.roles.includes('admin')
@@ -51,6 +53,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
         ? params.status
         : undefined,
       page,
+      pageSize,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
       dateFrom,
@@ -95,7 +98,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
             </div>
           }
         >
-          <PostsTable posts={posts} total={total} categories={categories} page={page} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} />
+          <PostsTable posts={posts} total={total} categories={categories} page={page} pageSize={pageSize} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} />
         </Suspense>
       </div>
     </div>

@@ -7,9 +7,12 @@ import AccessLogsTable from '@/app/components/settings/AccessLogsTable'
 import LogsToggle from '@/app/components/settings/LogsToggle'
 import LogsTruncateButton from '@/app/components/settings/LogsTruncateButton'
 import TableSearchForm from '@/app/components/TableSearchForm'
+import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
   page?: string
+  pageSize?: string
   search?: string
   eventType?: string
   country?: string
@@ -18,7 +21,7 @@ type SearchParams = Promise<{
   dateTo?: string
 }>
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
 
 function buildLogsHref(params: Record<string, string | undefined>) {
   const query = new URLSearchParams()
@@ -36,12 +39,13 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
 
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const pageSize = parseTablePageSize(params.pageSize, DEFAULT_PAGE_SIZE)
 
   const [logsEnabled, { rows, total }] = await Promise.all([
     isAccessLoggingEnabled(),
     getAccessLogs({
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       search: params.search,
       eventType: params.eventType,
       country: params.country,
@@ -51,7 +55,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
     }),
   ])
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const { totalPages, start, end } = getPageSlice(page, pageSize, total)
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -76,6 +80,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
 
         <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 dark:border-neutral-800 dark:bg-neutral-900">
           {params.search && <input type="hidden" name="search" value={params.search} />}
+          {params.pageSize && <input type="hidden" name="pageSize" value={params.pageSize} />}
           <input
             type="text"
             name="eventType"
@@ -127,25 +132,29 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
           </div>
         </form>
 
-        <TableSearchForm
-          action="/settings/logs"
-          defaultValue={params.search}
-          placeholder="Cari IP, email, agent..."
-          hiddenParams={{
-            eventType: params.eventType,
-            country: params.country,
-            path: params.path,
-            dateFrom: params.dateFrom,
-            dateTo: params.dateTo,
-          }}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TablePageSizeSelect value={pageSize} />
+          <TableSearchForm
+            action="/settings/logs"
+            defaultValue={params.search}
+            placeholder="Cari IP, email, agent..."
+            hiddenParams={{
+              pageSize: params.pageSize,
+              eventType: params.eventType,
+              country: params.country,
+              path: params.path,
+              dateFrom: params.dateFrom,
+              dateTo: params.dateTo,
+            }}
+          />
+        </div>
 
         <AccessLogsTable logs={rows} />
 
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {total > 0
-              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} log`
+              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} log`
               : '0 log'}
           </p>
           {totalPages > 1 && (

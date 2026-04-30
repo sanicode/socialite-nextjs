@@ -62,6 +62,7 @@ type Props = {
   open: boolean
   onClose: () => void
   appName: string
+  showSummary: boolean
   showDashboard: boolean
   showSettings: boolean
   showOperators: boolean
@@ -78,7 +79,7 @@ function LinkPendingHint() {
   )
 }
 
-export default function Sidebar({ open, onClose, appName, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
+export default function Sidebar({ open, onClose, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
   const pathname = usePathname()
 
   // Filter dashboard item
@@ -124,6 +125,24 @@ export default function Sidebar({ open, onClose, appName, showDashboard, showSet
             >
               {dashboardItem.icon}
               {dashboardItem.label}
+              <LinkPendingHint />
+            </Link>
+          )}
+
+          {showSummary && (
+            <Link
+              href="/summary"
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                pathname === '/summary'
+                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+              }`}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 13.5h4l2-7 4 14 2-7h6" />
+              </svg>
+              Summary
               <LinkPendingHint />
             </Link>
           )}

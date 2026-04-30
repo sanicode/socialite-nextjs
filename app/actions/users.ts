@@ -6,6 +6,7 @@ import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { Prisma } from '@/app/generated/prisma/client'
 import bcrypt from 'bcryptjs'
+import type { TablePageSize } from '@/app/lib/table-pagination'
 
 const MODEL_TYPE_USER = 'App\\Models\\User'
 const BULK_IMPORT_DOMAIN = 'bmi.com'
@@ -227,7 +228,7 @@ async function buildBulkUserImportPreview(rawText: string): Promise<BulkUserImpo
 
 export async function getUsers(params: {
   page?: number
-  pageSize?: number
+  pageSize?: TablePageSize
   search?: string
   status?: string   // 'active' | 'blocked' | '' (semua)
   loginSecurity?: string // 'has_attempts' | 'under_attack' | 'rate_limited'
@@ -240,7 +241,8 @@ export async function getUsers(params: {
 
   const page     = params.page     ?? 1
   const pageSize = params.pageSize ?? 20
-  const offset   = (page - 1) * pageSize
+  const offset   = pageSize === 'all' ? undefined : (page - 1) * pageSize
+  const take     = pageSize === 'all' ? undefined : pageSize
 
   const where: Prisma.usersWhereInput = {}
   if (params.search) {
@@ -364,7 +366,7 @@ export async function getUsers(params: {
       where,
       select: { id: true, name: true, email: true, phone_number: true, is_blocked: true, is_admin: true, last_seen_at: true },
       orderBy,
-      take: pageSize,
+      take,
       skip: offset,
     }),
     prisma.users.count({ where }),

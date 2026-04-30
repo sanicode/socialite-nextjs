@@ -5,10 +5,12 @@ import SearchInput from '@/app/components/posts/users/SearchInput'
 import Link from 'next/link'
 import PostsByUsersTable from '@/app/components/posts/users/PostsByUsersTable'
 import { getProvinces } from '@/app/actions/dashboard'
+import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
-type SearchParams = Promise<{ search?: string; sortBy?: string; sortDir?: string; page?: string; provinceId?: string; cityId?: string; dateFrom?: string; dateTo?: string }>
+type SearchParams = Promise<{ search?: string; sortBy?: string; sortDir?: string; page?: string; pageSize?: string; provinceId?: string; cityId?: string; dateFrom?: string; dateTo?: string }>
 
-const PAGE_SIZE = 10
+const DEFAULT_PAGE_SIZE = 10
 
 const ALLOWED_SORT_COLS: Record<string, string> = {
   provinsi:       'p.name',
@@ -49,10 +51,11 @@ export default async function PostsByUsersPage({
     redirect('/posts/upload')
   }
 
-  const { search, sortBy: rawSortBy, sortDir: rawSortDir, page: pageParam, provinceId, cityId, dateFrom: rawDateFrom, dateTo: rawDateTo } = await searchParams
+  const { search, sortBy: rawSortBy, sortDir: rawSortDir, page: pageParam, pageSize: pageSizeParam, provinceId, cityId, dateFrom: rawDateFrom, dateTo: rawDateTo } = await searchParams
   const isAdmin = user.roles.includes('admin')
 
   const page    = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const pageSize = parseTablePageSize(pageSizeParam, DEFAULT_PAGE_SIZE)
   const sortBy  = ALLOWED_SORT_COLS[rawSortBy ?? ''] ? (rawSortBy ?? 'operator') : 'operator'
   const sortDir = rawSortDir === 'desc' ? 'DESC' : 'ASC'
   const orderCol = ALLOWED_SORT_COLS[sortBy]
@@ -115,7 +118,7 @@ export default async function PostsByUsersPage({
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const offset = (page - 1) * PAGE_SIZE
+  const limitClause = pageSize === 'all' ? '' : `LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`
 
   const [{ count }] = await prisma.$queryRawUnsafe<[{ count: bigint }]>(`
     SELECT COUNT(*) AS count FROM (
@@ -133,7 +136,7 @@ export default async function PostsByUsersPage({
   `, ...params)
 
   const total = Number(count)
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const { totalPages, start, end } = getPageSlice(page, pageSize, total)
 
   const rows = await prisma.$queryRawUnsafe<{
     provinsi: string
@@ -164,13 +167,14 @@ export default async function PostsByUsersPage({
     ${whereClause}
     GROUP BY p.name, c.name, u.email, u.name, u.id
     ORDER BY ${orderCol} ${sortDir} NULLS LAST
-    LIMIT ${PAGE_SIZE} OFFSET ${offset}
+    ${limitClause}
   `, ...params)
 
   const flatParams: Record<string, string | undefined> = {
     search,
     sortBy:     rawSortBy,
     sortDir:    rawSortDir,
+    pageSize:   pageSizeParam,
     provinceId: isAdmin ? provinceId : undefined,
     cityId:     isAdmin ? cityId : undefined,
     dateFrom,
@@ -186,7 +190,7 @@ export default async function PostsByUsersPage({
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Pelaporan Per Operator</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             {total > 0
-              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} operator`
+              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} operator`
               : '0 operator'}
           </p>
         </div>
@@ -213,15 +217,18 @@ export default async function PostsByUsersPage({
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <SearchInput
-            defaultValue={search ?? ''}
-            provinces={provinces}
-            isAdmin={isAdmin}
-            defaultDateFrom={dateFrom}
-            defaultDateTo={dateTo}
-            showFilters={false}
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TablePageSizeSelect value={pageSize} />
+          <div className="flex justify-end">
+            <SearchInput
+              defaultValue={search ?? ''}
+              provinces={provinces}
+              isAdmin={isAdmin}
+              defaultDateFrom={dateFrom}
+              defaultDateTo={dateTo}
+              showFilters={false}
+            />
+          </div>
         </div>
 
         {/* Table */}
@@ -233,7 +240,7 @@ export default async function PostsByUsersPage({
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {total > 0
-              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} operator`
+              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} operator`
               : '0 operator'}
           </p>
           {totalPages > 1 && (

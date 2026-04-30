@@ -13,6 +13,7 @@ import { appendSuccessParam, getPathname, normalizeReturnTo } from '@/app/lib/re
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { deleteSession } from '@/app/lib/session'
+import type { TablePageSize } from '@/app/lib/table-pagination'
 
 async function redirectToLoginIfUnauthorized(error: unknown): Promise<never> {
   if (error instanceof Error && error.message === 'Unauthorized') {
@@ -159,6 +160,7 @@ export async function getPosts(params: {
   categoryId?: string
   status?: 'pending' | 'valid' | 'invalid'
   page?: number
+  pageSize?: TablePageSize
   userId?: string
   tenantId?: string
   dateFrom?: string
@@ -168,9 +170,9 @@ export async function getPosts(params: {
   provinceId?: string
   cityId?: string
 }): Promise<{ posts: SerializedPost[]; total: number }> {
-  const { search, categoryId, status, page = 1, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, provinceId, cityId } = params
-  const pageSize = 10
-  const skip = (page - 1) * pageSize
+  const { search, categoryId, status, page = 1, pageSize = 10, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, provinceId, cityId } = params
+  const skip = pageSize === 'all' ? undefined : (page - 1) * pageSize
+  const take = pageSize === 'all' ? undefined : pageSize
 
   // Resolve user IDs for tenant scoping (manager sees all tenant members' posts)
   let userIdFilter: { user_id: bigint } | { user_id: { in: bigint[] } } | undefined
@@ -254,7 +256,7 @@ export async function getPosts(params: {
       where,
       orderBy: { created_at: sortOrder },
       skip,
-      take: pageSize,
+      take,
       include: {
         blog_post_categories: true,
         users_blog_posts_user_idTousers: { select: { id: true, name: true } },

@@ -46,6 +46,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   const appName = process.env.APP_NAME ?? 'Admin Panel'
+  const showSummary = user.isAdmin
   const showDashboard = user.isAdmin || user.isManager || user.isOperator
   const showOperators = user.isManager
   const showLaporanPerOperator = user.isAdmin || user.isManager
@@ -62,5 +63,5 @@ export default async function AppShell({ children }: { children: React.ReactNode
     userEmail: user.email,
   })
 
-  return <ShellClient user={user} appName={appName} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi}>{children}</ShellClient>
+  return <ShellClient user={user} appName={appName} showSummary={showSummary} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi}>{children}</ShellClient>
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/app/lib/authorization'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
+import type { TablePageSize } from '@/app/lib/table-pagination'
 
 // Used when creating/deleting role assignments via Prisma (not inline SQL)
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
@@ -129,7 +130,7 @@ async function getTenantRoleCount(tenantId: string, roleName: 'manager' | 'opera
 
 export async function getTenants(params: {
   page?: number
-  pageSize?: number
+  pageSize?: TablePageSize
   search?: string
   cityId?: string
   sortBy?: string
@@ -139,7 +140,7 @@ export async function getTenants(params: {
 
   const page     = params.page     ?? 1
   const pageSize = params.pageSize ?? 20
-  const offset   = (page - 1) * pageSize
+  const offset   = pageSize === 'all' ? 0 : (page - 1) * pageSize
 
   // ── WHERE ────────────────────────────────────────────────────────────────────
   const conditions: string[] = []
@@ -188,16 +189,7 @@ export async function getTenants(params: {
        )
     )`
 
-  const [rows, countResult] = await Promise.all([
-    prisma.$queryRawUnsafe<{
-      id: bigint
-      name: string
-      domain: string | null
-      city: string | null
-      manager_count: bigint
-      operator_count: bigint
-    }[]>(
-      `SELECT
+  const tenantRowsSql = `SELECT
          t.id,
          t.name,
          t.domain,
@@ -207,11 +199,19 @@ export async function getTenants(params: {
        FROM tenants t
        ${where}
        ORDER BY ${orderBy}
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      ...qParams,
-      pageSize,
-      offset
-    ),
+       ${pageSize === 'all' ? '' : `LIMIT $${idx} OFFSET $${idx + 1}`}`
+
+  const tenantRowsParams = pageSize === 'all' ? qParams : [...qParams, pageSize, offset]
+
+  const [rows, countResult] = await Promise.all([
+    prisma.$queryRawUnsafe<{
+      id: bigint
+      name: string
+      domain: string | null
+      city: string | null
+      manager_count: bigint
+      operator_count: bigint
+    }[]>(tenantRowsSql, ...tenantRowsParams),
     prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) AS count FROM tenants t ${where}`,
       ...qParams

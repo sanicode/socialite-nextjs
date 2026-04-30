@@ -4,15 +4,18 @@ import { getSessionUser } from '@/app/lib/session'
 import { getOperators } from '@/app/actions/operators'
 import OperatorsTable from '@/app/components/operators/OperatorsTable'
 import TableSearchForm from '@/app/components/TableSearchForm'
+import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
   page?: string
+  pageSize?: string
   search?: string
   email?: string
   phone?: string
 }>
 
-const PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 20
 
 function buildHref(params: Record<string, string | undefined>) {
   const query = new URLSearchParams()
@@ -30,16 +33,17 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
 
   const params = await searchParams
   const page   = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const pageSize = parseTablePageSize(params.pageSize, DEFAULT_PAGE_SIZE)
 
   const { operators, total } = await getOperators({
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     search: params.search,
     email:  params.email,
     phone:  params.phone,
   })
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const { totalPages, start, end } = getPageSlice(page, pageSize, total)
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -56,6 +60,7 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
         {/* Filter */}
         <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
           {params.search && <input type="hidden" name="search" value={params.search} />}
+          {params.pageSize && <input type="hidden" name="pageSize" value={params.pageSize} />}
           <input
             type="search"
             name="email"
@@ -86,15 +91,19 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
           </div>
         </form>
 
-        <TableSearchForm
-          action="/operators"
-          defaultValue={params.search}
-          placeholder="Cari nama..."
-          hiddenParams={{
-            email: params.email,
-            phone: params.phone,
-          }}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TablePageSizeSelect value={pageSize} />
+          <TableSearchForm
+            action="/operators"
+            defaultValue={params.search}
+            placeholder="Cari nama..."
+            hiddenParams={{
+              pageSize: params.pageSize,
+              email: params.email,
+              phone: params.phone,
+            }}
+          />
+        </div>
 
         <OperatorsTable operators={operators} />
 
@@ -102,7 +111,7 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {total > 0
-              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} dari ${total.toLocaleString('id-ID')} operator`
+              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} operator`
               : '0 operator'}
           </p>
           {totalPages > 1 && (
