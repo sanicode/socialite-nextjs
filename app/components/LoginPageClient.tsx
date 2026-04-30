@@ -1,9 +1,30 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import Script from 'next/script'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { login } from '@/app/actions/auth'
 import { ToastProvider, useToast } from '@/app/components/ToastContext'
 import ToastContainer from '@/app/components/ToastContainer'
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string
+          callback: (token: string) => void
+          'expired-callback': () => void
+          'error-callback': () => void
+          theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'flexible' | 'compact'
+        }
+      ) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId: string) => void
+    }
+  }
+}
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -12,14 +33,73 @@ function formatCountdown(seconds: number): string {
   return `${s} detik`
 }
 
+function CaptchaField({ siteKey, resetSignal }: { siteKey: string; resetSignal: unknown }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const widgetIdRef = useRef<string | null>(null)
+  const [token, setToken] = useState('')
+  const [ready, setReady] = useState(false)
+
+  function renderCaptcha() {
+    if (!containerRef.current || !window.turnstile || widgetIdRef.current) return
+    widgetIdRef.current = window.turnstile.render(containerRef.current, {
+      sitekey: siteKey,
+      theme: 'auto',
+      size: 'flexible',
+      callback: setToken,
+      'expired-callback': () => setToken(''),
+      'error-callback': () => setToken(''),
+    })
+    setReady(true)
+  }
+
+  useEffect(() => {
+    renderCaptcha()
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current)
+        widgetIdRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    setToken('')
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current)
+    }
+  }, [resetSignal])
+
+  return (
+    <div className="space-y-2">
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        strategy="afterInteractive"
+        onReady={renderCaptcha}
+      />
+      <input type="hidden" name="cf-turnstile-response" value={token} />
+      <div className="flex min-h-[65px] w-full items-center justify-center">
+        <div ref={containerRef} className="w-full [&>iframe]:!w-full" />
+      </div>
+      {!ready && (
+        <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">Memuat verifikasi keamanan...</p>
+      )}
+    </div>
+  )
+}
+
 function LoginFormBody({
   state,
   action,
   pending,
+  captchaSiteKey,
+  initialCaptchaRequired,
 }: {
   state: Awaited<ReturnType<typeof login>>
   action: (formData: FormData) => void
   pending: boolean
+  captchaSiteKey: string | null
+  initialCaptchaRequired: boolean
 }) {
   const { showToast } = useToast()
   const [countdown, setCountdown] = useState<number | null>(state?.retryAfter ?? null)
@@ -41,9 +121,11 @@ function LoginFormBody({
     if (state?.message && !state.retryAfter) showToast('error', 'Login Gagal', state.message)
     if (state?.errors?.email) showToast('error', 'Email tidak valid', state.errors.email[0])
     if (state?.errors?.password) showToast('error', 'Password tidak valid', state.errors.password[0])
+    if (state?.errors?.captcha) showToast('error', 'Verifikasi gagal', state.errors.captcha[0])
   }, [state, showToast])
 
   const isLocked = countdown !== null && countdown > 0
+  const shouldShowCaptcha = Boolean(captchaSiteKey && (initialCaptchaRequired || state?.requireCaptcha))
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8 sm:px-6 lg:px-8">
@@ -122,6 +204,13 @@ function LoginFormBody({
             />
           </div>
 
+          {shouldShowCaptcha && captchaSiteKey && (
+            <CaptchaField
+              siteKey={captchaSiteKey}
+              resetSignal={state}
+            />
+          )}
+
           <button
             type="submit"
             disabled={pending || isLocked}
@@ -142,16 +231,37 @@ function LoginFormBody({
   )
 }
 
-function LoginForm() {
+function LoginForm({
+  captchaSiteKey,
+  initialCaptchaRequired,
+}: {
+  captchaSiteKey: string | null
+  initialCaptchaRequired: boolean
+}) {
   const [state, action, pending] = useActionState(login, undefined)
-  return <LoginFormBody key={state?.retryAfter ?? 'none'} state={state} action={action} pending={pending} />
+  return (
+    <LoginFormBody
+      key={state?.retryAfter ?? 'none'}
+      state={state}
+      action={action}
+      pending={pending}
+      captchaSiteKey={captchaSiteKey}
+      initialCaptchaRequired={initialCaptchaRequired}
+    />
+  )
 }
 
-export default function LoginPageClient() {
+export default function LoginPageClient({
+  captchaSiteKey,
+  initialCaptchaRequired,
+}: {
+  captchaSiteKey: string | null
+  initialCaptchaRequired: boolean
+}) {
   return (
     <ToastProvider>
       <ToastContainer />
-      <LoginForm />
+      <LoginForm captchaSiteKey={captchaSiteKey} initialCaptchaRequired={initialCaptchaRequired} />
     </ToastProvider>
   )
 }

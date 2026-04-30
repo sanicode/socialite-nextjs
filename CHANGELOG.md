@@ -17,6 +17,7 @@
 - Manager multi-tenant harus memilih `tenantId` pada endpoint operator mobile yang membutuhkan konteks tenant eksplisit.
 - Query role count tenant tidak lagi menyusun nama role dari interpolasi string dinamis.
 - Upload baru ke S3 memakai object key berbasis tanggal dan lokasi untuk memudahkan backup: `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/random.ext`.
+- Login web sekarang mendukung Cloudflare Turnstile CAPTCHA adaptif melalui `CAPTCHA_SITE_KEY` dan `CAPTCHA_SECRET_KEY`, aktif setelah IP yang sama gagal login minimal 5 kali dalam 10 menit.
 
 ### Reporting Hours
 

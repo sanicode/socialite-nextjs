@@ -7,11 +7,13 @@ import { createSession, deleteSession } from '@/app/lib/session'
 import { logEvent } from '@/app/lib/logger'
 import { getRequestSecurityDecision } from '@/app/lib/request-security'
 import { writeAccessLog } from '@/app/lib/access-logs'
+import { isCaptchaEnabled, verifyCaptchaToken } from '@/app/lib/captcha'
 import {
   getLoginIp,
   checkRateLimit,
   recordLoginFailure,
   clearLoginFailures,
+  shouldRequireLoginCaptcha,
 } from '@/app/lib/login-rate-limit'
 
 export type LoginFormState =
@@ -19,9 +21,11 @@ export type LoginFormState =
       errors?: {
         email?: string[]
         password?: string[]
+        captcha?: string[]
       }
       message?: string
       retryAfter?: number // detik tersisa sebelum boleh mencoba lagi
+      requireCaptcha?: boolean
     }
   | undefined
 
@@ -50,7 +54,7 @@ export async function login(
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
 
-  const errors: { email?: string[]; password?: string[] } = {}
+  const errors: { email?: string[]; password?: string[]; captcha?: string[] } = {}
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errors.email = ['Masukkan alamat email yang valid.']
@@ -65,6 +69,27 @@ export async function login(
   }
 
   const ip        = await getLoginIp()
+  const captchaRequired = isCaptchaEnabled() && await shouldRequireLoginCaptcha(ip)
+  if (captchaRequired) {
+    const captchaToken = formData.get('cf-turnstile-response')
+    const captchaPassed = await verifyCaptchaToken(typeof captchaToken === 'string' ? captchaToken : null, ip)
+    if (!captchaPassed) {
+      logEvent('warn', 'auth.login.captcha_failed', { email, ip })
+      await writeAccessLog({
+        eventType: 'login_blocked',
+        status: 'blocked',
+        ip,
+        userEmail: email,
+        details: { reason: 'captcha_failed' },
+      })
+      return {
+        errors: { captcha: ['Verifikasi keamanan gagal. Silakan coba lagi.'] },
+        message: 'Verifikasi keamanan gagal. Silakan coba lagi.',
+        requireCaptcha: true,
+      }
+    }
+  }
+
   const rateLimit = await checkRateLimit(email, ip)
 
   if (rateLimit.blocked) {
@@ -78,6 +103,7 @@ export async function login(
     return {
       message: 'Terlalu banyak percobaan login gagal. Silakan coba lagi setelah beberapa saat.',
       retryAfter: rateLimit.retryAfterSeconds,
+      requireCaptcha: captchaRequired,
     }
   }
 
@@ -94,6 +120,7 @@ export async function login(
 
   if (!user || user.is_blocked || !passwordMatch) {
     await recordLoginFailure(email, ip)
+    const nextCaptchaRequired = isCaptchaEnabled() && await shouldRequireLoginCaptcha(ip)
 
     if (user && user.is_blocked) {
       logEvent('warn', 'auth.login.blocked_user', { email, userId: user.id.toString() })
@@ -104,7 +131,10 @@ export async function login(
         userEmail: email,
         details: { reason: 'user_blocked' },
       })
-      return { message: 'Akun Anda telah diblokir. Hubungi administrator.' }
+      return {
+        message: 'Akun Anda telah diblokir. Hubungi administrator.',
+        requireCaptcha: nextCaptchaRequired,
+      }
     }
 
     logEvent('warn', 'auth.login.failed', { email, ip })
@@ -114,7 +144,10 @@ export async function login(
       userEmail: email,
       details: { reason: 'invalid_credentials' },
     })
-    return { message: 'Email atau password salah.' }
+    return {
+      message: 'Email atau password salah.',
+      requireCaptcha: nextCaptchaRequired,
+    }
   }
 
   await clearLoginFailures(email, ip)

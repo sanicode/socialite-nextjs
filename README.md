@@ -119,6 +119,10 @@ Nama provinsi/kota diubah menjadi slug aman untuk path S3. Jika data lokasi belu
 3. Manager hanya dapat memvalidasi laporan tenant miliknya dan hanya pada rentang jam validasi manager
 4. Admin tidak terkena pembatasan jam validasi
 
+### Login CAPTCHA
+
+Login web mendukung Cloudflare Turnstile adaptif. Jika `CAPTCHA_SITE_KEY` dan `CAPTCHA_SECRET_KEY` tersedia di `.env`, widget CAPTCHA baru tampil setelah IP yang sama mengalami minimal 5 kegagalan login dalam 10 menit. Token diverifikasi di server sebelum pengecekan rate limit dan password.
+
 ### Filter dan Pagination Tabel
 
 - Semua table page memakai pagination server-side berbasis URL.

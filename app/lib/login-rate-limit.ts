@@ -16,6 +16,10 @@ const TIER3_MAX        = 50
 const TIER3_WINDOW_MIN = 60  // 1 jam
 const TIER3_BLOCK_MIN  = 120 // 2 jam
 
+// CAPTCHA adaptif: tampilkan setelah ada indikasi serangan dari IP yang sama.
+const CAPTCHA_IP_FAILURE_MAX = 5
+const CAPTCHA_WINDOW_MIN     = 10
+
 export type RateLimitResult =
   | { blocked: false }
   | { blocked: true; retryAfterSeconds: number }
@@ -88,6 +92,23 @@ export async function checkRateLimit(
   }
 
   return { blocked: false }
+}
+
+export async function shouldRequireLoginCaptcha(ip: string | null): Promise<boolean> {
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL '4 hours'`,
+  )
+
+  const ipKey = ip ?? 'unknown'
+  const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+    `SELECT COUNT(*)::bigint AS count
+     FROM login_attempts
+     WHERE key = $1
+       AND attempted_at > NOW() - INTERVAL '${CAPTCHA_WINDOW_MIN} minutes'`,
+    ipKey,
+  )
+
+  return Number(result[0]?.count ?? 0) >= CAPTCHA_IP_FAILURE_MAX
 }
 
 export async function recordLoginFailure(email: string, ip: string | null): Promise<void> {
