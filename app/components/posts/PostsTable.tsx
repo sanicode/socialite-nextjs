@@ -230,7 +230,7 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
       )}
 
       {/* Filters */}
-      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
@@ -284,30 +284,52 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
           </label>
         )}
         {variant === 'default' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Jenis</span>
+            <select
+              defaultValue={searchParams.get('jenis') ?? ''}
+              disabled={isPending}
+              onChange={(e) => updateParam('jenis', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            >
+              <option value="">Semua jenis</option>
+              <option value="upload">Upload</option>
+              <option value="amplifikasi">Amplifikasi</option>
+            </select>
+          </label>
+        )}
+        {variant === 'default' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
+            <select
+              defaultValue={searchParams.get('status') ?? ''}
+              disabled={isPending}
+              onChange={(e) => updateParam('status', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            >
+              <option value="">Semua status</option>
+              <option value="pending">Pending</option>
+              <option value="valid">Valid</option>
+              <option value="invalid">Invalid</option>
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Media Sosial</span>
           <select
-            defaultValue={searchParams.get('jenis') ?? ''}
+            defaultValue={searchParams.get('category') ?? ''}
             disabled={isPending}
-            onChange={(e) => updateParam('jenis', e.target.value)}
+            onChange={(e) => updateParam('category', e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
-            <option value="">Semua jenis</option>
-            <option value="upload">Upload</option>
-            <option value="amplifikasi">Amplifikasi</option>
+            <option value="">Semua Media Sosial</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
           </select>
-        )}
-        <select
-          defaultValue={searchParams.get('category') ?? ''}
-          disabled={isPending}
-          onChange={(e) => updateParam('category', e.target.value)}
-          className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-        >
-          <option value="">Semua Media Sosial</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
+        </label>
       </div>
 
       {/* Bulk Action Bar */}
