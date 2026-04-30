@@ -60,7 +60,9 @@ const settingsItems = [
 
 type Props = {
   open: boolean
+  collapsed: boolean
   onClose: () => void
+  onToggleCollapsed: () => void
   appName: string
   showSummary: boolean
   showDashboard: boolean
@@ -79,12 +81,22 @@ function LinkPendingHint() {
   )
 }
 
-export default function Sidebar({ open, onClose, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
+export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
   const pathname = usePathname()
 
   // Filter dashboard item
   const dashboardItem = navItems.find(item => item.href === '/dashboard')
   const showDashboardLink = showDashboard && dashboardItem
+  const navLinkClass = (active: boolean, extra = '') => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+    collapsed ? 'md:justify-center md:gap-0 md:px-2' : 'md:justify-start'
+  } ${
+    active
+      ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+  } ${extra}`
+  const labelClass = collapsed ? 'md:hidden' : ''
+  const pendingClass = collapsed ? 'md:hidden' : ''
+  const sectionClass = `px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400 dark:text-neutral-500 ${collapsed ? 'md:hidden' : ''}`
 
   return (
     <>
@@ -94,14 +106,24 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
       )}
 
       <aside className={[
-        'fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-transform duration-200 ease-in-out',
+        'fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-[transform,width] duration-200 ease-in-out',
         open ? 'translate-x-0' : '-translate-x-full',
-        'md:static md:translate-x-0 md:w-60 md:flex md:flex-shrink-0',
+        `md:static md:translate-x-0 ${collapsed ? 'md:w-16' : 'md:w-60'} md:flex md:flex-shrink-0`,
       ].join(' ')}>
         
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0">
-          <span className="text-base font-bold text-neutral-900 dark:text-white tracking-tight">{appName}</span>
+        <div className={`h-16 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 flex-shrink-0 ${collapsed ? 'px-3 md:justify-center' : 'px-5'}`}>
+          <span className={`text-base font-bold text-neutral-900 dark:text-white tracking-tight ${collapsed ? 'md:hidden' : ''}`}>{appName}</span>
+          <button
+            onClick={onToggleCollapsed}
+            className="hidden rounded-lg p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 md:inline-flex dark:hover:bg-neutral-800 dark:hover:text-white"
+            aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+            title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+          >
+            <svg className={`h-5 w-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
           <button onClick={onClose} className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition md:hidden">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -110,22 +132,19 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className={`flex-1 py-4 space-y-1 overflow-y-auto px-3 ${collapsed ? 'md:px-2' : 'md:px-3'}`}>
           
           {/* Dashboard Section */}
           {showDashboardLink && (
             <Link
               href={dashboardItem.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                pathname === '/dashboard'
-                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              }`}
+              title={dashboardItem.label}
+              className={navLinkClass(pathname === '/dashboard')}
             >
               {dashboardItem.icon}
-              {dashboardItem.label}
-              <LinkPendingHint />
+              <span className={labelClass}>{dashboardItem.label}</span>
+              <span className={pendingClass}><LinkPendingHint /></span>
             </Link>
           )}
 
@@ -133,17 +152,14 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
             <Link
               href="/summary"
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                pathname === '/summary'
-                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              }`}
+              title="Summary"
+              className={navLinkClass(pathname === '/summary')}
             >
               <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 13.5h4l2-7 4 14 2-7h6" />
               </svg>
-              Summary
-              <LinkPendingHint />
+              <span className={labelClass}>Summary</span>
+              <span className={pendingClass}><LinkPendingHint /></span>
             </Link>
           )}
 
@@ -151,7 +167,7 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
           {/* Laporan Group */}
           {/* {(isAdmin || isManager) && ( */}
           <div className="space-y-1">
-            <div className="px-3 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400 dark:text-neutral-500">
+            <div className={`${sectionClass} pt-4`}>
               Laporan
             </div>
             
@@ -159,12 +175,11 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
               <Link
                 href="/posts"
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  pathname === '/posts' ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                }`}
+                title="Semua"
+                className={navLinkClass(pathname === '/posts')}
               >
                 <div className="w-5 flex justify-center"><div className={`w-1.5 h-1.5 rounded-full ${pathname === '/posts' ? 'bg-current' : 'bg-neutral-400'}`} /></div>
-                Semua <LinkPendingHint />
+                <span className={labelClass}>Semua</span> <span className={pendingClass}><LinkPendingHint /></span>
               </Link>
             )}
 
@@ -173,12 +188,11 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
               <Link
                 href="/posts/users"
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  pathname.startsWith('/posts/users') ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                }`}
+                title="Per Operator"
+                className={navLinkClass(pathname.startsWith('/posts/users'))}
               >
                 <div className="w-5 flex justify-center"><div className={`w-1.5 h-1.5 rounded-full ${pathname.startsWith('/posts/users') ? 'bg-current' : 'bg-neutral-400'}`} /></div>
-                Per Operator <LinkPendingHint />
+                <span className={labelClass}>Per Operator</span> <span className={pendingClass}><LinkPendingHint /></span>
               </Link>
             )}
 
@@ -186,12 +200,11 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
               <Link
                 href="/posts/upload"
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  pathname.startsWith('/posts/upload') ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                }`}
+                title="Upload"
+                className={navLinkClass(pathname.startsWith('/posts/upload'))}
               >
                 <div className="w-5 flex justify-center"><div className={`w-1.5 h-1.5 rounded-full ${pathname.startsWith('/posts/upload') ? 'bg-current' : 'bg-neutral-400'}`} /></div>
-                Upload <LinkPendingHint />
+                <span className={labelClass}>Upload</span> <span className={pendingClass}><LinkPendingHint /></span>
               </Link>
             )}
 
@@ -199,12 +212,11 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
               <Link
                 href="/posts/amplifikasi"
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  pathname.startsWith('/posts/amplifikasi') ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                }`}
+                title="Amplifikasi"
+                className={navLinkClass(pathname.startsWith('/posts/amplifikasi'))}
             >
               <div className="w-5 flex justify-center"><div className={`w-1.5 h-1.5 rounded-full ${pathname.startsWith('/posts/amplifikasi') ? 'bg-current' : 'bg-neutral-400'}`} /></div>
-              Amplifikasi <LinkPendingHint />
+              <span className={labelClass}>Amplifikasi</span> <span className={pendingClass}><LinkPendingHint /></span>
             </Link>
             )}
           </div>
@@ -213,7 +225,7 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
           {/* Settings Section */}
           {showSettings && (
             <>
-              <div className="px-3 pt-6 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400 dark:text-neutral-500">
+              <div className={`${sectionClass} pt-6 text-[11px]`}>
                 Settings
               </div>
               {settingsItems.map((item) => (
@@ -221,15 +233,12 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
                   key={item.href}
                   href={item.href}
                   onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                    pathname.startsWith(item.href)
-                      ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                  }`}
+                  title={item.label}
+                  className={navLinkClass(pathname.startsWith(item.href))}
                 >
                   {item.icon}
-                  {item.label}
-                  <LinkPendingHint />
+                  <span className={labelClass}>{item.label}</span>
+                  <span className={pendingClass}><LinkPendingHint /></span>
                 </Link>
               ))}
             </>
@@ -240,17 +249,14 @@ export default function Sidebar({ open, onClose, appName, showSummary, showDashb
             <Link
               href="/operators"
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition mt-4 ${
-                pathname.startsWith('/operators')
-                  ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              }`}
+              title="Operator"
+              className={navLinkClass(pathname.startsWith('/operators'), 'mt-4')}
             >
               <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              Operator
-              <LinkPendingHint />
+              <span className={labelClass}>Operator</span>
+              <span className={pendingClass}><LinkPendingHint /></span>
             </Link>
           )}          
         </nav>

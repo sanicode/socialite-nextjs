@@ -25,13 +25,28 @@ type Props = {
 
 export default function ShellClient({ user, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
     <ToastProvider>
     <ToastContainer />
     <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} appName={appName} showSummary={showSummary} showDashboard={showDashboard} showSettings={showSettings} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi} />
+      <Sidebar
+        open={sidebarOpen}
+        collapsed={sidebarCollapsed}
+        onClose={() => setSidebarOpen(false)}
+        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+        appName={appName}
+        showSummary={showSummary}
+        showDashboard={showDashboard}
+        showSettings={showSettings}
+        showOperators={showOperators}
+        showLaporanPerOperator={showLaporanPerOperator}
+        showLaporanSemua={showLaporanSemua}
+        showLaporanUpload={showLaporanUpload}
+        showLaporanAmplifikasi={showLaporanAmplifikasi}
+      />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
