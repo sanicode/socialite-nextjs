@@ -23,6 +23,12 @@ export type SecuritySettingsState =
         allowUnknownCountries: boolean
         apiEnabled: boolean
         maxUploadedFileSizeBytes: number
+        operatorReportingWindowEnabled: boolean
+        operatorReportingWindowStart: string
+        operatorReportingWindowEnd: string
+        managerReportingWindowEnabled: boolean
+        managerReportingWindowStart: string
+        managerReportingWindowEnd: string
       }
     }
   | undefined
@@ -47,6 +53,12 @@ export async function getSecuritySettingsFormState(): Promise<NonNullable<Securi
       allowUnknownCountries: settings.allowUnknownCountries,
       apiEnabled: settings.apiEnabled,
       maxUploadedFileSizeBytes: settings.maxUploadedFileSizeBytes,
+      operatorReportingWindowEnabled: settings.operatorReportingWindowEnabled,
+      operatorReportingWindowStart: settings.operatorReportingWindowStart,
+      operatorReportingWindowEnd: settings.operatorReportingWindowEnd,
+      managerReportingWindowEnabled: settings.managerReportingWindowEnabled,
+      managerReportingWindowStart: settings.managerReportingWindowStart,
+      managerReportingWindowEnd: settings.managerReportingWindowEnd,
     },
   }
 }
@@ -63,6 +75,12 @@ export async function saveSecuritySettings(
     allowUnknownCountries: formData.get('allowUnknownCountries') === '1',
     apiEnabled: formData.get('apiEnabled') === '1',
     maxUploadedFileSizeBytes: formData.get('maxUploadedFileSizeBytes'),
+    operatorReportingWindowEnabled: formData.get('operatorReportingWindowEnabled') === '1',
+    operatorReportingWindowStart: formData.get('operatorReportingWindowStart'),
+    operatorReportingWindowEnd: formData.get('operatorReportingWindowEnd'),
+    managerReportingWindowEnabled: formData.get('managerReportingWindowEnabled') === '1',
+    managerReportingWindowStart: formData.get('managerReportingWindowStart'),
+    managerReportingWindowEnd: formData.get('managerReportingWindowEnd'),
   })
 
   const currentContext = await getRequestSecurityContext()
@@ -78,6 +96,12 @@ export async function saveSecuritySettings(
         allowUnknownCountries: nextSettings.allowUnknownCountries,
         apiEnabled: nextSettings.apiEnabled,
         maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+        operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
+        operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
+        operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
+        managerReportingWindowEnabled: nextSettings.managerReportingWindowEnabled,
+        managerReportingWindowStart: nextSettings.managerReportingWindowStart,
+        managerReportingWindowEnd: nextSettings.managerReportingWindowEnd,
       },
     }
   }
@@ -90,6 +114,12 @@ export async function saveSecuritySettings(
     allowUnknownCountries: nextSettings.allowUnknownCountries,
     apiEnabled: nextSettings.apiEnabled,
     maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+    operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
+    operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
+    operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
+    managerReportingWindowEnabled: nextSettings.managerReportingWindowEnabled,
+    managerReportingWindowStart: nextSettings.managerReportingWindowStart,
+    managerReportingWindowEnd: nextSettings.managerReportingWindowEnd,
   })
 
   revalidatePath('/settings/security')
@@ -103,6 +133,12 @@ export async function saveSecuritySettings(
       allowUnknownCountries: nextSettings.allowUnknownCountries,
       apiEnabled: nextSettings.apiEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+      operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
+      operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
+      operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
+      managerReportingWindowEnabled: nextSettings.managerReportingWindowEnabled,
+      managerReportingWindowStart: nextSettings.managerReportingWindowStart,
+      managerReportingWindowEnd: nextSettings.managerReportingWindowEnd,
     },
   }
 }

@@ -4,6 +4,7 @@ import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3 } from '@/app/lib/s3'
 import { logEvent } from '@/app/lib/logger'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -83,6 +84,11 @@ export async function PUT(request: Request, { params }: Ctx) {
     )
     if (!canEdit) {
       throw new ApiError(403, 'Anda tidak memiliki akses untuk mengedit laporan ini')
+    }
+
+    const reportingWindowDecision = await getNonAdminReportingWindowDecision(payload.roles)
+    if (!reportingWindowDecision.allowed) {
+      throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.')
     }
 
     const body = await request.json()

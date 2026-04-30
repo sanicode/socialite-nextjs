@@ -5,6 +5,7 @@ import { createPost } from '@/app/actions/posts'
 import PostForm from '@/app/components/posts/PostForm'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { getSessionUser } from '@/app/lib/session'
+import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 export default async function NewPostPage() {
   const user = await getSessionUser()
@@ -12,6 +13,8 @@ export default async function NewPostPage() {
   const isAdmin = user.roles.includes('admin')
   const isManager = user.roles.includes('manager')
   if (isManager && !isAdmin) redirect('/posts')
+  const reportingWindowDecision = await getOperatorReportingWindowDecision(user.roles)
+  if (!reportingWindowDecision.allowed) redirect('/posts/upload?reportingWindow=closed')
 
   const [categories, securitySettings] = await Promise.all([
     getCategories(),

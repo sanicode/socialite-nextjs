@@ -4,6 +4,7 @@ import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { JwtPayload } from '@/app/lib/jwt'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
+import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,11 @@ export async function POST(request: Request) {
     // Manager-only cannot create posts
     if (payload.roles.includes('manager') && !payload.roles.includes('admin')) {
       throw new ApiError(403, 'Manager tidak dapat membuat laporan')
+    }
+
+    const reportingWindowDecision = await getOperatorReportingWindowDecision(payload.roles)
+    if (!reportingWindowDecision.allowed) {
+      throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.')
     }
 
     const body = await request.json()

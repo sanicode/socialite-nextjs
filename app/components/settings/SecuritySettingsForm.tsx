@@ -43,6 +43,24 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
   const [maxUploadedFileSizeBytes, setMaxUploadedFileSizeBytes] = useState(
     initialState.settings.maxUploadedFileSizeBytes
   )
+  const [operatorReportingWindowEnabled, setOperatorReportingWindowEnabled] = useState(
+    initialState.settings.operatorReportingWindowEnabled
+  )
+  const [operatorReportingWindowStart, setOperatorReportingWindowStart] = useState(
+    initialState.settings.operatorReportingWindowStart
+  )
+  const [operatorReportingWindowEnd, setOperatorReportingWindowEnd] = useState(
+    initialState.settings.operatorReportingWindowEnd
+  )
+  const [managerReportingWindowEnabled, setManagerReportingWindowEnabled] = useState(
+    initialState.settings.managerReportingWindowEnabled
+  )
+  const [managerReportingWindowStart, setManagerReportingWindowStart] = useState(
+    initialState.settings.managerReportingWindowStart
+  )
+  const [managerReportingWindowEnd, setManagerReportingWindowEnd] = useState(
+    initialState.settings.managerReportingWindowEnd
+  )
 
   useEffect(() => {
     if (!state) return
@@ -119,6 +137,112 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
           </select>
           <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
             Batas maksimal upload pada Post. Saat ini: {formatUploadFileSize(maxUploadedFileSizeBytes)}.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={operatorReportingWindowEnabled}
+              onChange={(event) => setOperatorReportingWindowEnabled(event.target.checked)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            />
+            <span>
+              <span className="block text-sm font-medium text-neutral-900 dark:text-white">
+                Batasi jam pelaporan operator
+              </span>
+              <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                Jika aktif, operator hanya bisa membuat atau mengubah laporan pada rentang jam WIB yang ditentukan.
+              </span>
+            </span>
+          </label>
+          <input type="hidden" name="operatorReportingWindowEnabled" value={operatorReportingWindowEnabled ? '1' : '0'} />
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Jam mulai
+              </label>
+              <input
+                type="time"
+                name="operatorReportingWindowStart"
+                value={operatorReportingWindowStart}
+                onChange={(event) => setOperatorReportingWindowStart(event.target.value)}
+                disabled={pending}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-3 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Jam selesai
+              </label>
+              <input
+                type="time"
+                name="operatorReportingWindowEnd"
+                value={operatorReportingWindowEnd}
+                onChange={(event) => setOperatorReportingWindowEnd(event.target.value)}
+                disabled={pending}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-3 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            Contoh: 08:00 sampai 21:00. Admin dan manager memakai aturan terpisah.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={managerReportingWindowEnabled}
+              onChange={(event) => setManagerReportingWindowEnabled(event.target.checked)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            />
+            <span>
+              <span className="block text-sm font-medium text-neutral-900 dark:text-white">
+                Batasi jam aksi manager
+              </span>
+              <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                Jika aktif, manager hanya bisa validasi status, mengedit laporan, atau mengubah gambar pada rentang jam WIB yang ditentukan.
+              </span>
+            </span>
+          </label>
+          <input type="hidden" name="managerReportingWindowEnabled" value={managerReportingWindowEnabled ? '1' : '0'} />
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Jam mulai
+              </label>
+              <input
+                type="time"
+                name="managerReportingWindowStart"
+                value={managerReportingWindowStart}
+                onChange={(event) => setManagerReportingWindowStart(event.target.value)}
+                disabled={pending}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-3 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Jam selesai
+              </label>
+              <input
+                type="time"
+                name="managerReportingWindowEnd"
+                value={managerReportingWindowEnd}
+                onChange={(event) => setManagerReportingWindowEnd(event.target.value)}
+                disabled={pending}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-3 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            Admin tetap dapat melakukan semua aksi di luar rentang jam ini.
           </p>
         </div>
 

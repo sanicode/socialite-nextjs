@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes, randomUUID } from 'crypto'
 import { uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
-import { requireJwt, apiError, requireApiEnabled } from '@/app/lib/api-auth'
+import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const COLLECTION_NAME = 'blog-images'
@@ -12,7 +13,11 @@ const COLLECTION_NAME = 'blog-images'
 export async function POST(request: NextRequest) {
   try {
     await requireApiEnabled()
-    requireJwt(request)
+    const payload = requireJwt(request)
+    const reportingWindowDecision = await getNonAdminReportingWindowDecision(payload.roles)
+    if (!reportingWindowDecision.allowed) {
+      throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.')
+    }
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null

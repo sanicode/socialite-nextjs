@@ -4,9 +4,11 @@ import { redirect } from 'next/navigation'
 import { getPosts, getCategories } from '@/app/actions/posts'
 import { getProvinces } from '@/app/actions/dashboard'
 import PostsTable from '@/app/components/posts/PostsTable'
+import AppAlert from '@/app/components/AppAlert'
 import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
 import { parseTablePageSize } from '@/app/lib/table-pagination'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; jenis?: string; status?: string; provinceId?: string; cityId?: string }>
 
@@ -31,6 +33,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
   if (isOperator) redirect('/posts/upload')
   const canVerify = isAdmin || isManager
   const sortOrder = (params.sort === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  const reportingWindowClosed = !reportingWindowDecision.allowed
   const today = getJakartaDateString()
   const dateFrom = params.dateFrom ?? today
   const dateTo = params.dateTo ?? today
@@ -81,14 +85,32 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
             </p>
           </div>
           {(!isManager || isAdmin) && (
-            <Link
-              href="/posts/new"
-              className="px-4 py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
-            >
-              + Buat Laporan
-            </Link>
+            reportingWindowClosed ? (
+              <span
+                aria-disabled="true"
+                title={reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.'}
+                className="cursor-not-allowed rounded-lg bg-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
+              >
+                + Buat Laporan
+              </span>
+            ) : (
+              <Link
+                href="/posts/new"
+                className="px-4 py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
+              >
+                + Buat Laporan
+              </Link>
+            )
           )}
         </div>
+
+        {reportingWindowClosed && (
+          <AppAlert
+            type="error"
+            title="Validasi Pelaporan Ditutup"
+            message={reportingWindowDecision.message}
+          />
+        )}
 
         {/* Table */}
         <Suspense
@@ -98,7 +120,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
             </div>
           }
         >
-          <PostsTable posts={posts} total={total} categories={categories} page={page} pageSize={pageSize} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} />
+          <PostsTable posts={posts} total={total} categories={categories} page={page} pageSize={pageSize} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} createDisabled={reportingWindowClosed} createDisabledMessage={reportingWindowDecision.message} actionsDisabled={reportingWindowClosed} actionsDisabledMessage={reportingWindowDecision.message} />
         </Suspense>
       </div>
     </div>

@@ -33,11 +33,18 @@ function getStatusClass(status: PostStatus) {
   return 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
 }
 
-export default function UserPostsTableClient({ posts, mediaByPostId }: {
+export default function UserPostsTableClient({
+  posts,
+  mediaByPostId,
+  actionsDisabled = false,
+  actionsDisabledMessage,
+}: {
   posts: SerializedPost[]
   mediaByPostId: Record<string, SerializedMedia>
   userData: SerializedUser
   status: string
+  actionsDisabled?: boolean
+  actionsDisabledMessage?: string | null
 }) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -46,6 +53,7 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
 
   const handleStatusChange = (postId: string, newStatus: PostStatus) => {
+    if (actionsDisabled) return
     setOptimisticPosts(prev => prev.filter((p) => p.id.toString() !== postId))
     startTransition(async () => {
       try {
@@ -161,9 +169,11 @@ export default function UserPostsTableClient({ posts, mediaByPostId }: {
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">
                         <select
-                          className={`rounded-lg border px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition ${getStatusClass(post.status)}`}
+                          className={`rounded-lg border px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:cursor-not-allowed disabled:opacity-50 ${getStatusClass(post.status)}`}
                           value={post.status}
                           onChange={(e) => handleStatusChange(post.id.toString(), e.target.value as PostStatus)}
+                          disabled={actionsDisabled}
+                          title={actionsDisabled ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.') : undefined}
                         >
                           <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="pending">Pending</option>
                           <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="valid">Valid</option>

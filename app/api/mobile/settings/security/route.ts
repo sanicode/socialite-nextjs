@@ -33,6 +33,12 @@ export async function PUT(request: Request) {
       allowUnknownCountries: body.allowUnknownCountries ?? true,
       apiEnabled: body.apiEnabled ?? true,
       maxUploadedFileSizeBytes: body.maxUploadedFileSizeBytes,
+      operatorReportingWindowEnabled: body.operatorReportingWindowEnabled ?? body.reportingWindowEnabled ?? false,
+      operatorReportingWindowStart: body.operatorReportingWindowStart ?? body.reportingWindowStart,
+      operatorReportingWindowEnd: body.operatorReportingWindowEnd ?? body.reportingWindowEnd,
+      managerReportingWindowEnabled: body.managerReportingWindowEnabled ?? false,
+      managerReportingWindowStart: body.managerReportingWindowStart,
+      managerReportingWindowEnd: body.managerReportingWindowEnd,
     })
 
     await setConfigValue('app_security_policy', JSON.stringify(nextSettings))
@@ -44,6 +50,12 @@ export async function PUT(request: Request) {
       allowUnknownCountries: nextSettings.allowUnknownCountries,
       apiEnabled: nextSettings.apiEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+      operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
+      operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
+      operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
+      managerReportingWindowEnabled: nextSettings.managerReportingWindowEnabled,
+      managerReportingWindowStart: nextSettings.managerReportingWindowStart,
+      managerReportingWindowEnd: nextSettings.managerReportingWindowEnd,
     })
 
     return Response.json(nextSettings)

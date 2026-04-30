@@ -7,6 +7,7 @@ import { getSecuritySettings } from '@/app/lib/request-security'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSessionUser } from '@/app/lib/session'
 import { normalizeReturnTo, refererToReturnTo } from '@/app/lib/return-to'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type Params = Promise<{ id: string }>
 type SearchParams = Promise<{ returnTo?: string }>
@@ -33,6 +34,8 @@ export default async function EditAmplifikasiPage({ params, searchParams }: { pa
     })
     if (!canEdit) redirect('/posts/amplifikasi')
   }
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
+  if (!reportingWindowDecision.allowed) redirect('/posts/amplifikasi')
 
   const backHref = normalizeReturnTo(returnTo ?? refererReturnTo, '/posts/amplifikasi')
 

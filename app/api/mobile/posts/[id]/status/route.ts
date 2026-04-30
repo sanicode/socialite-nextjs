@@ -1,6 +1,7 @@
 import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -12,6 +13,11 @@ export async function PATCH(request: Request, { params }: Ctx) {
 
     if (!payload.roles.includes('admin') && !payload.roles.includes('manager')) {
       throw new ApiError(403, 'Hanya admin atau manager yang dapat mengubah status laporan')
+    }
+
+    const reportingWindowDecision = await getNonAdminReportingWindowDecision(payload.roles)
+    if (!reportingWindowDecision.allowed) {
+      throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
     }
 
     const body = await request.json()

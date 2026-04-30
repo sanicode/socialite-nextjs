@@ -6,6 +6,8 @@ import { prisma } from '@/app/lib/prisma'
 import Link from 'next/link'
 import UserPostsTableClient from './UserPostsTableClient'
 import UserPostsFilterClient from './UserPostsFilterClient'
+import AppAlert from '@/app/components/AppAlert'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type SearchParams = Promise<{
   jenis?: string
@@ -27,6 +29,8 @@ export default async function UserPostsByStatusPage({
 
   const { userId, status } = await params
   const { jenis, category, dateFrom, dateTo } = await searchParams
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
+  const reportingWindowClosed = !reportingWindowDecision.allowed
 
   if (!userId || isNaN(Number(userId))) {
     return <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6 text-neutral-500">User ID tidak valid</div>
@@ -112,6 +116,14 @@ export default async function UserPostsByStatusPage({
           {posts.length} laporan ditemukan
         </p>
 
+        {reportingWindowClosed && (
+          <AppAlert
+            type="error"
+            title="Validasi Pelaporan Ditutup"
+            message={reportingWindowDecision.message}
+          />
+        )}
+
         {/* Table */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
           <UserPostsTableClient
@@ -120,6 +132,8 @@ export default async function UserPostsByStatusPage({
             mediaByPostId={serialize(mediaByPostId)}
             userData={serialize(userData)}
             status={status}
+            actionsDisabled={reportingWindowClosed}
+            actionsDisabledMessage={reportingWindowDecision.message}
           />
         </div>
 

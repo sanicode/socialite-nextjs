@@ -8,6 +8,7 @@ import { writeAccessLog } from '@/app/lib/access-logs'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { ApiError, requireApiEnabled } from '@/app/lib/api-auth'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const COLLECTION_NAME = 'blog-images'
@@ -16,6 +17,11 @@ export async function POST(request: NextRequest) {
   try {
     await requireApiEnabled()
     const user = await requireUser()
+    const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
+    if (!reportingWindowDecision.allowed) {
+      throw new ApiError(403, reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.')
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const { maxUploadedFileSizeBytes } = await getSecuritySettings()

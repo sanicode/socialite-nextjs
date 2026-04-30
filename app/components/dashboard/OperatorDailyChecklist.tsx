@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import Link from 'next/link'
+import AppAlert from '@/app/components/AppAlert'
 
 export type OperatorChecklistStatus = 'missing' | 'pending' | 'valid' | 'invalid'
 
@@ -24,6 +25,8 @@ type Props = {
   dateLabel: string
   platforms: string[]
   rows: OperatorChecklistRow[]
+  reportingWindowClosed?: boolean
+  reportingWindowMessage?: string | null
 }
 
 function getStatusHeaderClass(status: Exclude<OperatorChecklistStatus, 'missing'>) {
@@ -56,7 +59,13 @@ function getCountCellClass(status: Exclude<OperatorChecklistStatus, 'missing'>, 
   }
 }
 
-export default function OperatorDailyChecklist({ dateLabel, platforms, rows }: Props) {
+export default function OperatorDailyChecklist({
+  dateLabel,
+  platforms,
+  rows,
+  reportingWindowClosed = false,
+  reportingWindowMessage,
+}: Props) {
   const totalTasks = rows.reduce((total, row) => {
     return total + platforms.reduce((rowTotal, platform) => rowTotal + (row.cells[platform]?.totalCount ?? 0), 0)
   }, 0)
@@ -73,6 +82,14 @@ export default function OperatorDailyChecklist({ dateLabel, platforms, rows }: P
           Checklist tugas hari ini untuk laporan upload, amplifikasi, dan YouTube.
         </p>
       </div>
+
+      {reportingWindowClosed && (
+        <AppAlert
+          type="error"
+          title="Jam Pelaporan Ditutup"
+          message={reportingWindowMessage ?? 'Pelaporan operator sedang ditutup.'}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
@@ -100,18 +117,39 @@ export default function OperatorDailyChecklist({ dateLabel, platforms, rows }: P
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Checklist Tugas Hari Ini</h2>
           </div>
           <div className="flex gap-2">
-            <Link
-              href="/posts/upload/new"
-              className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-            >
-              Tambah Upload
-            </Link>
-            <Link
-              href="/posts/amplifikasi/new"
-              className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
-            >
-              Tambah Amplifikasi
-            </Link>
+            {reportingWindowClosed ? (
+              <>
+                <span
+                  aria-disabled="true"
+                  title={reportingWindowMessage ?? 'Pelaporan operator sedang ditutup.'}
+                  className="cursor-not-allowed rounded-lg bg-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
+                >
+                  Tambah Upload
+                </span>
+                <span
+                  aria-disabled="true"
+                  title={reportingWindowMessage ?? 'Pelaporan operator sedang ditutup.'}
+                  className="cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600"
+                >
+                  Tambah Amplifikasi
+                </span>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/posts/upload/new"
+                  className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                >
+                  Tambah Upload
+                </Link>
+                <Link
+                  href="/posts/amplifikasi/new"
+                  className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  Tambah Amplifikasi
+                </Link>
+              </>
+            )}
           </div>
         </div>
 

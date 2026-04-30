@@ -483,6 +483,12 @@ const spec: OpenApiSpec = {
           allowUnknownCountries: { type: 'boolean', default: true },
           apiEnabled: { type: 'boolean', default: true },
           maxUploadedFileSizeBytes: { type: 'integer', example: 5242880 },
+          operatorReportingWindowEnabled: { type: 'boolean', default: false },
+          operatorReportingWindowStart: { type: 'string', example: '08:00' },
+          operatorReportingWindowEnd: { type: 'string', example: '21:00' },
+          managerReportingWindowEnabled: { type: 'boolean', default: false },
+          managerReportingWindowStart: { type: 'string', example: '08:00' },
+          managerReportingWindowEnd: { type: 'string', example: '21:00' },
         },
       },
       AccessLogRow: {

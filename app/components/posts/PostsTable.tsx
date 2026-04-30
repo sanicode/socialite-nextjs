@@ -25,6 +25,10 @@ type Props = {
   defaultDateFrom?: string
   defaultDateTo?: string
   pageSize: TablePageSize
+  createDisabled?: boolean
+  createDisabledMessage?: string | null
+  actionsDisabled?: boolean
+  actionsDisabledMessage?: string | null
 }
 
 function getStatusLabel(status: string) {
@@ -44,7 +48,24 @@ function getStatusClass(status: string) {
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
 }
 
-export default function PostsTable({ posts, total, categories, page, isAdmin, canVerify, basePath = '/posts', variant = 'default', provinces, defaultDateFrom = '', defaultDateTo = '', pageSize }: Props) {
+export default function PostsTable({
+  posts,
+  total,
+  categories,
+  page,
+  isAdmin,
+  canVerify,
+  basePath = '/posts',
+  variant = 'default',
+  provinces,
+  defaultDateFrom = '',
+  defaultDateTo = '',
+  pageSize,
+  createDisabled = false,
+  createDisabledMessage,
+  actionsDisabled = false,
+  actionsDisabledMessage,
+}: Props) {
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
   const showReadOnlyStatus = !canVerify
@@ -461,9 +482,18 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                     className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400"
                   >
                     Belum ada laporan.{' '}
-                    <Link href={`${basePath}/new`} className="underline">
-                      Buat laporan pertama Anda
-                    </Link>
+                    {createDisabled ? (
+                      <span
+                        title={createDisabledMessage ?? 'Pelaporan operator sedang ditutup.'}
+                        className="cursor-not-allowed text-neutral-400 dark:text-neutral-600"
+                      >
+                        Buat laporan pertama Anda
+                      </span>
+                    ) : (
+                      <Link href={`${basePath}/new`} className="underline">
+                        Buat laporan pertama Anda
+                      </Link>
+                    )}
                   </td>
                 </tr>
               )}
@@ -623,8 +653,9 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                             }
                           })
                         }}
-                        disabled={isPending}
-                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer transition disabled:opacity-50 ${getStatusClass(post.status)}`}
+                        disabled={isPending || actionsDisabled}
+                        title={actionsDisabled ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.') : undefined}
+                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 transition disabled:cursor-not-allowed disabled:opacity-50 ${actionsDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${getStatusClass(post.status)}`}
                       >
                         <option value="pending">Pending</option>
                         <option value="valid">Valid</option>
@@ -646,12 +677,22 @@ export default function PostsTable({ posts, total, categories, page, isAdmin, ca
                   {canVerify && (
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={buildEditHref(post.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-                      >
-                        Edit
-                      </Link>
+                      {actionsDisabled ? (
+                        <span
+                          aria-disabled="true"
+                          title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
+                          className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                        >
+                          Edit
+                        </span>
+                      ) : (
+                        <Link
+                          href={buildEditHref(post.id)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                        >
+                          Edit
+                        </Link>
+                      )}
                       {isAdmin && (
                         <button
                           onClick={() => handleDelete(post.id)}

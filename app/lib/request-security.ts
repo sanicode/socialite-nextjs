@@ -15,10 +15,32 @@ export type SecuritySettings = {
   allowUnknownCountries: boolean
   apiEnabled: boolean
   maxUploadedFileSizeBytes: number
+  operatorReportingWindowEnabled: boolean
+  operatorReportingWindowStart: string
+  operatorReportingWindowEnd: string
+  managerReportingWindowEnabled: boolean
+  managerReportingWindowStart: string
+  managerReportingWindowEnd: string
 }
 
-export type SecuritySettingsInput = Partial<Omit<SecuritySettings, 'maxUploadedFileSizeBytes'>> & {
+export type SecuritySettingsInput = Partial<
+  Omit<
+    SecuritySettings,
+    | 'maxUploadedFileSizeBytes'
+    | 'operatorReportingWindowStart'
+    | 'operatorReportingWindowEnd'
+    | 'managerReportingWindowStart'
+    | 'managerReportingWindowEnd'
+  >
+> & {
   maxUploadedFileSizeBytes?: unknown
+  operatorReportingWindowStart?: unknown
+  operatorReportingWindowEnd?: unknown
+  managerReportingWindowStart?: unknown
+  managerReportingWindowEnd?: unknown
+  reportingWindowEnabled?: boolean
+  reportingWindowStart?: unknown
+  reportingWindowEnd?: unknown
 }
 
 export type RequestSecurityContext = {
@@ -32,12 +54,26 @@ export type RequestSecurityDecision = RequestSecurityContext & {
   message: string | null
 }
 
+export type ReportingWindowDecision = {
+  allowed: boolean
+  message: string | null
+  start: string
+  end: string
+  current: string
+}
+
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   blockedIps: [],
   allowedCountries: [],
   allowUnknownCountries: true,
   apiEnabled: true,
   maxUploadedFileSizeBytes: DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
+  operatorReportingWindowEnabled: false,
+  operatorReportingWindowStart: '08:00',
+  operatorReportingWindowEnd: '21:00',
+  managerReportingWindowEnabled: false,
+  managerReportingWindowStart: '08:00',
+  managerReportingWindowEnd: '21:00',
 }
 
 function normalizeIp(ip: string): string {
@@ -48,6 +84,30 @@ function normalizeCountry(country: string): string {
   return country.trim().toUpperCase()
 }
 
+function normalizeTime(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback
+  const trimmed = value.trim()
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed) ? trimmed : fallback
+}
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function getJakartaTime(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+
+  const hour = parts.find((part) => part.type === 'hour')?.value ?? '00'
+  const minute = parts.find((part) => part.type === 'minute')?.value ?? '00'
+  return `${hour === '24' ? '00' : hour}:${minute}`
+}
+
 export function normalizeSecuritySettings(input: SecuritySettingsInput): SecuritySettings {
   return {
     blockedIps: Array.from(new Set((input.blockedIps ?? []).map(normalizeIp).filter(Boolean))),
@@ -55,6 +115,24 @@ export function normalizeSecuritySettings(input: SecuritySettingsInput): Securit
     allowUnknownCountries: input.allowUnknownCountries ?? true,
     apiEnabled: input.apiEnabled ?? true,
     maxUploadedFileSizeBytes: normalizeUploadFileSizeBytes(input.maxUploadedFileSizeBytes),
+    operatorReportingWindowEnabled: input.operatorReportingWindowEnabled ?? input.reportingWindowEnabled ?? false,
+    operatorReportingWindowStart: normalizeTime(
+      input.operatorReportingWindowStart ?? input.reportingWindowStart,
+      DEFAULT_SECURITY_SETTINGS.operatorReportingWindowStart
+    ),
+    operatorReportingWindowEnd: normalizeTime(
+      input.operatorReportingWindowEnd ?? input.reportingWindowEnd,
+      DEFAULT_SECURITY_SETTINGS.operatorReportingWindowEnd
+    ),
+    managerReportingWindowEnabled: input.managerReportingWindowEnabled ?? false,
+    managerReportingWindowStart: normalizeTime(
+      input.managerReportingWindowStart,
+      DEFAULT_SECURITY_SETTINGS.managerReportingWindowStart
+    ),
+    managerReportingWindowEnd: normalizeTime(
+      input.managerReportingWindowEnd,
+      DEFAULT_SECURITY_SETTINGS.managerReportingWindowEnd
+    ),
   }
 }
 
@@ -134,6 +212,40 @@ export async function getRequestSecurityDecision(): Promise<RequestSecurityDecis
   ])
 
   return evaluateRequestSecurity(settings, context)
+}
+
+export function evaluateReportingWindow(
+  settings: SecuritySettings,
+  role: 'operator' | 'manager' = 'operator',
+  date = new Date()
+): ReportingWindowDecision {
+  const start = role === 'manager' ? settings.managerReportingWindowStart : settings.operatorReportingWindowStart
+  const end = role === 'manager' ? settings.managerReportingWindowEnd : settings.operatorReportingWindowEnd
+  const enabled = role === 'manager' ? settings.managerReportingWindowEnabled : settings.operatorReportingWindowEnabled
+  const current = getJakartaTime(date)
+
+  if (!enabled) {
+    return { allowed: true, message: null, start, end, current }
+  }
+
+  const startMinutes = timeToMinutes(start)
+  const endMinutes = timeToMinutes(end)
+  const currentMinutes = timeToMinutes(current)
+  const allowed = startMinutes <= endMinutes
+    ? currentMinutes >= startMinutes && currentMinutes <= endMinutes
+    : currentMinutes >= startMinutes || currentMinutes <= endMinutes
+
+  return {
+    allowed,
+    message: allowed
+      ? null
+      : role === 'manager'
+        ? `Validasi pelaporan hanya bisa dilakukan pada pukul ${start} sampai ${end} WIB.`
+        : `Pelaporan operator hanya bisa dilakukan pukul ${start} sampai ${end} WIB.`,
+    start,
+    end,
+    current,
+  }
 }
 
 export async function redirectIfRequestBlocked(): Promise<void> {

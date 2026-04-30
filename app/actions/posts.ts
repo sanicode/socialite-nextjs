@@ -14,6 +14,10 @@ import { formatUploadFileSize } from '@/app/lib/upload-size'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { deleteSession } from '@/app/lib/session'
 import type { TablePageSize } from '@/app/lib/table-pagination'
+import {
+  getNonAdminReportingWindowDecision,
+  getOperatorReportingWindowDecision,
+} from '@/app/lib/operator-reporting-window'
 
 async function redirectToLoginIfUnauthorized(error: unknown): Promise<never> {
   if (error instanceof Error && error.message === 'Unauthorized') {
@@ -24,7 +28,11 @@ async function redirectToLoginIfUnauthorized(error: unknown): Promise<never> {
 }
 
 export async function updatePostStatus(postId: string, status: 'pending' | 'valid' | 'invalid') {
-  await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
+  }
   try {
     await prisma.blog_posts.update({
       where: { id: BigInt(postId) },
@@ -488,6 +496,10 @@ type PostVariantOpts = {
 
 async function processCreate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
   const sessionUser = assertNotManagerOnly(await requireUser().catch(redirectToLoginIfUnauthorized))
+  const reportingWindowDecision = await getOperatorReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    return { message: reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.' }
+  }
 
   const rawTitle = (formData.get('title') as string)?.trim()
   const title = rawTitle || '-'
@@ -593,6 +605,10 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
 async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise<PostFormState> {
   const sessionUser = await requireUser().catch(redirectToLoginIfUnauthorized)
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    return { message: reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.' }
+  }
 
   const id = formData.get('id') as string
   if (!id || !/^\d+$/.test(id)) {
@@ -778,6 +794,10 @@ export async function togglePublish(id: string, currentStatus: boolean): Promise
 
 export async function updateStatus(id: string, status: 'pending' | 'valid' | 'invalid'): Promise<void> {
   const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
+  }
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {

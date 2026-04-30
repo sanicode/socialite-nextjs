@@ -7,6 +7,7 @@ import { getSecuritySettings } from '@/app/lib/request-security'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSessionUser } from '@/app/lib/session'
 import { normalizeReturnTo, refererToReturnTo } from '@/app/lib/return-to'
+import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type Params = Promise<{ id: string }>
 type SearchParams = Promise<{ returnTo?: string }>
@@ -33,6 +34,8 @@ export default async function EditUploadPage({ params, searchParams }: { params:
     })
     if (!canEdit) redirect('/posts/upload')
   }
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
+  if (!reportingWindowDecision.allowed) redirect('/posts/upload')
 
   const backHref = normalizeReturnTo(returnTo ?? refererReturnTo, '/posts/upload')
 

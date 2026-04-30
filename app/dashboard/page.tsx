@@ -20,6 +20,7 @@ import OperatorDailyChecklist, {
   type OperatorChecklistRow,
   type OperatorChecklistStatus,
 } from '@/app/components/dashboard/OperatorDailyChecklist'
+import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
 type Props = {
   searchParams: Promise<{
@@ -186,7 +187,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   }
 
   if (isOperator && !isAdmin && !isManager) {
-    const checklist = await getOperatorDailyChecklist(user.id)
+    const [checklist, reportingWindowDecision] = await Promise.all([
+      getOperatorDailyChecklist(user.id),
+      getOperatorReportingWindowDecision(user.roles),
+    ])
 
     return (
       <div className="px-4 py-5 sm:p-6">
@@ -195,6 +199,8 @@ export default async function DashboardPage({ searchParams }: Props) {
             dateLabel={checklist.dateLabel}
             platforms={OPERATOR_CHECKLIST_PLATFORMS}
             rows={checklist.rows}
+            reportingWindowClosed={!reportingWindowDecision.allowed}
+            reportingWindowMessage={reportingWindowDecision.message}
           />
         </div>
       </div>
