@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState, useEffect } from 'react'
+import { useActionState, useState, useEffect, useRef, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PostFormState, SerializedCategory, SerializedPost } from '@/app/actions/posts'
 import ImageUpload from './ImageUpload'
@@ -12,6 +12,7 @@ type Props = {
   post?: SerializedPost
   categories: SerializedCategory[]
   maxUploadFileSizeBytes: number
+  imageCompressionEnabled: boolean
   variant?: 'default' | 'upload' | 'amplifikasi'
   basePath?: string
   returnTo?: string
@@ -58,11 +59,21 @@ const ALERT_ICON = {
   ),
 }
 
-export default function PostForm({ action, post, categories, maxUploadFileSizeBytes, variant = 'default', basePath = '/posts', returnTo }: Props) {
+export default function PostForm({ action, post, categories, maxUploadFileSizeBytes, imageCompressionEnabled, variant = 'default', basePath = '/posts', returnTo }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
   const [state, formAction, pending] = useActionState(action, undefined)
   const backHref = returnTo ?? basePath
+  const screenshotFileRef = useRef<File | null>(null)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const file = screenshotFileRef.current
+    if (!file) return
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    formData.set('screenshot', file, file.name)
+    startTransition(() => formAction(formData))
+  }
 
   const showUrl        = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
@@ -141,7 +152,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
     (showScreenshot && !!screenshotClientError && !hasExistingScreenshot)
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-6">
 
       {post && <input type="hidden" name="id" value={post.id} />}
       {post?.thumbnail?.id && <input type="hidden" name="old_media_id" value={post.thumbnail.id} />}
@@ -245,8 +256,10 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
                 error={screenshotFieldError ?? undefined}
                 maxFileSizeBytes={maxUploadFileSizeBytes}
                 maxFileSizeLabel={formatUploadFileSize(maxUploadFileSizeBytes)}
+                compressionEnabled={imageCompressionEnabled}
                 onFileChange={setHasScreenshot}
                 onValidationChange={setScreenshotClientError}
+                onFileReady={(file) => { screenshotFileRef.current = file }}
               />
             </div>
           )}

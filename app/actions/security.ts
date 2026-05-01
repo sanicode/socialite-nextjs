@@ -23,6 +23,7 @@ export type SecuritySettingsState =
         allowUnknownCountries: boolean
         apiEnabled: boolean
         maxUploadedFileSizeBytes: number
+        imageCompressionEnabled: boolean
         operatorReportingWindowEnabled: boolean
         operatorReportingWindowStart: string
         operatorReportingWindowEnd: string
@@ -53,6 +54,7 @@ export async function getSecuritySettingsFormState(): Promise<NonNullable<Securi
       allowUnknownCountries: settings.allowUnknownCountries,
       apiEnabled: settings.apiEnabled,
       maxUploadedFileSizeBytes: settings.maxUploadedFileSizeBytes,
+      imageCompressionEnabled: settings.imageCompressionEnabled,
       operatorReportingWindowEnabled: settings.operatorReportingWindowEnabled,
       operatorReportingWindowStart: settings.operatorReportingWindowStart,
       operatorReportingWindowEnd: settings.operatorReportingWindowEnd,
@@ -75,6 +77,7 @@ export async function saveSecuritySettings(
     allowUnknownCountries: formData.get('allowUnknownCountries') === '1',
     apiEnabled: formData.get('apiEnabled') === '1',
     maxUploadedFileSizeBytes: formData.get('maxUploadedFileSizeBytes'),
+    imageCompressionEnabled: formData.get('imageCompressionEnabled') === '1',
     operatorReportingWindowEnabled: formData.get('operatorReportingWindowEnabled') === '1',
     operatorReportingWindowStart: formData.get('operatorReportingWindowStart'),
     operatorReportingWindowEnd: formData.get('operatorReportingWindowEnd'),
@@ -96,6 +99,7 @@ export async function saveSecuritySettings(
         allowUnknownCountries: nextSettings.allowUnknownCountries,
         apiEnabled: nextSettings.apiEnabled,
         maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+        imageCompressionEnabled: nextSettings.imageCompressionEnabled,
         operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
         operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
         operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
@@ -114,6 +118,7 @@ export async function saveSecuritySettings(
     allowUnknownCountries: nextSettings.allowUnknownCountries,
     apiEnabled: nextSettings.apiEnabled,
     maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+    imageCompressionEnabled: nextSettings.imageCompressionEnabled,
     operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
     operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
     operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
@@ -133,6 +138,7 @@ export async function saveSecuritySettings(
       allowUnknownCountries: nextSettings.allowUnknownCountries,
       apiEnabled: nextSettings.apiEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+      imageCompressionEnabled: nextSettings.imageCompressionEnabled,
       operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
       operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
       operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,

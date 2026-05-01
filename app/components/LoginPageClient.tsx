@@ -1,7 +1,7 @@
 'use client'
 
 import Script from 'next/script'
-import { useActionState, useEffect, useRef, useState } from 'react'
+import { useActionState, useCallback, useEffect, useRef, useState } from 'react'
 import { login } from '@/app/actions/auth'
 import { ToastProvider, useToast } from '@/app/components/ToastContext'
 import ToastContainer from '@/app/components/ToastContainer'
@@ -39,7 +39,7 @@ function CaptchaField({ siteKey, resetSignal }: { siteKey: string; resetSignal: 
   const [token, setToken] = useState('')
   const [ready, setReady] = useState(false)
 
-  function renderCaptcha() {
+  const renderCaptcha = useCallback(() => {
     if (!containerRef.current || !window.turnstile || widgetIdRef.current) return
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
@@ -50,24 +50,26 @@ function CaptchaField({ siteKey, resetSignal }: { siteKey: string; resetSignal: 
       'error-callback': () => setToken(''),
     })
     setReady(true)
-  }
+  }, [siteKey])
 
   useEffect(() => {
-    renderCaptcha()
+    const timer = window.setTimeout(renderCaptcha, 0)
 
     return () => {
+      window.clearTimeout(timer)
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current)
         widgetIdRef.current = null
       }
     }
-  }, [])
+  }, [renderCaptcha])
 
   useEffect(() => {
-    setToken('')
+    const timer = window.setTimeout(() => setToken(''), 0)
     if (widgetIdRef.current && window.turnstile) {
       window.turnstile.reset(widgetIdRef.current)
     }
+    return () => window.clearTimeout(timer)
   }, [resetSignal])
 
   return (

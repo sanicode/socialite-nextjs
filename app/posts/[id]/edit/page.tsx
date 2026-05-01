@@ -86,6 +86,7 @@ export default async function EditPostPage({ params, searchParams }: { params: P
             post={post}
             categories={categories}
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+            imageCompressionEnabled={securitySettings.imageCompressionEnabled}
             variant={editConfig.variant}
             basePath={editConfig.basePath}
             returnTo={backHref}

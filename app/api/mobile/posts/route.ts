@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     const ptParam    = searchParams.get('postType')
     const postType   = ptParam === 'upload' || ptParam === 'amplifikasi' ? ptParam : undefined
 
-    let userId = isOperatorJwt(payload) ? payload.sub : (searchParams.get('userId') ?? undefined)
+    const userId = isOperatorJwt(payload) ? payload.sub : (searchParams.get('userId') ?? undefined)
     let tenantId = payload.roles.includes('admin') ? (searchParams.get('tenantId') ?? undefined) : undefined
     let tenantIds: string[] | undefined
 

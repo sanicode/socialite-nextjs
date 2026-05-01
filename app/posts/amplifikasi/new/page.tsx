@@ -39,6 +39,7 @@ export default async function NewAmplifikasiPage() {
             action={createAmplifikasi}
             categories={categories}
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+            imageCompressionEnabled={securitySettings.imageCompressionEnabled}
             variant="amplifikasi"
             basePath="/posts/amplifikasi"
           />

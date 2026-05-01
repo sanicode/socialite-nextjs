@@ -84,7 +84,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
               {total} post terdaftar
             </p>
           </div>
-          {(!isManager || isAdmin) && (
+          {!isManager && !isAdmin && (
             reportingWindowClosed ? (
               <span
                 aria-disabled="true"

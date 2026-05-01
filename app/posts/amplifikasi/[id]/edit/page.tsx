@@ -59,6 +59,7 @@ export default async function EditAmplifikasiPage({ params, searchParams }: { pa
             post={post}
             categories={categories}
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+            imageCompressionEnabled={securitySettings.imageCompressionEnabled}
             variant="amplifikasi"
             basePath="/posts/amplifikasi"
             returnTo={backHref}

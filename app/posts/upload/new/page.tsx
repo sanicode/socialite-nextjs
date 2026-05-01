@@ -39,6 +39,7 @@ export default async function NewUploadPage() {
             action={createUpload}
             categories={categories}
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+            imageCompressionEnabled={securitySettings.imageCompressionEnabled}
             variant="upload"
             basePath="/posts/upload"
           />

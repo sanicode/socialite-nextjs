@@ -9,6 +9,7 @@ Login aplikasi ini berbasis:
 - identitas user dari tabel `users`
 - session cookie bertanda tangan HMAC, bukan tabel session database
 - brute-force protection 3-tier dari tabel `login_attempts`
+- Cloudflare Turnstile adaptif untuk login web saat kegagalan IP sudah melewati ambang
 - request security policy berbasis IP dan country dari config database
 - audit trail keamanan di tabel `access_logs`
 - authorization pasca-login melalui role yang di-resolve dari `model_has_roles`, `roles`, dan `tenant_user`
@@ -21,6 +22,7 @@ Implementasi utama berada di:
 - `app/lib/login-rate-limit.ts`
 - `app/lib/request-security.ts`
 - `app/lib/access-logs.ts`
+- `app/lib/captcha.ts`
 - `app/lib/permissions.ts`
 - `app/lib/authorization.ts`
 - `app/lib/api-auth.ts`
@@ -103,7 +105,19 @@ IP diambil dari header request:
 
 IP ini dipakai untuk rate limiting dan logging.
 
-### 6. Rate limit login diperiksa
+### 6. CAPTCHA adaptif diverifikasi jika diperlukan
+
+Login web mendukung Cloudflare Turnstile adaptif. Fitur aktif jika `CAPTCHA_SITE_KEY` dan `CAPTCHA_SECRET_KEY` tersedia di environment.
+
+Widget CAPTCHA baru diminta setelah IP yang sama mengalami minimal 5 kegagalan login dalam 10 menit. Jika CAPTCHA diperlukan:
+
+- token `cf-turnstile-response` wajib ada
+- token diverifikasi ke Cloudflare memakai IP request
+- jika token kosong atau tidak valid, login berhenti sebelum rate limit dan password diperiksa
+
+CAPTCHA hanya berlaku untuk login web. Mobile login tetap mengandalkan request security policy, rate limit 3-tier, dan access logging.
+
+### 7. Rate limit login diperiksa
 
 Function `checkRateLimit(email, ip)` memeriksa tabel `login_attempts` menggunakan tiga lapisan:
 
@@ -125,7 +139,7 @@ Jika salah satu tier aktif:
 
 Sebelum pengecekan, sistem juga membersihkan row `login_attempts` yang lebih lama dari 4 jam agar tabel tidak terus membesar.
 
-### 7. User dicari berdasarkan email
+### 8. User dicari berdasarkan email
 
 Jika lolos rate limit, sistem query tabel `users` berdasarkan `email`.
 
@@ -137,7 +151,7 @@ Field yang diambil:
 - `password`
 - `is_blocked`
 
-### 8. Status blokir akun diperiksa
+### 9. Status blokir akun diperiksa
 
 Jika user ditemukan tetapi `is_blocked = true`:
 
@@ -148,7 +162,7 @@ Jika user ditemukan tetapi `is_blocked = true`:
 
 Ini penting karena akun yang diblokir harus tertahan sebelum password dipakai lebih jauh.
 
-### 9. Password diverifikasi
+### 10. Password diverifikasi
 
 Jika user ada dan tidak diblokir, password diverifikasi menggunakan `bcrypt.compare()` terhadap hash di `users.password`.
 
@@ -161,7 +175,7 @@ Jika password salah atau user tidak ditemukan:
 
 Pesan generik dipakai agar sistem tidak membocorkan apakah email terdaftar atau tidak.
 
-### 10. Session dibuat saat login sukses
+### 11. Session dibuat saat login sukses
 
 Jika password benar:
 
@@ -351,6 +365,7 @@ Peran:
 - menyimpan IP blocklist
 - menyimpan country allowlist
 - menyimpan opsi `allowUnknownCountries`
+- menyimpan status REST API, batas upload, kompresi image, dan jam pelaporan/validasi
 - mengatur apakah access logging aktif
 
 ### 5. `model_has_roles`
@@ -411,10 +426,12 @@ Secara konseptual, alurnya seperti ini:
 - user bisa login sukses tetapi tetap tidak boleh mengakses fitur tertentu
 - proteksi page tidak cukup untuk melindungi server action
 - login rate limit bersifat persisten karena memakai tabel database
+- CAPTCHA web bersifat adaptif dan tidak menggantikan rate limit database
 
 ## Referensi Kode
 
 - `app/actions/auth.ts`
+- `app/lib/captcha.ts`
 - `app/lib/session.ts`
 - `app/lib/login-rate-limit.ts`
 - `app/lib/request-security.ts`

@@ -485,6 +485,7 @@ const spec: OpenApiSpec = {
           allowUnknownCountries: { type: 'boolean', default: true },
           apiEnabled: { type: 'boolean', default: true },
           maxUploadedFileSizeBytes: { type: 'integer', example: 5242880 },
+          imageCompressionEnabled: { type: 'boolean', default: true },
           operatorReportingWindowEnabled: { type: 'boolean', default: false },
           operatorReportingWindowStart: { type: 'string', example: '08:00' },
           operatorReportingWindowEnd: { type: 'string', example: '21:00' },

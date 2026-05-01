@@ -43,6 +43,7 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
   const [maxUploadedFileSizeBytes, setMaxUploadedFileSizeBytes] = useState(
     initialState.settings.maxUploadedFileSizeBytes
   )
+  const [imageCompressionEnabled, setImageCompressionEnabled] = useState(initialState.settings.imageCompressionEnabled)
   const [operatorReportingWindowEnabled, setOperatorReportingWindowEnabled] = useState(
     initialState.settings.operatorReportingWindowEnabled
   )
@@ -138,6 +139,27 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
           <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
             Batas maksimal upload pada Post. Saat ini: {formatUploadFileSize(maxUploadedFileSizeBytes)}.
           </p>
+        </div>
+
+        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={imageCompressionEnabled}
+              onChange={(event) => setImageCompressionEnabled(event.target.checked)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            />
+            <span>
+              <span className="block text-sm font-medium text-neutral-900 dark:text-white">
+                Image Compression
+              </span>
+              <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                Jika aktif, bukti screenshot operator di atas 1 MB akan dikompresi di browser sebelum dikirim.
+              </span>
+            </span>
+          </label>
+          <input type="hidden" name="imageCompressionEnabled" value={imageCompressionEnabled ? '1' : '0'} />
         </div>
 
         <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">

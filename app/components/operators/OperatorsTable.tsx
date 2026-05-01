@@ -31,11 +31,11 @@ function AttachDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
     if (query.trim().length < 2) {
-      setResults([])
+      timerRef.current = setTimeout(() => setResults([]), 0)
       return
     }
-    setSearching(true)
     timerRef.current = setTimeout(async () => {
+      setSearching(true)
       const res = await searchUsersForOperator(query)
       setResults(res)
       setSearching(false)

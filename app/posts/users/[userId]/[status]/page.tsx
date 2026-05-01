@@ -9,6 +9,7 @@ import UserPostsFilterClient from './UserPostsFilterClient'
 import AppAlert from '@/app/components/AppAlert'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { canActorAccessTenant } from '@/app/lib/tenant-access'
+import type { Prisma } from '@/app/generated/prisma/client'
 
 type SearchParams = Promise<{
   jenis?: string
@@ -16,6 +17,8 @@ type SearchParams = Promise<{
   dateFrom?: string
   dateTo?: string
 }>
+
+type PostStatus = 'pending' | 'valid' | 'invalid'
 
 export default async function UserPostsByStatusPage({
   params,
@@ -53,7 +56,7 @@ export default async function UserPostsByStatusPage({
 
   const categories = await prisma.blog_post_categories.findMany({ orderBy: { name: 'asc' } })
 
-  const where: Record<string, any> = {
+  const where: Prisma.blog_postsWhereInput = {
     user_id: userData.id,
     status,
     ...(jenis === 'upload' || jenis === 'amplifikasi' ? { source_url: jenis } : {}),
@@ -73,7 +76,8 @@ export default async function UserPostsByStatusPage({
   })
 
   const postIds = posts.map((p) => p.id)
-  let mediaByPostId: Record<string, any> = {}
+  type MediaRow = Awaited<ReturnType<typeof prisma.media.findMany>>[number]
+  let mediaByPostId: Record<string, MediaRow> = {}
   if (postIds.length > 0) {
     const media = await prisma.media.findMany({
       where: {
@@ -87,12 +91,35 @@ export default async function UserPostsByStatusPage({
       const id = m.model_id.toString()
       if (!acc[id]) acc[id] = m
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, MediaRow>)
   }
 
-  const serialize = (data: any) => JSON.parse(JSON.stringify(data, (_, v) =>
-    typeof v === 'bigint' ? v.toString() : v
-  ))
+  const serializedCategories = categories.map((item) => ({
+    id: item.id.toString(),
+    name: item.name,
+  }))
+  const serializedPosts = posts.map((post) => ({
+    id: post.id.toString(),
+    title: post.title,
+    created_at: post.created_at?.toISOString() ?? null,
+    source_url: post.source_url,
+    status: post.status as PostStatus,
+    blog_post_categories: post.blog_post_categories ? { name: post.blog_post_categories.name } : null,
+  }))
+  const serializedMediaByPostId = Object.fromEntries(
+    Object.entries(mediaByPostId).map(([id, media]) => [
+      id,
+      {
+        model_id: media.model_id.toString(),
+        file_name: media.file_name,
+        custom_properties: media.custom_properties,
+        order_column: media.order_column,
+      },
+    ])
+  )
+  const serializedUserData = {
+    name: userData.name,
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -114,7 +141,7 @@ export default async function UserPostsByStatusPage({
 
         {/* Filter */}
         <UserPostsFilterClient
-          categories={serialize(categories)}
+          categories={serializedCategories}
           jenis={jenis ?? ''}
           category={category ?? ''}
           dateFrom={dateFrom ?? ''}
@@ -138,9 +165,9 @@ export default async function UserPostsByStatusPage({
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
           <UserPostsTableClient
             key={`${jenis}-${category}-${dateFrom}-${dateTo}`}
-            posts={serialize(posts)}
-            mediaByPostId={serialize(mediaByPostId)}
-            userData={serialize(userData)}
+            posts={serializedPosts}
+            mediaByPostId={serializedMediaByPostId}
+            userData={serializedUserData}
             status={status}
             actionsDisabled={reportingWindowClosed}
             actionsDisabledMessage={reportingWindowDecision.message}

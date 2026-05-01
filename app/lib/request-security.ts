@@ -15,6 +15,7 @@ export type SecuritySettings = {
   allowUnknownCountries: boolean
   apiEnabled: boolean
   maxUploadedFileSizeBytes: number
+  imageCompressionEnabled: boolean
   operatorReportingWindowEnabled: boolean
   operatorReportingWindowStart: string
   operatorReportingWindowEnd: string
@@ -68,6 +69,7 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   allowUnknownCountries: true,
   apiEnabled: true,
   maxUploadedFileSizeBytes: DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
+  imageCompressionEnabled: true,
   operatorReportingWindowEnabled: false,
   operatorReportingWindowStart: '08:00',
   operatorReportingWindowEnd: '21:00',
@@ -115,6 +117,7 @@ export function normalizeSecuritySettings(input: SecuritySettingsInput): Securit
     allowUnknownCountries: input.allowUnknownCountries ?? true,
     apiEnabled: input.apiEnabled ?? true,
     maxUploadedFileSizeBytes: normalizeUploadFileSizeBytes(input.maxUploadedFileSizeBytes),
+    imageCompressionEnabled: input.imageCompressionEnabled ?? true,
     operatorReportingWindowEnabled: input.operatorReportingWindowEnabled ?? input.reportingWindowEnabled ?? false,
     operatorReportingWindowStart: normalizeTime(
       input.operatorReportingWindowStart ?? input.reportingWindowStart,

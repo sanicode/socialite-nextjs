@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-01
+
+### Security
+
+- Login web sekarang mendukung Cloudflare Turnstile CAPTCHA adaptif melalui `CAPTCHA_SITE_KEY` dan `CAPTCHA_SECRET_KEY`, aktif setelah IP yang sama gagal login minimal 5 kali dalam 10 menit.
+- Upload screenshot web di atas 1 MB, atau batas upload admin yang lebih kecil, sekarang dapat dikompresi di browser sebelum dikirim ke server/S3.
+- Settings Security memiliki toggle Image Compression untuk mengaktifkan atau mematikan kompresi bukti screenshot operator.
+- Setting `imageCompressionEnabled` ikut tersedia di endpoint mobile security settings dan schema OpenAPI.
+
+### Dashboard
+
+- Grafik Pelapor per Provinsi, Pelapor per Kota, Pelapor per Tanggal, dan tabel Rekapitulasi Pelaporan menghitung pelapor per tanggal dalam rentang filter: minimal satu upload dan satu amplifikasi pada tanggal tersebut.
+
 ## 2026-04-30
 
 ### Security
@@ -17,7 +30,6 @@
 - Manager multi-tenant harus memilih `tenantId` pada endpoint operator mobile yang membutuhkan konteks tenant eksplisit.
 - Query role count tenant tidak lagi menyusun nama role dari interpolasi string dinamis.
 - Upload baru ke S3 memakai object key berbasis tanggal dan lokasi untuk memudahkan backup: `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/random.ext`.
-- Login web sekarang mendukung Cloudflare Turnstile CAPTCHA adaptif melalui `CAPTCHA_SITE_KEY` dan `CAPTCHA_SECRET_KEY`, aktif setelah IP yang sama gagal login minimal 5 kali dalam 10 menit.
 
 ### Reporting Hours
 

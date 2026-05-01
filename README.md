@@ -62,7 +62,7 @@ Operator tidak bisa mengakses `/posts` (redirect ke `/posts/upload`), tidak munc
 | `/posts/users/[userId]/[status]` | Manager, Admin | Detail laporan per operator |
 | `/operators` | Manager, Admin | Manajemen akun operator |
 | `/settings/users` | Admin | Manajemen user (block/unblock, reset rate limit) |
-| `/settings/security` | Admin | Konfigurasi IP blocklist, country allowlist, ukuran upload, jam pelaporan operator, dan jam validasi manager |
+| `/settings/security` | Admin | Konfigurasi IP blocklist, country allowlist, REST API, ukuran upload, kompresi image, jam pelaporan operator, dan jam validasi manager |
 | `/settings/logs` | Admin | Access log audit trail |
 | `/settings/tenants` | Admin | Manajemen tenant |
 
@@ -92,9 +92,12 @@ Detail lengkap: [LOGIN_FLOW.md](LOGIN_FLOW.md)
 ### Submit Laporan
 
 1. User pilih kategori, isi link, upload screenshot
-2. Validasi di client dan server (format URL per platform, duplicate harian, magic bytes file upload)
-3. Post disimpan ke `blog_posts`, screenshot diunggah ke S3, metadata ke `media`
-4. Operator hanya dapat submit/edit di rentang jam operator yang diatur admin
+2. Jika Image Compression aktif, screenshot di atas 1 MB atau batas upload admin yang lebih kecil dikompresi di browser sebelum dikirim
+3. Validasi di client dan server (format URL per platform, duplicate harian, magic bytes file upload)
+4. Post disimpan ke `blog_posts`, screenshot diunggah ke S3, metadata ke `media`
+5. Operator hanya dapat submit/edit di rentang jam operator yang diatur admin
+
+Kompresi upload web dapat diaktifkan atau dimatikan admin melalui Settings -> Security -> Image Compression. Saat aktif, file di bawah 500 KB ditolak, lalu screenshot yang melebihi target dikompresi memakai canvas browser. Target kompresi adalah batas upload admin atau 1 MB, mana yang lebih kecil. Aplikasi membandingkan kandidat JPEG, WebP, dan PNG lalu memilih hasil terbesar yang masih aman di bawah target. Sisi terpanjang gambar dibatasi mulai dari 1920px dan diturunkan bertahap sampai 1080px bila semua kandidat masih terlalu besar. Validasi server tetap berjalan setelah kompresi, sehingga file yang masih terlalu besar atau bukan gambar valid akan ditolak.
 
 Format object key S3 untuk upload baru:
 
@@ -142,7 +145,7 @@ Membaca dari SQL views:
 
 Export ke Excel dengan hyperlink aktif via SheetJS.
 
-Dashboard admin dan manager menampilkan 3 card operator: Total Operator, Sudah Lapor, dan Belum Lapor. Card Sudah Lapor dan Belum Lapor dapat diklik untuk membuka dialog tabel operator sesuai filter tanggal, status, provinsi, kota, serta tenant.
+Dashboard admin dan manager menampilkan 3 card operator: Total Operator, Sudah Lapor, dan Belum Lapor. Card Sudah Lapor dan Belum Lapor dapat diklik untuk membuka dialog tabel operator sesuai filter tanggal, status, provinsi, kota, serta tenant. Definisi Sudah Lapor pada card menghitung operator unik dalam filter aktif. Grafik Pelapor per Provinsi, Pelapor per Kota, Pelapor per Tanggal, dan Rekapitulasi Pelaporan menghitung pelapor per tanggal dalam rentang filter: operator harus memiliki minimal satu laporan upload dan satu laporan amplifikasi pada tanggal tersebut.
 
 ### Summary
 
@@ -245,6 +248,8 @@ S3_SECRET_ACCESS_KEY=
 S3_BUCKET=
 NEXT_PUBLIC_S3_PUBLIC_URL=
 SENTRY_DSN=                  # opsional
+CAPTCHA_SITE_KEY=            # opsional, Cloudflare Turnstile login web
+CAPTCHA_SECRET_KEY=          # opsional, Cloudflare Turnstile login web
 ```
 
 ## Menjalankan Aplikasi

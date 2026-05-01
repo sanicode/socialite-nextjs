@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTransition, useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import type { FormEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
@@ -89,25 +90,30 @@ export default function PostsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? defaultDateFrom)
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? defaultDateTo)
+  const [filterProvinceId, setFilterProvinceId] = useState(searchParams.get('provinceId') ?? '')
+  const [filterCityId, setFilterCityId] = useState(searchParams.get('cityId') ?? '')
+  const [filterJenis, setFilterJenis] = useState(searchParams.get('jenis') ?? '')
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
+  const [filterCategory, setFilterCategory] = useState(searchParams.get('category') ?? '')
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
-  const currentProvinceId = searchParams.get('provinceId') ?? ''
-  const currentCityId = searchParams.get('cityId') ?? ''
   const showRegionFilter = isAdmin && !!provinces
 
   useEffect(() => {
     if (!showRegionFilter) return
     let cancelled = false
     async function load() {
-      if (!currentProvinceId) {
+      if (!filterProvinceId) {
         if (!cancelled) setCities([])
         return
       }
-      const next = await getCities(currentProvinceId)
+      const next = await getCities(filterProvinceId)
       if (!cancelled) setCities(next)
     }
     void load()
     return () => { cancelled = true }
-  }, [currentProvinceId, showRegionFilter])
+  }, [filterProvinceId, showRegionFilter])
 
   const currentReturnTo = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
@@ -201,20 +207,16 @@ export default function PostsTable({
     })
   }, [basePath, router, searchParams, startTransition])
 
-  const handleProvinceChange = useCallback((value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) params.set('provinceId', value)
-    else params.delete('provinceId')
-    params.delete('cityId')
-    params.delete('page')
-    startTransition(() => {
-      router.push(`${basePath}?${params.toString()}`)
-    })
-  }, [basePath, router, searchParams, startTransition])
-
   useEffect(() => {
     setSearchValue(searchParams.get('search') ?? '')
-  }, [searchParams])
+    setFilterDateFrom(searchParams.get('dateFrom') ?? defaultDateFrom)
+    setFilterDateTo(searchParams.get('dateTo') ?? defaultDateTo)
+    setFilterProvinceId(searchParams.get('provinceId') ?? '')
+    setFilterCityId(searchParams.get('cityId') ?? '')
+    setFilterJenis(searchParams.get('jenis') ?? '')
+    setFilterStatus(searchParams.get('status') ?? '')
+    setFilterCategory(searchParams.get('category') ?? '')
+  }, [defaultDateFrom, defaultDateTo, searchParams])
 
   useEffect(() => {
     const currentSearch = searchParams.get('search') ?? ''
@@ -242,6 +244,35 @@ export default function PostsTable({
     })
   }
 
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const params = new URLSearchParams(searchParams.toString())
+    const entries: Array<[string, string]> = [
+      ['dateFrom', filterDateFrom],
+      ['dateTo', filterDateTo],
+      ['status', filterStatus],
+      ['category', filterCategory],
+      ['search', searchValue],
+    ]
+
+    if (variant === 'default') entries.push(['jenis', filterJenis])
+    if (showRegionFilter) {
+      entries.push(['provinceId', filterProvinceId])
+      entries.push(['cityId', filterProvinceId ? filterCityId : ''])
+    }
+
+    for (const [key, value] of entries) {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    params.delete('page')
+
+    startTransition(() => {
+      const query = params.toString()
+      router.push(query ? `${basePath}?${query}` : basePath)
+    })
+  }
+
   return (
     <div className="space-y-4">
       {isPending && (
@@ -252,14 +283,14 @@ export default function PostsTable({
       )}
 
       {/* Filters */}
-      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <form onSubmit={applyFilters} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
             type="date"
-            defaultValue={searchParams.get('dateFrom') ?? defaultDateFrom}
+            value={filterDateFrom}
             disabled={isPending}
-            onChange={(e) => updateParam('dateFrom', e.target.value)}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
         </label>
@@ -267,9 +298,9 @@ export default function PostsTable({
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
           <input
             type="date"
-            defaultValue={searchParams.get('dateTo') ?? defaultDateTo}
+            value={filterDateTo}
             disabled={isPending}
-            onChange={(e) => updateParam('dateTo', e.target.value)}
+            onChange={(e) => setFilterDateTo(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           />
         </label>
@@ -277,9 +308,12 @@ export default function PostsTable({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Propinsi</span>
             <select
-              value={currentProvinceId}
+              value={filterProvinceId}
               disabled={isPending}
-              onChange={(e) => handleProvinceChange(e.target.value)}
+              onChange={(e) => {
+                setFilterProvinceId(e.target.value)
+                setFilterCityId('')
+              }}
               className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
             >
               <option value="">Semua Propinsi</option>
@@ -293,9 +327,9 @@ export default function PostsTable({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota</span>
             <select
-              value={currentCityId}
-              disabled={!currentProvinceId || isPending}
-              onChange={(e) => updateParam('cityId', e.target.value)}
+              value={filterCityId}
+              disabled={!filterProvinceId || isPending}
+              onChange={(e) => setFilterCityId(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:opacity-50"
             >
               <option value="">Semua Kota</option>
@@ -309,9 +343,9 @@ export default function PostsTable({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Jenis</span>
             <select
-              defaultValue={searchParams.get('jenis') ?? ''}
+              value={filterJenis}
               disabled={isPending}
-              onChange={(e) => updateParam('jenis', e.target.value)}
+              onChange={(e) => setFilterJenis(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
             >
               <option value="">Semua jenis</option>
@@ -323,9 +357,9 @@ export default function PostsTable({
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
           <select
-            defaultValue={searchParams.get('status') ?? ''}
+            value={filterStatus}
             disabled={isPending}
-            onChange={(e) => updateParam('status', e.target.value)}
+            onChange={(e) => setFilterStatus(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
             <option value="">Semua status</option>
@@ -337,9 +371,9 @@ export default function PostsTable({
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Media Sosial</span>
           <select
-            defaultValue={searchParams.get('category') ?? ''}
+            value={filterCategory}
             disabled={isPending}
-            onChange={(e) => updateParam('category', e.target.value)}
+            onChange={(e) => setFilterCategory(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
             <option value="">Semua Media Sosial</option>
@@ -350,7 +384,17 @@ export default function PostsTable({
             ))}
           </select>
         </label>
-      </div>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6 12h12m-8 7.5h4" />
+          </svg>
+          Filter
+        </button>
+      </form>
 
       {/* Bulk Action Bar */}
       {isAdmin && selectedIds.size > 0 && (
@@ -391,7 +435,7 @@ export default function PostsTable({
       {/* Table */}
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-max w-full text-sm">
             <thead>
               <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800">
                 {isAdmin && (
@@ -441,17 +485,17 @@ export default function PostsTable({
                   </th>
                 )}
                 {canVerify && (
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36 hidden md:table-cell">
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36">
                     Author
                   </th>
                 )}
                 {isAdmin && (
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36 hidden md:table-cell">
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36">
                     Propinsi
                   </th>
                 )}
                 {isAdmin && (
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36 hidden md:table-cell">
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36">
                     Kota
                   </th>
                 )}
@@ -465,10 +509,10 @@ export default function PostsTable({
                     Status
                   </th>
                 )}
-                {isAdmin && (
-                <th className="text-right px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
-                  Aksi
-                </th>
+                {canVerify && (
+                  <th className="text-right px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
+                    Aksi
+                  </th>
                 )}
               </tr>
             </thead>
@@ -610,7 +654,7 @@ export default function PostsTable({
 
                   {/* Author */}
                   {canVerify && (
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3">
                       <span className="text-xs text-neutral-600 dark:text-neutral-400">
                         {post.user?.name ?? '—'}
                       </span>
@@ -619,7 +663,7 @@ export default function PostsTable({
 
                   {/* Propinsi */}
                   {isAdmin && (
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3">
                       <span className="text-xs text-neutral-600 dark:text-neutral-400">
                         {post.province ?? '—'}
                       </span>
@@ -628,7 +672,7 @@ export default function PostsTable({
 
                   {/* Kota */}
                   {isAdmin && (
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3">
                       <span className="text-xs text-neutral-600 dark:text-neutral-400">
                         {post.city ?? '—'}
                       </span>
@@ -673,35 +717,35 @@ export default function PostsTable({
 
                   {/* Actions */}
                   {canVerify && (
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      {actionsDisabled ? (
-                        <span
-                          aria-disabled="true"
-                          title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
-                          className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
-                        >
-                          Edit
-                        </span>
-                      ) : (
-                        <Link
-                          href={buildEditHref(post.id)}
-                          className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-                        >
-                          Edit
-                        </Link>
-                      )}
-                      {isAdmin && (
-                        <button
-                          onClick={() => handleDelete(post.id)}
-                          disabled={deletingId === post.id || isPending}
-                          className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50"
-                        >
-                          {deletingId === post.id ? '...' : 'Hapus'}
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        {actionsDisabled ? (
+                          <span
+                            aria-disabled="true"
+                            title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
+                            className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                          >
+                            Edit
+                          </span>
+                        ) : (
+                          <Link
+                            href={buildEditHref(post.id)}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                          >
+                            Edit
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(post.id)}
+                            disabled={deletingId === post.id || isPending}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50"
+                          >
+                            {deletingId === post.id ? '...' : 'Hapus'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   )}
                 </tr>
               ))}

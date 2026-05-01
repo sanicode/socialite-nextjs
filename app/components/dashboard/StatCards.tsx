@@ -84,13 +84,17 @@ function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () 
     : filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
-    setSearch('')
-    setPage(1)
-    setPageSize(10)
+    const timer = window.setTimeout(() => {
+      setSearch('')
+      setPage(1)
+      setPageSize(10)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [dialog])
 
   useEffect(() => {
-    setPage(1)
+    const timer = window.setTimeout(() => setPage(1), 0)
+    return () => window.clearTimeout(timer)
   }, [search, pageSize])
 
   if (!dialog) return null

@@ -12,6 +12,7 @@ export default async function NewPostPage() {
   if (!user) redirect('/login')
   const isAdmin = user.roles.includes('admin')
   const isManager = user.roles.includes('manager')
+  if (isAdmin) redirect('/posts')
   if (isManager && !isAdmin) redirect('/posts')
   const reportingWindowDecision = await getOperatorReportingWindowDecision(user.roles)
   if (!reportingWindowDecision.allowed) redirect('/posts/upload?reportingWindow=closed')
@@ -43,6 +44,7 @@ export default async function NewPostPage() {
             action={createPost}
             categories={categories}
             maxUploadFileSizeBytes={securitySettings.maxUploadedFileSizeBytes}
+            imageCompressionEnabled={securitySettings.imageCompressionEnabled}
           />
         </div>
       </div>

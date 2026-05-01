@@ -64,23 +64,6 @@ export type ReportRow = Record<string, unknown>
 
 const BLOG_POST_JAKARTA_DATE_SQL = `date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
 
-const REKAPITULASI_REPORT_COLUMNS = [
-  'tanggal_pelaporan',
-  'email',
-  'nama_operator',
-  'no_hp',
-  'propinsi',
-  'kabupaten_kota',
-  'tiktok_link',
-  'instagram_link',
-  'facebook_link',
-  'youtube_link',
-  'amplifikasi_1',
-  'amplifikasi_2',
-  'amplifikasi_3',
-  'amplifikasi_4',
-].map((column) => `v.${column}`).join(',\n      ')
-
 function buildBlogPostReportFilters(filters: DashboardFilters) {
   const conditions: string[] = [
     `bp.source_url IN ('upload', 'amplifikasi')`,
@@ -123,6 +106,44 @@ function buildBlogPostReportFilters(filters: DashboardFilters) {
     whereClause: `WHERE ${conditions.join(' AND ')}`,
     params,
   }
+}
+
+function buildDailyReportedOperatorsCte(whereClause: string) {
+  return `
+    WITH daily_reported_operators AS (
+      SELECT
+        ${BLOG_POST_JAKARTA_DATE_SQL} AS tanggal_pelaporan,
+        bp.user_id,
+        bp.tenant_id,
+        rp.name AS province,
+        rc.name AS city
+      FROM blog_posts bp
+      INNER JOIN users u ON u.id = bp.user_id
+      INNER JOIN tenant_user tu
+        ON tu.user_id = bp.user_id
+       AND tu.tenant_id = bp.tenant_id
+      INNER JOIN model_has_roles mhr
+        ON mhr.model_id = tu.id
+       AND mhr.model_type = 'App\\Models\\TenantUser'
+      INNER JOIN roles r
+        ON r.id = mhr.role_id
+       AND r.name = 'operator'
+      LEFT JOIN LATERAL (
+        SELECT a.city_id
+        FROM addresses a
+        WHERE a.tenant_id = tu.tenant_id
+        ORDER BY a.id ASC
+        LIMIT 1
+      ) addr ON true
+      LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+      LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+      ${whereClause}
+        AND COALESCE(u.is_blocked, false) = false
+      GROUP BY ${BLOG_POST_JAKARTA_DATE_SQL}, bp.user_id, bp.tenant_id, rp.name, rc.name
+      HAVING COUNT(*) FILTER (WHERE bp.source_url = 'upload') > 0
+         AND COUNT(*) FILTER (WHERE bp.source_url = 'amplifikasi') > 0
+    )
+  `
 }
 
 const getProvincesCached = cache(async () => {
@@ -302,24 +323,13 @@ export async function getPostsByProvince(filters: DashboardFilters): Promise<Cha
   const { whereClause, params } = buildBlogPostReportFilters(filters)
 
   const result = await prisma.$queryRawUnsafe<{ name: string; value: bigint }[]>(
-    `SELECT
-       rp.name,
-       COUNT(DISTINCT (bp.user_id, bp.tenant_id, ${BLOG_POST_JAKARTA_DATE_SQL})) AS value
-     FROM blog_posts bp
-     INNER JOIN tenant_user tu ON tu.user_id = bp.user_id
-       AND tu.tenant_id = bp.tenant_id
-     LEFT JOIN LATERAL (
-       SELECT a.city_id
-       FROM addresses a
-       WHERE a.tenant_id = tu.tenant_id
-       ORDER BY a.id ASC
-       LIMIT 1
-     ) addr ON true
-     LEFT JOIN reg_cities rc ON rc.id = addr.city_id
-     LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
-     ${whereClause}
-       AND rp.name IS NOT NULL
-     GROUP BY rp.id, rp.name
+    `${buildDailyReportedOperatorsCte(whereClause)}
+     SELECT
+       province AS name,
+       COUNT(*) AS value
+     FROM daily_reported_operators
+     WHERE province IS NOT NULL
+     GROUP BY province
      ORDER BY value DESC`,
     ...params
   )
@@ -360,25 +370,13 @@ export async function getProvinceChartData(filters: DashboardFilters): Promise<P
 
   const [postRows, opRows] = await Promise.all([
     prisma.$queryRawUnsafe<{ name: string; posts: bigint }[]>(
-      `SELECT
-         rp.name AS name,
-         COUNT(DISTINCT (bp.user_id, bp.tenant_id, ${BLOG_POST_JAKARTA_DATE_SQL})) AS posts
-       FROM blog_posts bp
-       INNER JOIN tenant_user tu
-         ON tu.user_id = bp.user_id
-        AND tu.tenant_id = bp.tenant_id
-       LEFT JOIN LATERAL (
-         SELECT a.city_id
-         FROM addresses a
-         WHERE a.tenant_id = tu.tenant_id
-         ORDER BY a.id ASC
-         LIMIT 1
-       ) addr ON true
-       LEFT JOIN reg_cities rc ON rc.id = addr.city_id
-       LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
-       ${whereClause}
-         AND rp.name IS NOT NULL
-       GROUP BY rp.id, rp.name`,
+      `${buildDailyReportedOperatorsCte(whereClause)}
+       SELECT
+         province AS name,
+         COUNT(*) AS posts
+       FROM daily_reported_operators
+       WHERE province IS NOT NULL
+       GROUP BY province`,
       ...params
     ),
     prisma.$queryRawUnsafe<{ name: string; operators: bigint }[]>(
@@ -455,27 +453,15 @@ export async function getTopCitiesByPosts(filters: DashboardFilters): Promise<Ci
 
   const [postRows, opRows] = await Promise.all([
     prisma.$queryRawUnsafe<{ province: string; name: string; posts: bigint }[]>(
-      `SELECT
-         rp.name AS province,
-         rc.name AS name,
-         COUNT(DISTINCT (bp.user_id, bp.tenant_id, ${BLOG_POST_JAKARTA_DATE_SQL})) AS posts
-       FROM blog_posts bp
-       INNER JOIN tenant_user tu
-         ON tu.user_id = bp.user_id
-        AND tu.tenant_id = bp.tenant_id
-       LEFT JOIN LATERAL (
-         SELECT a.city_id
-         FROM addresses a
-         WHERE a.tenant_id = tu.tenant_id
-         ORDER BY a.id ASC
-         LIMIT 1
-       ) addr ON true
-       LEFT JOIN reg_cities rc ON rc.id = addr.city_id
-       LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
-       ${whereClause}
-         AND rp.name IS NOT NULL
-         AND rc.name IS NOT NULL
-       GROUP BY rp.id, rp.name, rc.id, rc.name`,
+      `${buildDailyReportedOperatorsCte(whereClause)}
+       SELECT
+         province,
+         city AS name,
+         COUNT(*) AS posts
+       FROM daily_reported_operators
+       WHERE province IS NOT NULL
+         AND city IS NOT NULL
+       GROUP BY province, city`,
       ...params
     ),
     prisma.$queryRawUnsafe<{ province: string; name: string; operators: bigint }[]>(
@@ -563,6 +549,12 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
       INNER JOIN tenant_user tu
         ON tu.user_id = bp.user_id
        AND tu.tenant_id = bp.tenant_id
+      INNER JOIN model_has_roles mhr
+        ON mhr.model_id = tu.id
+       AND mhr.model_type = 'App\\Models\\TenantUser'
+      INNER JOIN roles r
+        ON r.id = mhr.role_id
+       AND r.name = 'operator'
       LEFT JOIN LATERAL (
         SELECT a.city_id
         FROM addresses a
@@ -578,6 +570,7 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
        AND m.model_id = bp.id
        AND m.collection_name = 'blog-images'
       ${whereClause}
+        AND COALESCE(u.is_blocked, false) = false
     ),
     numbered AS (
       SELECT
@@ -608,6 +601,8 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
       MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4
     FROM numbered
     GROUP BY tanggal_pelaporan, email, nama_operator, no_hp, propinsi, kabupaten_kota
+    HAVING COUNT(*) FILTER (WHERE source_url = 'upload') > 0
+       AND COUNT(*) FILTER (WHERE source_url = 'amplifikasi') > 0
     ORDER BY tanggal_pelaporan DESC, nama_operator
     `,
     ...params
@@ -630,23 +625,12 @@ export async function getPostsByDate(filters: DashboardFilters): Promise<ChartIt
   const { whereClause, params } = buildBlogPostReportFilters(filters)
   const result = await prisma.$queryRawUnsafe<{ date: string; value: bigint }[]>(
     `
+    ${buildDailyReportedOperatorsCte(whereClause)}
     SELECT
-      to_char(${BLOG_POST_JAKARTA_DATE_SQL}, 'YYYY-MM-DD') AS date,
-      COUNT(DISTINCT (bp.user_id, bp.tenant_id, ${BLOG_POST_JAKARTA_DATE_SQL})) AS value
-    FROM blog_posts bp
-    INNER JOIN tenant_user tu
-      ON tu.user_id = bp.user_id
-     AND tu.tenant_id = bp.tenant_id
-    LEFT JOIN LATERAL (
-      SELECT a.city_id
-      FROM addresses a
-      WHERE a.tenant_id = tu.tenant_id
-      ORDER BY a.id ASC
-      LIMIT 1
-    ) addr ON true
-    LEFT JOIN reg_cities rc ON rc.id = addr.city_id
-    ${whereClause}
-    GROUP BY ${BLOG_POST_JAKARTA_DATE_SQL}
+      to_char(tanggal_pelaporan, 'YYYY-MM-DD') AS date,
+      COUNT(*) AS value
+    FROM daily_reported_operators
+    GROUP BY tanggal_pelaporan
     ORDER BY date ASC
     `,
     ...params

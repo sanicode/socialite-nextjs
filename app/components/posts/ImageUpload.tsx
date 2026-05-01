@@ -2,14 +2,167 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
+import { BYTES_IN_KB, BYTES_IN_MB, formatUploadFileSize } from '@/app/lib/upload-size'
 
 type Props = {
   currentUrl?: string | null
   error?: string
   maxFileSizeBytes: number
   maxFileSizeLabel: string
+  compressionEnabled?: boolean
   onFileChange?: (hasFile: boolean) => void
   onValidationChange?: (message: string | null) => void
+  onFileReady?: (file: File | null) => void
+}
+
+const MIN_SCREENSHOT_BYTES = 500 * BYTES_IN_KB
+const IMAGE_COMPRESSION_THRESHOLD_BYTES = 1 * BYTES_IN_MB
+const IMAGE_COMPRESSION_MAX_DIMENSION = 1920
+const IMAGE_COMPRESSION_MIN_DIMENSION = 1080
+const IMAGE_COMPRESSION_MAX_QUALITY = 1
+const IMAGE_COMPRESSION_MIN_QUALITY = 0.5
+const IMAGE_COMPRESSION_QUALITY_SEARCH_STEPS = 10
+
+type CompressionFormat = {
+  mime: 'image/jpeg' | 'image/webp' | 'image/png'
+  ext: 'jpg' | 'webp' | 'png'
+  quality?: boolean
+}
+
+type CompressionCandidate = {
+  blob: Blob
+  ext: CompressionFormat['ext']
+}
+
+const IMAGE_COMPRESSION_FORMATS: CompressionFormat[] = [
+  { mime: 'image/jpeg', ext: 'jpg', quality: true },
+  { mime: 'image/webp', ext: 'webp', quality: true },
+  { mime: 'image/png', ext: 'png' },
+]
+
+function getCompressedFileName(fileName: string, ext: CompressionFormat['ext']) {
+  const baseName = fileName.replace(/\.[^.]+$/, '') || 'screenshot'
+  return `${baseName}.${ext}`
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const image = document.createElement('img')
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Gambar tidak dapat dibaca.'))
+    }
+    image.src = url
+  })
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, mime: CompressionFormat['mime'], quality?: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error('Kompresi gambar gagal.')),
+      mime,
+      quality
+    )
+  })
+}
+
+// Compress the file so its size is <= targetBytes.
+// targetBytes is the admin-configured maximum (e.g. 1 MB), not the 500 KB floor.
+async function compressImageFile(file: File, targetBytes: number): Promise<File> {
+  const image = await loadImageFromFile(file)
+  const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
+  let maxDimension = Math.min(IMAGE_COMPRESSION_MAX_DIMENSION, longestSide)
+  let candidate = await compressImageToTarget(image, maxDimension, targetBytes)
+
+  while (candidate.blob.size > targetBytes && maxDimension > IMAGE_COMPRESSION_MIN_DIMENSION) {
+    maxDimension = Math.max(IMAGE_COMPRESSION_MIN_DIMENSION, Math.round(maxDimension * 0.9))
+    candidate = await compressImageToTarget(image, maxDimension, targetBytes)
+  }
+
+  return new File([candidate.blob], getCompressedFileName(file.name, candidate.ext), {
+    type: candidate.blob.type,
+    lastModified: Date.now(),
+  })
+}
+
+async function compressImageToTarget(
+  image: HTMLImageElement,
+  maxDimension: number,
+  targetBytes: number,
+): Promise<CompressionCandidate> {
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Browser tidak mendukung kompresi gambar.')
+  context.drawImage(image, 0, 0, width, height)
+
+  const candidates: CompressionCandidate[] = []
+  let smallestOversized: CompressionCandidate | null = null
+
+  function trackCandidate(candidate: CompressionCandidate) {
+    if (candidate.blob.size <= targetBytes) {
+      candidates.push(candidate)
+      return
+    }
+    if (!smallestOversized || candidate.blob.size < smallestOversized.blob.size) {
+      smallestOversized = candidate
+    }
+  }
+
+  for (const format of IMAGE_COMPRESSION_FORMATS) {
+    const maxQualityBlob = await canvasToBlob(canvas, format.mime, format.quality ? IMAGE_COMPRESSION_MAX_QUALITY : undefined)
+    const maxQualityCandidate = { blob: maxQualityBlob, ext: format.ext }
+    trackCandidate(maxQualityCandidate)
+
+    if (!format.quality || maxQualityBlob.size <= targetBytes) {
+      continue
+    }
+
+    const minQualityBlob = await canvasToBlob(canvas, format.mime, IMAGE_COMPRESSION_MIN_QUALITY)
+    const minQualityCandidate = { blob: minQualityBlob, ext: format.ext }
+    trackCandidate(minQualityCandidate)
+    if (minQualityBlob.size > targetBytes) {
+      continue
+    }
+
+    let lowerQuality = IMAGE_COMPRESSION_MIN_QUALITY
+    let upperQuality = IMAGE_COMPRESSION_MAX_QUALITY
+    let bestCandidate = minQualityCandidate
+
+    for (let step = 0; step < IMAGE_COMPRESSION_QUALITY_SEARCH_STEPS; step += 1) {
+      const quality = (lowerQuality + upperQuality) / 2
+      const blob = await canvasToBlob(canvas, format.mime, quality)
+
+      if (blob.size <= targetBytes) {
+        bestCandidate = { blob, ext: format.ext }
+        lowerQuality = quality
+      } else {
+        upperQuality = quality
+      }
+    }
+
+    trackCandidate(bestCandidate)
+  }
+
+  // Pick the largest candidate that still fits under targetBytes (= best visual quality).
+  const bestUnderTarget = candidates.sort((a, b) => b.blob.size - a.blob.size)[0]
+  return bestUnderTarget ?? smallestOversized ?? { blob: await canvasToBlob(canvas, 'image/jpeg', IMAGE_COMPRESSION_MIN_QUALITY), ext: 'jpg' }
+}
+
+function setInputFile(input: HTMLInputElement, file: File) {
+  const dataTransfer = new DataTransfer()
+  dataTransfer.items.add(file)
+  input.files = dataTransfer.files
 }
 
 export default function ImageUpload({
@@ -17,20 +170,76 @@ export default function ImageUpload({
   error,
   maxFileSizeBytes,
   maxFileSizeLabel,
+  compressionEnabled = true,
   onFileChange,
   onValidationChange,
+  onFileReady,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(currentUrl ?? null)
   const [isExisting, setIsExisting] = useState<boolean>(!!currentUrl)
+  const [compressionMessage, setCompressionMessage] = useState<string | null>(null)
+  const [fileSize, setFileSize] = useState<number | null>(null)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0]
+    if (!selectedFile) return
+    let file = selectedFile
     const hasUsableScreenshot = Boolean(preview)
+    setCompressionMessage(null)
+
+    // Reject files below the 500 KB minimum before any processing.
+    if (selectedFile.size < MIN_SCREENSHOT_BYTES) {
+      e.target.value = ''
+      onValidationChange?.(
+        `Ukuran screenshot terlalu kecil (${formatUploadFileSize(selectedFile.size)}). ` +
+        `Screenshot harus minimal ${formatUploadFileSize(MIN_SCREENSHOT_BYTES)}.`
+      )
+      onFileChange?.(hasUsableScreenshot)
+      return
+    }
+
+    // Compress when the file exceeds 1 MB (or the admin-configured maximum, whichever is lower).
+    const compressionTarget = Math.min(maxFileSizeBytes, IMAGE_COMPRESSION_THRESHOLD_BYTES)
+    if (compressionEnabled && selectedFile.size > compressionTarget) {
+      e.target.value = ''
+      onFileChange?.(hasUsableScreenshot)
+      onValidationChange?.(null)
+      setCompressionMessage(`Mengompresi gambar ${formatUploadFileSize(selectedFile.size)}...`)
+
+      try {
+        file = await compressImageFile(selectedFile, compressionTarget)
+
+        // Compression must not drop below the 500 KB floor.
+        if (file.size < MIN_SCREENSHOT_BYTES) {
+          setCompressionMessage(null)
+          onValidationChange?.(
+            `Hasil kompresi terlalu kecil (${formatUploadFileSize(file.size)}). ` +
+            `Screenshot harus tetap minimal ${formatUploadFileSize(MIN_SCREENSHOT_BYTES)} setelah dikompresi.`
+          )
+          onFileChange?.(hasUsableScreenshot)
+          return
+        }
+
+        if (file.size > maxFileSizeBytes) {
+          throw new Error('Hasil kompresi masih terlalu besar.')
+        }
+
+        if (inputRef.current) setInputFile(inputRef.current, file)
+        setCompressionMessage(
+          `Dikompresi dari ${formatUploadFileSize(selectedFile.size)} menjadi ${formatUploadFileSize(file.size)}.`
+        )
+      } catch {
+        setCompressionMessage(null)
+        onValidationChange?.('Kompresi gambar gagal. Pilih gambar lain atau gunakan file yang lebih kecil.')
+        onFileChange?.(hasUsableScreenshot)
+        return
+      }
+    }
 
     if (file.size > maxFileSizeBytes) {
       if (inputRef.current) inputRef.current.value = ''
+      setCompressionMessage(null)
       onValidationChange?.(
         hasUsableScreenshot
           ? `Ukuran file terlalu besar (maks ${maxFileSizeLabel}). Screenshot lama tetap digunakan.`
@@ -40,21 +249,25 @@ export default function ImageUpload({
       return
     }
 
-    // Revoke previous object URL to avoid memory leaks
     if (preview && !isExisting) URL.revokeObjectURL(preview)
     setPreview(URL.createObjectURL(file))
     setIsExisting(false)
+    setFileSize(file.size)
     onValidationChange?.(null)
     onFileChange?.(true)
+    onFileReady?.(file)
   }
 
   function handleClear() {
     if (preview && !isExisting) URL.revokeObjectURL(preview)
     setPreview(null)
     setIsExisting(false)
+    setCompressionMessage(null)
+    setFileSize(null)
     if (inputRef.current) inputRef.current.value = ''
     onValidationChange?.(null)
     onFileChange?.(false)
+    onFileReady?.(null)
   }
 
   return (
@@ -78,6 +291,13 @@ export default function ImageUpload({
               Hapus
             </button>
           </div>
+          {fileSize !== null && (
+            <div className="absolute bottom-2 left-2">
+              <span className="bg-black/50 text-white text-xs px-2 py-0.5 rounded-md">
+                {formatUploadFileSize(fileSize)}
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <button
@@ -93,11 +313,13 @@ export default function ImageUpload({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span className="text-sm font-medium">Klik untuk pilih gambar</span>
-          <span className="text-xs">JPG, PNG, GIF, WebP — maks {maxFileSizeLabel}</span>
+          <span className="text-xs">
+            JPG, PNG, GIF, WebP — min 500 KB, maks {maxFileSizeLabel}
+            {compressionEnabled ? ', kompresi aktif' : ''}
+          </span>
         </button>
       )}
 
-      {/* Actual file input — part of the form, submitted with the form */}
       <input
         ref={inputRef}
         type="file"
@@ -108,6 +330,9 @@ export default function ImageUpload({
       />
 
       {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+      {compressionMessage && !error && (
+        <p className="text-xs text-green-600 dark:text-green-400">{compressionMessage}</p>
+      )}
     </div>
   )
 }

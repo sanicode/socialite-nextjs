@@ -35,12 +35,15 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
   const [rangeError, setRangeError] = useState('')
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParamsString)
-    setDateFrom(defaultDateFrom)
-    setDateTo(defaultDateTo)
-    setStatus(params.get('status') ?? '')
-    setProvinceId(params.get('provinceId') ?? '')
-    setCityId(params.get('cityId') ?? '')
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParamsString)
+      setDateFrom(defaultDateFrom)
+      setDateTo(defaultDateTo)
+      setStatus(params.get('status') ?? '')
+      setProvinceId(params.get('provinceId') ?? '')
+      setCityId(params.get('cityId') ?? '')
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [defaultDateFrom, defaultDateTo, searchParamsString])
 
   useEffect(() => {

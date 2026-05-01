@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ReportRow } from '@/app/actions/dashboard'
 import * as XLSX from 'xlsx'
 import { getPageSlice, TABLE_PAGE_SIZE_OPTIONS, type TablePageSize } from '@/app/lib/table-pagination'
@@ -17,10 +17,6 @@ export default function ReportTable({ data }: Props) {
   const { totalPages, start, end } = getPageSlice(page, pageSize, data.length)
   const currentPage = Math.min(page, totalPages)
   const pageData = pageSize === 'all' ? data : data.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-
-  useEffect(() => {
-    setPage(1)
-  }, [pageSize])
 
   function isUrl(value: unknown): value is string {
     if (typeof value !== 'string') return false
@@ -105,7 +101,10 @@ export default function ReportTable({ data }: Props) {
         <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
           <select
             value={String(pageSize)}
-            onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            onChange={(e) => {
+              setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))
+              setPage(1)
+            }}
             className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
           >
             {TABLE_PAGE_SIZE_OPTIONS.map((option) => (

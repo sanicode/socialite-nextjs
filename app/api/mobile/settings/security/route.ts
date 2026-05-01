@@ -26,6 +26,7 @@ export async function PUT(request: Request) {
     await requireApiEnabled()
     const admin = await requireJwtRole(request, 'admin')
     const body = await request.json()
+    const currentSettings = await getSecuritySettings()
 
     const nextSettings = normalizeSecuritySettings({
       blockedIps: Array.isArray(body.blockedIps) ? body.blockedIps : [],
@@ -33,6 +34,7 @@ export async function PUT(request: Request) {
       allowUnknownCountries: body.allowUnknownCountries ?? true,
       apiEnabled: body.apiEnabled ?? true,
       maxUploadedFileSizeBytes: body.maxUploadedFileSizeBytes,
+      imageCompressionEnabled: body.imageCompressionEnabled ?? currentSettings.imageCompressionEnabled,
       operatorReportingWindowEnabled: body.operatorReportingWindowEnabled ?? body.reportingWindowEnabled ?? false,
       operatorReportingWindowStart: body.operatorReportingWindowStart ?? body.reportingWindowStart,
       operatorReportingWindowEnd: body.operatorReportingWindowEnd ?? body.reportingWindowEnd,
@@ -50,6 +52,7 @@ export async function PUT(request: Request) {
       allowUnknownCountries: nextSettings.allowUnknownCountries,
       apiEnabled: nextSettings.apiEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
+      imageCompressionEnabled: nextSettings.imageCompressionEnabled,
       operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
       operatorReportingWindowStart: nextSettings.operatorReportingWindowStart,
       operatorReportingWindowEnd: nextSettings.operatorReportingWindowEnd,
