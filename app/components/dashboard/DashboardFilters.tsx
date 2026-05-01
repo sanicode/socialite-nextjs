@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition } from 'react'
+import type { FormEvent } from 'react'
 import { getCities } from '@/app/actions/dashboard'
 import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 
@@ -22,27 +23,36 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const searchParamsString = searchParams.toString()
   const [isPending, startTransition] = useTransition()
 
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
   const [dateFrom, setDateFrom] = useState(defaultDateFrom)
   const [dateTo, setDateTo] = useState(defaultDateTo)
+  const [status, setStatus] = useState(searchParams.get('status') ?? '')
+  const [provinceId, setProvinceId] = useState(searchParams.get('provinceId') ?? '')
+  const [cityId, setCityId] = useState(searchParams.get('cityId') ?? '')
   const [rangeError, setRangeError] = useState('')
 
-  const currentProvinceId = searchParams.get('provinceId') ?? ''
-  const currentCityId = searchParams.get('cityId') ?? ''
-  const currentStatus = searchParams.get('status') ?? ''
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsString)
+    setDateFrom(defaultDateFrom)
+    setDateTo(defaultDateTo)
+    setStatus(params.get('status') ?? '')
+    setProvinceId(params.get('provinceId') ?? '')
+    setCityId(params.get('cityId') ?? '')
+  }, [defaultDateFrom, defaultDateTo, searchParamsString])
 
   useEffect(() => {
     let cancelled = false
 
     async function loadCities() {
-      if (!currentProvinceId) {
+      if (!provinceId) {
         if (!cancelled) setCities([])
         return
       }
 
-      const nextCities = await getCities(currentProvinceId)
+      const nextCities = await getCities(provinceId)
       if (!cancelled) setCities(nextCities)
     }
 
@@ -51,16 +61,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     return () => {
       cancelled = true
     }
-  }, [currentProvinceId])
-
-  function applyDates(from: string, to: string) {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('dateFrom', from)
-    params.set('dateTo', to)
-    startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`)
-    })
-  }
+  }, [provinceId])
 
   function handleDateFrom(val: string) {
     if (!val) return
@@ -70,7 +71,6 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     const newTo = dateTo > maxTo ? maxTo : dateTo < val ? val : dateTo
     setDateFrom(val)
     setDateTo(newTo)
-    applyDates(val, newTo)
   }
 
   function handleDateTo(val: string) {
@@ -79,28 +79,47 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
     if (val > maxTo) {
       setRangeError('Rentang maksimal 1 bulan. Tanggal akhir disesuaikan otomatis.')
       setDateTo(maxTo)
-      applyDates(dateFrom, maxTo)
       return
     }
     if (val < dateFrom) {
       setRangeError('')
       setDateTo(dateFrom)
-      applyDates(dateFrom, dateFrom)
       return
     }
     setRangeError('')
     setDateTo(val)
-    applyDates(dateFrom, val)
   }
 
-  function updateParam(key: string, value: string) {
+  function handleProvinceChange(value: string) {
+    setProvinceId(value)
+    setCityId('')
+  }
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
     const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
+    params.set('dateFrom', dateFrom)
+    params.set('dateTo', dateTo)
+
+    if (status) {
+      params.set('status', status)
     } else {
-      params.delete(key)
+      params.delete('status')
     }
-    if (key === 'provinceId') params.delete('cityId')
+
+    if (isAdmin && provinceId) {
+      params.set('provinceId', provinceId)
+    } else {
+      params.delete('provinceId')
+    }
+
+    if (isAdmin && provinceId && cityId) {
+      params.set('cityId', cityId)
+    } else {
+      params.delete('cityId')
+    }
+
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })
@@ -118,7 +137,7 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
         />
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
+      <form onSubmit={applyFilters} className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
@@ -152,9 +171,9 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
           <select
-            value={currentStatus}
+            value={status}
             disabled={isPending}
-            onChange={(e) => updateParam('status', e.target.value)}
+            onChange={(e) => setStatus(e.target.value)}
             className="sm:w-40 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
           >
             <option value="">Semua Status</option>
@@ -167,9 +186,9 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Propinsi</span>
             <select
-              value={currentProvinceId}
+              value={provinceId}
               disabled={isPending}
-              onChange={(e) => updateParam('provinceId', e.target.value)}
+              onChange={(e) => handleProvinceChange(e.target.value)}
               className="sm:w-52 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
             >
               <option value="">Semua Propinsi</option>
@@ -185,9 +204,9 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota</span>
             <select
-              value={currentCityId}
-              onChange={(e) => updateParam('cityId', e.target.value)}
-              disabled={!currentProvinceId || isPending}
+              value={cityId}
+              onChange={(e) => setCityId(e.target.value)}
+              disabled={!provinceId || isPending}
               className="sm:w-52 px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:opacity-50"
             >
               <option value="">Semua Kota</option>
@@ -199,7 +218,17 @@ export default function DashboardFilters({ provinces, isAdmin, defaultDateFrom, 
             </select>
           </label>
         )}
-      </div>
+        <button
+          type="submit"
+          disabled={isPending || Boolean(rangeError)}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
+          </svg>
+          Filter
+        </button>
+      </form>
       {rangeError && (
         <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
           <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
