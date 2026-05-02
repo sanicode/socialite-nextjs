@@ -31,7 +31,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
   const isManager = sessionUser.roles.includes('manager')
   const isOperator = !isAdmin && !isManager
   if (isOperator) redirect('/posts/upload')
-  const canVerify = isAdmin || isManager
+  const canVerify = isAdmin
   const sortOrder = (params.sort === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed

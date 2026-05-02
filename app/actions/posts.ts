@@ -37,6 +37,9 @@ export async function updatePostStatus(postId: string, status: 'pending' | 'vali
   if (!reportingWindowDecision.allowed) {
     throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
   }
+  if (!sessionUser.roles.includes('admin') && status !== 'pending') {
+    throw new Error('Validasi manager dilakukan dari halaman View operator.')
+  }
   try {
     const post = await prisma.blog_posts.findUnique({
       where: { id: BigInt(postId) },
@@ -65,6 +68,176 @@ export async function updatePostStatus(postId: string, status: 'pending' | 'vali
   } catch (error) {
     console.error(error)
     throw new Error("Failed to update status")
+  }
+}
+
+export async function updateOperatorPostStatus(
+  postId: string,
+  status: 'pending' | 'valid' | 'invalid',
+  dateFrom: string,
+  dateTo: string,
+) {
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
+  }
+
+  const post = await prisma.blog_posts.findUnique({
+    where: { id: BigInt(postId) },
+    select: { user_id: true, tenant_id: true },
+  })
+  if (!post) throw new Error('Laporan tidak ditemukan')
+
+  const canValidate = await canActorValidatePost(sessionUser, {
+    userId: post.user_id.toString(),
+    tenantId: post.tenant_id?.toString() ?? null,
+  })
+  if (!canValidate) throw new Error('Anda tidak memiliki akses untuk mengubah status laporan ini')
+
+  if (!sessionUser.roles.includes('admin') && status !== 'pending') {
+    const validDate = /^\d{4}-\d{2}-\d{2}$/
+    if (!validDate.test(dateFrom) || !validDate.test(dateTo)) {
+      throw new Error('Rentang tanggal tidak valid')
+    }
+
+    const [uploadCount, amplifikasiCount] = await Promise.all([
+      prisma.blog_posts.count({
+        where: {
+          user_id: post.user_id,
+          source_url: 'upload',
+          created_at: {
+            gte: getJakartaDateBounds(dateFrom, false),
+            lte: getJakartaDateBounds(dateTo, true),
+          },
+        },
+      }),
+      prisma.blog_posts.count({
+        where: {
+          user_id: post.user_id,
+          source_url: 'amplifikasi',
+          created_at: {
+            gte: getJakartaDateBounds(dateFrom, false),
+            lte: getJakartaDateBounds(dateTo, true),
+          },
+        },
+      }),
+    ])
+
+    if (uploadCount < 3 || amplifikasiCount < 3) {
+      throw new Error('Validasi aktif setelah minimal 3 upload dan 3 amplifikasi terpenuhi.')
+    }
+  }
+
+  await prisma.blog_posts.update({
+    where: { id: BigInt(postId) },
+    data: { status, updated_at: new Date() },
+  })
+
+  logEvent('info', 'posts.operator_update_status', {
+    postId,
+    userId: sessionUser.id,
+    status,
+    dateFrom,
+    dateTo,
+  })
+  revalidatePath('/posts/users/[userId]', 'page')
+  revalidatePath('/posts/users/[userId]/[status]', 'page')
+  revalidatePosts()
+
+  return {
+    message: 'Status post berhasil diupdate.',
+    success: 'updated',
+  }
+}
+
+export async function bulkUpdateOperatorPostStatus(
+  postIds: string[],
+  status: 'valid' | 'invalid',
+  dateFrom: string,
+  dateTo: string,
+) {
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
+  if (!reportingWindowDecision.allowed) {
+    throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
+  }
+
+  const uniquePostIds = Array.from(new Set(postIds.filter((id) => /^\d+$/.test(id))))
+  if (uniquePostIds.length === 0) throw new Error('Pilih minimal satu laporan')
+
+  const validDate = /^\d{4}-\d{2}-\d{2}$/
+  if (!validDate.test(dateFrom) || !validDate.test(dateTo)) {
+    throw new Error('Rentang tanggal tidak valid')
+  }
+
+  const posts = await prisma.blog_posts.findMany({
+    where: { id: { in: uniquePostIds.map((id) => BigInt(id)) } },
+    select: { id: true, user_id: true, tenant_id: true },
+  })
+  if (posts.length !== uniquePostIds.length) throw new Error('Sebagian laporan tidak ditemukan')
+
+  const userIds = new Set(posts.map((post) => post.user_id.toString()))
+  if (userIds.size !== 1) throw new Error('Bulk validasi hanya dapat dilakukan untuk satu operator')
+
+  for (const post of posts) {
+    const canValidate = await canActorValidatePost(sessionUser, {
+      userId: post.user_id.toString(),
+      tenantId: post.tenant_id?.toString() ?? null,
+    })
+    if (!canValidate) throw new Error('Anda tidak memiliki akses untuk mengubah status laporan ini')
+  }
+
+  if (!sessionUser.roles.includes('admin')) {
+    const userId = posts[0].user_id
+    const [uploadCount, amplifikasiCount] = await Promise.all([
+      prisma.blog_posts.count({
+        where: {
+          user_id: userId,
+          source_url: 'upload',
+          created_at: {
+            gte: getJakartaDateBounds(dateFrom, false),
+            lte: getJakartaDateBounds(dateTo, true),
+          },
+        },
+      }),
+      prisma.blog_posts.count({
+        where: {
+          user_id: userId,
+          source_url: 'amplifikasi',
+          created_at: {
+            gte: getJakartaDateBounds(dateFrom, false),
+            lte: getJakartaDateBounds(dateTo, true),
+          },
+        },
+      }),
+    ])
+
+    if (uploadCount < 3 || amplifikasiCount < 3) {
+      throw new Error('Validasi aktif setelah minimal 3 upload dan 3 amplifikasi terpenuhi.')
+    }
+  }
+
+  await prisma.blog_posts.updateMany({
+    where: { id: { in: posts.map((post) => post.id) } },
+    data: { status, updated_at: new Date() },
+  })
+
+  logEvent('info', 'posts.operator_bulk_update_status', {
+    postIds: uniquePostIds,
+    count: uniquePostIds.length,
+    userId: sessionUser.id,
+    status,
+    dateFrom,
+    dateTo,
+  })
+  revalidatePath('/posts/users/[userId]', 'page')
+  revalidatePath('/posts/users/[userId]/[status]', 'page')
+  revalidatePosts()
+
+  return {
+    message: `${uniquePostIds.length} post berhasil diupdate.`,
+    success: 'updated',
   }
 }
 
@@ -804,6 +977,9 @@ export async function updateStatus(id: string, status: 'pending' | 'valid' | 'in
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(sessionUser.roles)
   if (!reportingWindowDecision.allowed) {
     throw new Error(reportingWindowDecision.message ?? 'Pelaporan sedang ditutup.')
+  }
+  if (!sessionUser.roles.includes('admin') && status !== 'pending') {
+    throw new Error('Validasi manager dilakukan dari halaman View operator.')
   }
   const post = await prisma.blog_posts.findUnique({
     where: { id: BigInt(id) },

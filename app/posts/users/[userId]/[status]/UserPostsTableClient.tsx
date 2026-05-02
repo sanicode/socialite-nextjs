@@ -1,6 +1,6 @@
 "use client"
 import { useState, useTransition } from "react"
-import { updatePostStatus } from '@/app/actions/posts'
+import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus } from '@/app/actions/posts'
 import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
 import { useRouter } from "next/navigation"
@@ -36,6 +36,11 @@ function getStatusClass(status: PostStatus) {
 export default function UserPostsTableClient({
   posts,
   mediaByPostId,
+  validationEnabled = true,
+  validationDisabledMessage,
+  validationDateFrom,
+  validationDateTo,
+  removeOnStatusChange = true,
   actionsDisabled = false,
   actionsDisabledMessage,
 }: {
@@ -43,21 +48,33 @@ export default function UserPostsTableClient({
   mediaByPostId: Record<string, SerializedMedia>
   userData: SerializedUser
   status: string
+  validationEnabled?: boolean
+  validationDisabledMessage?: string | null
+  validationDateFrom?: string
+  validationDateTo?: string
+  removeOnStatusChange?: boolean
   actionsDisabled?: boolean
   actionsDisabledMessage?: string | null
 }) {
   const router = useRouter()
   const { showToast } = useToast()
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
   const [modalUrl, setModalUrl] = useState<string | null>(null)
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
+  const bulkEnabled = Boolean(validationDateFrom && validationDateTo)
+  const actionsLocked = actionsDisabled || !validationEnabled || isPending
 
   const handleStatusChange = (postId: string, newStatus: PostStatus) => {
-    if (actionsDisabled) return
-    setOptimisticPosts(prev => prev.filter((p) => p.id.toString() !== postId))
+    if (actionsLocked) return
+    setOptimisticPosts(prev => removeOnStatusChange
+      ? prev.filter((p) => p.id.toString() !== postId)
+      : prev.map((p) => p.id.toString() === postId ? { ...p, status: newStatus } : p)
+    )
     startTransition(async () => {
       try {
-        const result = await updatePostStatus(postId, newStatus)
+        const result = validationDateFrom && validationDateTo
+          ? await updateOperatorPostStatus(postId, newStatus, validationDateFrom, validationDateTo)
+          : await updatePostStatus(postId, newStatus)
         if (result?.success) {
           showToast('success', 'Status Diperbarui', `Post dipindahkan ke ${newStatus}.`)
           router.refresh()
@@ -71,8 +88,53 @@ export default function UserPostsTableClient({
     })
   }
 
+  const handleBulkStatusChange = (newStatus: 'valid' | 'invalid') => {
+    if (actionsLocked || !validationDateFrom || !validationDateTo || optimisticPosts.length === 0) return
+    const ids = optimisticPosts.map((post) => post.id.toString())
+    setOptimisticPosts(prev => prev.map((post) => ids.includes(post.id.toString()) ? { ...post, status: newStatus } : post))
+    startTransition(async () => {
+      try {
+        const result = await bulkUpdateOperatorPostStatus(ids, newStatus, validationDateFrom, validationDateTo)
+        if (result?.success) {
+          showToast('success', 'Status Diperbarui', `${ids.length} post ditandai sebagai ${newStatus}.`)
+          router.refresh()
+        } else {
+          throw new Error("Gagal")
+        }
+      } catch {
+        showToast('error', 'Gagal Memperbarui', 'Terjadi kesalahan saat mengubah status.')
+        router.refresh()
+      }
+    })
+  }
+
   return (
     <>
+      {bulkEnabled && (
+        <div className="flex flex-col gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            Terapkan status ke semua laporan pada halaman ini
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleBulkStatusChange('valid')}
+              disabled={actionsLocked || optimisticPosts.length === 0}
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Valid Semua
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkStatusChange('invalid')}
+              disabled={actionsLocked || optimisticPosts.length === 0}
+              className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Invalid Semua
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -172,8 +234,14 @@ export default function UserPostsTableClient({
                           className={`rounded-lg border px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:cursor-not-allowed disabled:opacity-50 ${getStatusClass(post.status)}`}
                           value={post.status}
                           onChange={(e) => handleStatusChange(post.id.toString(), e.target.value as PostStatus)}
-                          disabled={actionsDisabled}
-                          title={actionsDisabled ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.') : undefined}
+                          disabled={actionsLocked}
+                          title={
+                            actionsDisabled
+                              ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.')
+                              : !validationEnabled
+                                ? (validationDisabledMessage ?? 'Validasi belum memenuhi syarat.')
+                                : undefined
+                          }
                         >
                           <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="pending">Pending</option>
                           <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="valid">Valid</option>

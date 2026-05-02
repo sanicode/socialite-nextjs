@@ -64,6 +64,15 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
     )
   }
 
+  function buildViewHref(userId: number) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('page')
+    params.delete('sortBy')
+    params.delete('sortDir')
+    const query = params.toString()
+    return query ? `/posts/users/${userId}?${query}` : `/posts/users/${userId}`
+  }
+
   return (
     <div>
       <div className="overflow-x-auto">
@@ -84,12 +93,15 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
                   </button>
                 </th>
               ))}
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                Aksi
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-neutral-400 dark:text-neutral-500">
+                <td colSpan={8} className="px-4 py-10 text-center text-neutral-400 dark:text-neutral-500">
                   Tidak ada data
                 </td>
               </tr>
@@ -122,6 +134,14 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
                       className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
                     >
                       {row.invalid_posts}
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <a
+                      href={buildViewHref(row.user_id)}
+                      className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    >
+                      View
                     </a>
                   </td>
                 </tr>

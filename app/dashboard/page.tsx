@@ -263,7 +263,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Dashboard</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            Ringkasan data pelaporan upload media sosial
+            Ringkasan data pelaporan
           </p>
         </div>
 

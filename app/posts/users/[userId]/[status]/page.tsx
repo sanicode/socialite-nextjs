@@ -169,6 +169,8 @@ export default async function UserPostsByStatusPage({
             mediaByPostId={serializedMediaByPostId}
             userData={serializedUserData}
             status={status}
+            validationEnabled={user.roles.includes('admin')}
+            validationDisabledMessage="Validasi manager dilakukan dari halaman View operator."
             actionsDisabled={reportingWindowClosed}
             actionsDisabledMessage={reportingWindowDecision.message}
           />
