@@ -8,19 +8,19 @@ import CityBarChart from '@/app/components/dashboard/CityBarChart'
 import DailyPostsChart from '@/app/components/dashboard/DailyPostsChart'
 import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 import type {
-  StatistikDashboardPayload,
+  PublicStatistikDashboardPayload,
   StatistikFilters,
 } from '@/app/lib/statistik-data'
+import type { OperatorReportSummary } from '@/app/actions/dashboard'
 
 type Props = {
-  initialData: StatistikDashboardPayload
   initialCities: { id: string; name: string }[]
   initialFilters: StatistikFilters
   provinces: { id: number; name: string }[]
   accessId: string
 }
 
-type ApiPayload = StatistikDashboardPayload & {
+type ApiPayload = PublicStatistikDashboardPayload & {
   cities: { id: string; name: string }[]
 }
 
@@ -53,13 +53,12 @@ function buildPageUrl(accessId: string, filters: StatistikFilters) {
 }
 
 export default function StatistikDashboardClient({
-  initialData,
   initialCities,
   initialFilters,
   provinces,
   accessId,
 }: Props) {
-  const [data, setData] = useState(initialData)
+  const [data, setData] = useState<PublicStatistikDashboardPayload | null>(null)
   const [cities, setCities] = useState(initialCities)
   const [filters, setFilters] = useState(initialFilters)
   const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom ?? '')
@@ -84,6 +83,11 @@ export default function StatistikDashboardClient({
     if (updateCities) setCities(payload.cities)
     setLastUpdated(new Date())
   }, [accessId])
+
+  useEffect(() => {
+    void loadData(filters).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -245,10 +249,18 @@ export default function StatistikDashboardClient({
           {rangeError && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{rangeError}</p>}
         </div>
 
-        <StatCards summary={data.summary} hideOperatorEmail hideOperatorContact maskOperatorName />
-        <ProvinceDonutChart data={data.provinceData} />
-        <CityBarChart data={data.cityData} />
-        <DailyPostsChart data={data.dailyData} />
+        {data ? (
+          <>
+            <StatCards summary={data.summary as unknown as OperatorReportSummary} hideOperatorEmail hideOperatorContact />
+            <ProvinceDonutChart data={data.provinceData} />
+            <CityBarChart data={data.cityData} />
+            <DailyPostsChart data={data.dailyData} />
+          </>
+        ) : (
+          <div className="flex items-center justify-center py-20 text-sm text-neutral-500 dark:text-neutral-400">
+            Memuat statistik...
+          </div>
+        )}
       </div>
     </main>
   )

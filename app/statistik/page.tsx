@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import {
   getStatistikCities,
-  getStatistikDashboardData,
   getStatistikProvinces,
   normalizeStatistikFilters,
   type StatistikFilters,
@@ -33,15 +32,13 @@ export default async function StatistikPage({ searchParams }: Props) {
     status: params.status === 'pending' || params.status === 'valid' || params.status === 'invalid' ? params.status : undefined,
   })
 
-  const [provinces, cities, initialData] = await Promise.all([
+  const [provinces, cities] = await Promise.all([
     getStatistikProvinces(),
     filters.provinceId ? getStatistikCities(filters.provinceId) : Promise.resolve([]),
-    getStatistikDashboardData(filters),
   ])
 
   return (
     <StatistikDashboardClient
-      initialData={initialData}
       initialCities={cities}
       initialFilters={filters}
       provinces={provinces}

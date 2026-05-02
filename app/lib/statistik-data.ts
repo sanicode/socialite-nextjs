@@ -1,5 +1,7 @@
 import { prisma } from '@/app/lib/prisma'
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
 export type StatistikFilters = {
   dateFrom?: string
   dateTo?: string
@@ -52,6 +54,40 @@ export type StatistikDashboardPayload = {
   provinceData: StatistikProvinceChartItem[]
   cityData: StatistikCityChartGroup[]
   dailyData: StatistikChartItem[]
+}
+
+export type PublicStatistikOperatorReportRow = Omit<StatistikOperatorReportRow, 'email' | 'phoneNumber' | 'userId'>
+
+export type PublicStatistikOperatorReportSummary = Omit<StatistikOperatorReportSummary, 'reportedRows' | 'missingRows'> & {
+  reportedRows: PublicStatistikOperatorReportRow[]
+  missingRows: PublicStatistikOperatorReportRow[]
+}
+
+export type PublicStatistikDashboardPayload = Omit<StatistikDashboardPayload, 'summary'> & {
+  summary: PublicStatistikOperatorReportSummary
+}
+
+function maskName(value: string): string {
+  const parts = value.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '-'
+  const maskPart = (part: string) => `${part[0]?.toUpperCase() ?? ''}${'*'.repeat(Math.max(part.length - 1, 0))}`
+  const first = maskPart(parts[0])
+  const last = parts.length > 1 ? maskPart(parts[parts.length - 1]) : ''
+  return last ? `${first} ${last}` : first
+}
+
+export function stripDashboardPii(payload: StatistikDashboardPayload): PublicStatistikDashboardPayload {
+  function stripRow({ email: _e, phoneNumber: _p, userId: _u, name, ...rest }: StatistikOperatorReportRow): PublicStatistikOperatorReportRow {
+    return { ...rest, name: maskName(name) }
+  }
+  return {
+    ...payload,
+    summary: {
+      ...payload.summary,
+      reportedRows: payload.summary.reportedRows.map(stripRow),
+      missingRows: payload.summary.missingRows.map(stripRow),
+    },
+  }
 }
 
 const BLOG_POST_JAKARTA_DATE_SQL = `date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
@@ -144,8 +180,8 @@ export function getJakartaDateString(date = new Date()) {
 
 export function normalizeStatistikFilters(filters: StatistikFilters): Required<Pick<StatistikFilters, 'dateFrom' | 'dateTo'>> & StatistikFilters {
   const today = getJakartaDateString()
-  const rawFrom = filters.dateFrom ?? today
-  const rawTo = filters.dateTo ?? today
+  const rawFrom = filters.dateFrom && ISO_DATE_RE.test(filters.dateFrom) ? filters.dateFrom : today
+  const rawTo = filters.dateTo && ISO_DATE_RE.test(filters.dateTo) ? filters.dateTo : today
   const fromDate = new Date(rawFrom)
   const maxToDate = new Date(fromDate)
   maxToDate.setMonth(maxToDate.getMonth() + 1)

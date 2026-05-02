@@ -3,6 +3,7 @@ import {
   getStatistikCities,
   getStatistikDashboardData,
   normalizeStatistikFilters,
+  stripDashboardPii,
   type StatistikFilters,
 } from '@/app/lib/statistik-data'
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   ])
 
   return NextResponse.json({
-    ...payload,
+    ...stripDashboardPii(payload),
     cities,
   })
 }
