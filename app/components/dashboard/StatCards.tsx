@@ -4,15 +4,23 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OperatorReportRow, OperatorReportSummary } from '@/app/actions/dashboard'
 import { getPageSlice, TABLE_PAGE_SIZE_OPTIONS, type TablePageSize } from '@/app/lib/table-pagination'
 
+type DisplayOperatorReportRow = Omit<OperatorReportRow, 'tenantUserId' | 'userId' | 'email' | 'phoneNumber'> &
+  Partial<Pick<OperatorReportRow, 'tenantUserId' | 'userId' | 'email' | 'phoneNumber'>>
+
+type DisplayOperatorReportSummary = Omit<OperatorReportSummary, 'reportedRows' | 'missingRows'> & {
+  reportedRows: DisplayOperatorReportRow[]
+  missingRows: DisplayOperatorReportRow[]
+}
+
 type Props = {
-  summary: OperatorReportSummary
+  summary: DisplayOperatorReportSummary
   hideOperatorEmail?: boolean
   hideOperatorContact?: boolean
   maskOperatorName?: boolean
 }
 
 type DialogState =
-  | { title: string; rows: OperatorReportRow[] }
+  | { title: string; rows: DisplayOperatorReportRow[] }
   | null
 
 function PeopleIcon() {
@@ -186,8 +194,11 @@ function OperatorDialog({
                   </td>
                 </tr>
               )}
-              {pageRows.map((row) => (
-                <tr key={row.tenantUserId} className="bg-white transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50">
+              {pageRows.map((row, index) => (
+                <tr
+                  key={row.tenantUserId ?? `${row.name}-${row.province ?? ''}-${row.city ?? ''}-${index}`}
+                  className="bg-white transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-neutral-900 dark:text-white">
                       {maskOperatorName ? maskName(row.name) : row.name}

@@ -11,7 +11,6 @@ import type {
   PublicStatistikDashboardPayload,
   StatistikFilters,
 } from '@/app/lib/statistik-data'
-import type { OperatorReportSummary } from '@/app/actions/dashboard'
 
 type Props = {
   initialCities: { id: string; name: string }[]
@@ -251,7 +250,7 @@ export default function StatistikDashboardClient({
 
         {data ? (
           <>
-            <StatCards summary={data.summary as unknown as OperatorReportSummary} hideOperatorEmail hideOperatorContact />
+            <StatCards summary={data.summary} hideOperatorEmail hideOperatorContact />
             <ProvinceDonutChart data={data.provinceData} />
             <CityBarChart data={data.cityData} />
             <DailyPostsChart data={data.dailyData} />

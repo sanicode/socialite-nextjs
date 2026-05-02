@@ -56,7 +56,7 @@ export type StatistikDashboardPayload = {
   dailyData: StatistikChartItem[]
 }
 
-export type PublicStatistikOperatorReportRow = Omit<StatistikOperatorReportRow, 'email' | 'phoneNumber' | 'userId'>
+export type PublicStatistikOperatorReportRow = Omit<StatistikOperatorReportRow, 'tenantUserId' | 'email' | 'phoneNumber' | 'userId'>
 
 export type PublicStatistikOperatorReportSummary = Omit<StatistikOperatorReportSummary, 'reportedRows' | 'missingRows'> & {
   reportedRows: PublicStatistikOperatorReportRow[]
@@ -77,8 +77,17 @@ function maskName(value: string): string {
 }
 
 export function stripDashboardPii(payload: StatistikDashboardPayload): PublicStatistikDashboardPayload {
-  function stripRow({ email: _e, phoneNumber: _p, userId: _u, name, ...rest }: StatistikOperatorReportRow): PublicStatistikOperatorReportRow {
-    return { ...rest, name: maskName(name) }
+  function stripRow(row: StatistikOperatorReportRow): PublicStatistikOperatorReportRow {
+    return {
+      name: maskName(row.name),
+      province: row.province,
+      city: row.city,
+      uploadCount: row.uploadCount,
+      amplifikasiCount: row.amplifikasiCount,
+      missingUpload: row.missingUpload,
+      missingAmplifikasi: row.missingAmplifikasi,
+      hasReported: row.hasReported,
+    }
   }
   return {
     ...payload,
