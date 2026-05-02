@@ -80,7 +80,7 @@ function getChartColors(variant: Props['variant'], theme: Props['theme']) {
 
 export default function ProvinceDonutChart({ data, variant = 'default', theme = 'light' }: Props) {
   const colors = getChartColors(variant, theme)
-  const overlaySeries = variant === 'statistik'
+  const compactCluster = variant === 'statistik'
 
   if (data.length === 0) {
     return (
@@ -94,6 +94,9 @@ export default function ProvinceDonutChart({ data, variant = 'default', theme = 
   // Reverse so highest performer renders at top (recharts fills bottom-up)
   const chartData = [...data].reverse()
   const maxVal = Math.max(...data.map((d) => Math.max(d.posts, d.operators)), 1)
+  const chartHeight = compactCluster
+    ? Math.max(180, chartData.length * 64 + 96)
+    : Math.max(300, chartData.length * 44 + 40)
 
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-5" style={colors.panelStyle}>
@@ -118,15 +121,15 @@ export default function ProvinceDonutChart({ data, variant = 'default', theme = 
 
       <div
         className="text-neutral-600 dark:text-neutral-300"
-        style={{ color: colors.axis, height: Math.max(300, chartData.length * 44 + 40), minHeight: 300 }}
+        style={{ color: colors.axis, height: chartHeight, minHeight: compactCluster ? 180 : 300 }}
       >
-        <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 44 + 40)}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
             data={chartData}
             layout="vertical"
             margin={{ top: 0, right: 72, left: 8, bottom: 0 }}
-            barCategoryGap={overlaySeries ? '48%' : '25%'}
-            barGap={overlaySeries ? -16 : 3}
+            barCategoryGap={compactCluster ? '8%' : '25%'}
+            barGap={compactCluster ? 2 : 3}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -167,25 +170,12 @@ export default function ProvinceDonutChart({ data, variant = 'default', theme = 
               ]}
               cursor={{ fill: colors.cursor }}
             />
-            {overlaySeries ? (
-              <>
-                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" barSize={16} maxBarSize={16}>
-                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
-                </Bar>
-                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" barSize={16} maxBarSize={16}>
-                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
-                </Bar>
-              </>
-            ) : (
-              <>
-                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" maxBarSize={16}>
-                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
-                </Bar>
-                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" maxBarSize={16}>
-                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
-                </Bar>
-              </>
-            )}
+            <Bar dataKey="posts" fill={colors.primary} radius={[0, 3, 3, 0]} name="posts" barSize={compactCluster ? 20 : undefined} maxBarSize={compactCluster ? 20 : 16}>
+              <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
+            </Bar>
+            <Bar dataKey="operators" fill={colors.secondary} radius={[0, 3, 3, 0]} name="operators" barSize={compactCluster ? 20 : undefined} maxBarSize={compactCluster ? 20 : 16}>
+              <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

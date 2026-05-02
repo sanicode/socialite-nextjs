@@ -82,12 +82,12 @@ function ProvinceChart({
   province,
   cities,
   colors,
-  overlaySeries,
+  compactCluster,
 }: {
   province: string
   cities: ProvinceChartItem[]
   colors: ReturnType<typeof getChartColors>
-  overlaySeries: boolean
+  compactCluster: boolean
 }) {
   // Reverse so highest performer renders at top
   const chartData = [...cities].reverse()
@@ -110,8 +110,8 @@ function ProvinceChart({
             data={chartData}
             layout="vertical"
             margin={{ top: 0, right: 54, left: 4, bottom: 0 }}
-            barCategoryGap={overlaySeries ? '48%' : '25%'}
-            barGap={overlaySeries ? -14 : 2}
+            barCategoryGap={compactCluster ? '12%' : '25%'}
+            barGap={2}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -153,25 +153,12 @@ function ProvinceChart({
               ]}
               cursor={{ fill: colors.cursor }}
             />
-            {overlaySeries ? (
-              <>
-                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" barSize={14} maxBarSize={14}>
-                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
-                </Bar>
-                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" barSize={14} maxBarSize={14}>
-                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
-                </Bar>
-              </>
-            ) : (
-              <>
-                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" maxBarSize={14}>
-                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
-                </Bar>
-                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" maxBarSize={14}>
-                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
-                </Bar>
-              </>
-            )}
+            <Bar dataKey="posts" fill={colors.primary} radius={[0, 3, 3, 0]} name="posts" maxBarSize={compactCluster ? 20 : 14}>
+              <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
+            </Bar>
+            <Bar dataKey="operators" fill={colors.secondary} radius={[0, 3, 3, 0]} name="operators" maxBarSize={compactCluster ? 20 : 14}>
+              <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -181,7 +168,7 @@ function ProvinceChart({
 
 export default function CityBarChart({ data, variant = 'default', theme = 'light' }: Props) {
   const colors = getChartColors(variant, theme)
-  const overlaySeries = variant === 'statistik'
+  const compactCluster = variant === 'statistik'
 
   if (data.length === 0) {
     return (
@@ -220,7 +207,7 @@ export default function CityBarChart({ data, variant = 'default', theme = 'light
             province={group.province}
             cities={group.cities}
             colors={colors}
-            overlaySeries={overlaySeries}
+            compactCluster={compactCluster}
           />
         ))}
       </div>
