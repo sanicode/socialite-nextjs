@@ -195,7 +195,11 @@ export function normalizeStatistikFilters(filters: StatistikFilters): Required<P
   const maxToDate = new Date(fromDate)
   maxToDate.setMonth(maxToDate.getMonth() + 1)
   const toDate = new Date(rawTo)
-  const clampedTo = toDate > maxToDate ? maxToDate.toISOString().slice(0, 10) : rawTo
+  const clampedTo = toDate < fromDate
+    ? rawFrom
+    : toDate > maxToDate
+      ? maxToDate.toISOString().slice(0, 10)
+      : rawTo
 
   return {
     dateFrom: rawFrom,

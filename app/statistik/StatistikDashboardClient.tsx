@@ -1,12 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import StatCards from '@/app/components/dashboard/StatCards'
 import ProvinceDonutChart from '@/app/components/dashboard/ProvinceDonutChart'
 import CityBarChart from '@/app/components/dashboard/CityBarChart'
 import DailyPostsChart from '@/app/components/dashboard/DailyPostsChart'
-import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 import type {
   PublicStatistikDashboardPayload,
   StatistikFilters,
@@ -69,7 +68,7 @@ export default function StatistikDashboardClient({
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [themeMounted, setThemeMounted] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [isFilterLoading, setIsFilterLoading] = useState(false)
 
   const loadData = useCallback(async (nextFilters: StatistikFilters, updateCities = true) => {
     const response = await fetch(buildApiUrl(accessId, nextFilters), { cache: 'no-store' })
@@ -141,6 +140,11 @@ export default function StatistikDashboardClient({
   function handleDateTo(value: string) {
     if (!value) return
     const maxTo = addOneMonth(dateFrom)
+    if (value === dateFrom) {
+      setRangeError('')
+      setDateTo(value)
+      return
+    }
     if (value > maxTo) {
       setRangeError('Rentang maksimal 1 bulan. Tanggal akhir disesuaikan otomatis.')
       setDateTo(maxTo)
@@ -162,22 +166,26 @@ export default function StatistikDashboardClient({
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const safeDateTo = dateTo < dateFrom ? dateFrom : dateTo
+    if (safeDateTo !== dateTo) {
+      setRangeError('')
+      setDateTo(safeDateTo)
+    }
     const nextFilters: StatistikFilters = {
       dateFrom,
-      dateTo,
+      dateTo: safeDateTo,
       status: status === 'pending' || status === 'valid' || status === 'invalid' ? status : undefined,
       provinceId: provinceId || undefined,
       cityId: provinceId && cityId ? cityId : undefined,
     }
     setFilters(nextFilters)
     window.history.replaceState(null, '', buildPageUrl(accessId, nextFilters))
-    startTransition(() => {
-      void loadData(nextFilters).catch(() => {})
-    })
+    setIsFilterLoading(true)
+    void loadData(nextFilters)
+      .catch(() => {})
+      .finally(() => setIsFilterLoading(false))
   }
 
-  const maxDateTo = useMemo(() => addOneMonth(dateFrom), [dateFrom])
-  const today = new Date().toISOString().slice(0, 10)
   const isDarkTheme = theme === 'dark'
 
   return (
@@ -192,13 +200,6 @@ export default function StatistikDashboardClient({
         paddingTop: '40px',
       }}
     >
-      {isPending && (
-        <RequestLoadingOverlay
-          title="Memuat statistik..."
-          description="Chart diperbarui tanpa me-reload halaman."
-        />
-      )}
-
       <div className="mx-auto max-w-7xl space-y-5">
 
         {/* Header */}
@@ -354,13 +355,12 @@ export default function StatistikDashboardClient({
           <p className="mb-3.5 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
             Filter
           </p>
-          <form onSubmit={applyFilters} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <form noValidate onSubmit={applyFilters} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
               <input
                 type="date"
                 value={dateFrom}
-                max={today}
                 onChange={(event) => handleDateFrom(event.target.value)}
                 className="rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:border-[#e8782d] focus:outline-none focus:ring-2 focus:ring-[#f7d6bf] dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d] sm:w-44"
               />
@@ -372,8 +372,6 @@ export default function StatistikDashboardClient({
               <input
                 type="date"
                 value={dateTo}
-                min={dateFrom}
-                max={maxDateTo}
                 onChange={(event) => handleDateTo(event.target.value)}
                 className={`rounded-lg border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-white sm:w-44 ${
                   rangeError
@@ -424,7 +422,7 @@ export default function StatistikDashboardClient({
             </label>
             <button
               type="submit"
-              disabled={Boolean(rangeError) || isPending}
+              disabled={Boolean(rangeError) || isFilterLoading}
               className="statistik-filter-button inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 backgroundColor: isDarkTheme ? '#f08a3d' : '#e8782d',
@@ -432,10 +430,17 @@ export default function StatistikDashboardClient({
                 color: '#ffffff',
               }}
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
-              </svg>
-              Filter
+              {isFilterLoading ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
+                </svg>
+              )}
+              {isFilterLoading ? 'Memuat' : 'Filter'}
             </button>
           </form>
           {rangeError && (
