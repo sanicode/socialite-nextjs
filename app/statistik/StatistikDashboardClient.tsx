@@ -245,7 +245,7 @@ export default function StatistikDashboardClient({
           {rangeError && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{rangeError}</p>}
         </div>
 
-        <StatCards summary={data.summary} />
+        <StatCards summary={data.summary} hideOperatorEmail hideOperatorContact maskOperatorName />
         <ProvinceDonutChart data={data.provinceData} />
         <CityBarChart data={data.cityData} />
         <DailyPostsChart data={data.dailyData} />

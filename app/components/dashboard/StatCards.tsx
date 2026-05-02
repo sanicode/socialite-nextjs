@@ -6,6 +6,9 @@ import { getPageSlice, TABLE_PAGE_SIZE_OPTIONS, type TablePageSize } from '@/app
 
 type Props = {
   summary: OperatorReportSummary
+  hideOperatorEmail?: boolean
+  hideOperatorContact?: boolean
+  maskOperatorName?: boolean
 }
 
 type DialogState =
@@ -53,7 +56,28 @@ function StatusBadge({ missing, label, count }: { missing: boolean; label: strin
   )
 }
 
-function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () => void }) {
+function maskName(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '-'
+  const maskPart = (part: string) => `${part[0]?.toUpperCase() ?? ''}${'*'.repeat(Math.max(part.length - 1, 0))}`
+  const first = maskPart(parts[0])
+  const last = parts.length > 1 ? maskPart(parts[parts.length - 1]) : ''
+  return last ? `${first} ${last}` : first
+}
+
+function OperatorDialog({
+  dialog,
+  hideOperatorEmail,
+  hideOperatorContact,
+  maskOperatorName,
+  onClose,
+}: {
+  dialog: DialogState
+  hideOperatorEmail: boolean
+  hideOperatorContact: boolean
+  maskOperatorName: boolean
+  onClose: () => void
+}) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<TablePageSize>(10)
@@ -145,7 +169,9 @@ function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () 
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-800">
                 <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Operator</th>
-                <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Kontak</th>
+                {!hideOperatorContact && (
+                  <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Kontak</th>
+                )}
                 <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Provinsi</th>
                 <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Kota</th>
                 <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Upload</th>
@@ -155,7 +181,7 @@ function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () 
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-neutral-500 dark:text-neutral-400">
+                  <td colSpan={hideOperatorContact ? 5 : 6} className="px-4 py-10 text-center text-neutral-500 dark:text-neutral-400">
                     Tidak ada data yang cocok.
                   </td>
                 </tr>
@@ -163,10 +189,16 @@ function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () 
               {pageRows.map((row) => (
                 <tr key={row.tenantUserId} className="bg-white transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-neutral-900 dark:text-white">{row.name}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">{row.email}</div>
+                    <div className="font-medium text-neutral-900 dark:text-white">
+                      {maskOperatorName ? maskName(row.name) : row.name}
+                    </div>
+                    {!hideOperatorEmail && (
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">{row.email}</div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.phoneNumber || '-'}</td>
+                  {!hideOperatorContact && (
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.phoneNumber || '-'}</td>
+                  )}
                   <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.province || '-'}</td>
                   <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{row.city || '-'}</td>
                   <td className="px-4 py-3"><StatusBadge missing={row.missingUpload} label="upload" count={row.uploadCount} /></td>
@@ -198,7 +230,12 @@ function OperatorDialog({ dialog, onClose }: { dialog: DialogState; onClose: () 
   )
 }
 
-export default function StatCards({ summary }: Props) {
+export default function StatCards({
+  summary,
+  hideOperatorEmail = false,
+  hideOperatorContact = false,
+  maskOperatorName = false,
+}: Props) {
   const [dialog, setDialog] = useState<DialogState>(null)
   const cards = [
     {
@@ -271,7 +308,13 @@ export default function StatCards({ summary }: Props) {
         })}
       </div>
 
-      <OperatorDialog dialog={dialog} onClose={() => setDialog(null)} />
+      <OperatorDialog
+        dialog={dialog}
+        hideOperatorEmail={hideOperatorEmail}
+        hideOperatorContact={hideOperatorContact}
+        maskOperatorName={maskOperatorName}
+        onClose={() => setDialog(null)}
+      />
     </>
   )
 }
