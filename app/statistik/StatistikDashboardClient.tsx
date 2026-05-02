@@ -67,6 +67,8 @@ export default function StatistikDashboardClient({
   const [cityId, setCityId] = useState(initialFilters.cityId ?? '')
   const [rangeError, setRangeError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [themeMounted, setThemeMounted] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const loadData = useCallback(async (nextFilters: StatistikFilters, updateCities = true) => {
@@ -89,11 +91,25 @@ export default function StatistikDashboardClient({
   }, [])
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+      setThemeMounted(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
     const interval = window.setInterval(() => {
       void loadData(filters, false).catch(() => {})
     }, 30000)
     return () => window.clearInterval(interval)
   }, [filters, loadData])
+
+  function applyTheme(nextTheme: 'light' | 'dark') {
+    setTheme(nextTheme)
+    localStorage.setItem('theme', nextTheme)
+    document.documentElement.classList.toggle('dark', nextTheme === 'dark')
+  }
 
   function handleDateFrom(value: string) {
     if (!value) return
@@ -153,16 +169,37 @@ export default function StatistikDashboardClient({
         />
       )}
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Statistik</h1>
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
               Ringkasan data pelaporan
             </p>
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Auto reload tiap 30 detik{lastUpdated ? ` • terakhir ${lastUpdated.toLocaleTimeString('id-ID')}` : ''}
-          </p>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            {themeMounted && (
+              <button
+                type="button"
+                onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label={theme === 'dark' ? 'Aktifkan tema light' : 'Aktifkan tema dark'}
+                title={theme === 'dark' ? 'Tema light' : 'Tema dark'}
+                className="text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+              >
+                {theme === 'dark' ? (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3v1m0 16v1m8.66-9H21M3 12H2m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Auto reload tiap 30 detik{lastUpdated ? ` • terakhir ${lastUpdated.toLocaleTimeString('id-ID')}` : ''}
+            </p>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
