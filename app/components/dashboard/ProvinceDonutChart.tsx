@@ -80,6 +80,7 @@ function getChartColors(variant: Props['variant'], theme: Props['theme']) {
 
 export default function ProvinceDonutChart({ data, variant = 'default', theme = 'light' }: Props) {
   const colors = getChartColors(variant, theme)
+  const overlaySeries = variant === 'statistik'
 
   if (data.length === 0) {
     return (
@@ -124,8 +125,8 @@ export default function ProvinceDonutChart({ data, variant = 'default', theme = 
             data={chartData}
             layout="vertical"
             margin={{ top: 0, right: 72, left: 8, bottom: 0 }}
-            barCategoryGap="25%"
-            barGap={3}
+            barCategoryGap={overlaySeries ? '48%' : '25%'}
+            barGap={overlaySeries ? -16 : 3}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -166,12 +167,25 @@ export default function ProvinceDonutChart({ data, variant = 'default', theme = 
               ]}
               cursor={{ fill: colors.cursor }}
             />
-            <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" maxBarSize={16}>
-              <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
-            </Bar>
-            <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" maxBarSize={16}>
-              <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
-            </Bar>
+            {overlaySeries ? (
+              <>
+                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" barSize={16} maxBarSize={16}>
+                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
+                </Bar>
+                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" barSize={16} maxBarSize={16}>
+                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
+                </Bar>
+              </>
+            ) : (
+              <>
+                <Bar dataKey="posts" fill={colors.primary} radius={[0, 4, 4, 0]} name="posts" maxBarSize={16}>
+                  <LabelList dataKey="posts" content={renderHorizontalBarValueLabel} />
+                </Bar>
+                <Bar dataKey="operators" fill={colors.secondary} radius={[0, 4, 4, 0]} name="operators" maxBarSize={16}>
+                  <LabelList dataKey="operators" content={renderHorizontalBarValueLabel} />
+                </Bar>
+              </>
+            )}
           </BarChart>
         </ResponsiveContainer>
       </div>
