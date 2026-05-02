@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
-import { BYTES_IN_KB, BYTES_IN_MB, formatUploadFileSize } from '@/app/lib/upload-size'
+import { BYTES_IN_MB, formatUploadFileSize } from '@/app/lib/upload-size'
 
 type Props = {
   currentUrl?: string | null
@@ -15,7 +15,6 @@ type Props = {
   onFileReady?: (file: File | null) => void
 }
 
-const MIN_SCREENSHOT_BYTES = 500 * BYTES_IN_KB
 const IMAGE_COMPRESSION_THRESHOLD_BYTES = 1 * BYTES_IN_MB
 const IMAGE_COMPRESSION_MAX_DIMENSION = 1920
 const IMAGE_COMPRESSION_MIN_DIMENSION = 1080
@@ -72,7 +71,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, mime: CompressionFormat['mime']
 }
 
 // Compress the file so its size is <= targetBytes.
-// targetBytes is the admin-configured maximum (e.g. 1 MB), not the 500 KB floor.
+// targetBytes is the admin-configured maximum (e.g. 1 MB).
 async function compressImageFile(file: File, targetBytes: number): Promise<File> {
   const image = await loadImageFromFile(file)
   const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
@@ -188,17 +187,6 @@ export default function ImageUpload({
     const hasUsableScreenshot = Boolean(preview)
     setCompressionMessage(null)
 
-    // Reject files below the 500 KB minimum before any processing.
-    if (selectedFile.size < MIN_SCREENSHOT_BYTES) {
-      e.target.value = ''
-      onValidationChange?.(
-        `Ukuran screenshot terlalu kecil (${formatUploadFileSize(selectedFile.size)}). ` +
-        `Screenshot harus minimal ${formatUploadFileSize(MIN_SCREENSHOT_BYTES)}.`
-      )
-      onFileChange?.(hasUsableScreenshot)
-      return
-    }
-
     // Compress when the file exceeds 1 MB (or the admin-configured maximum, whichever is lower).
     const compressionTarget = Math.min(maxFileSizeBytes, IMAGE_COMPRESSION_THRESHOLD_BYTES)
     if (compressionEnabled && selectedFile.size > compressionTarget) {
@@ -209,17 +197,6 @@ export default function ImageUpload({
 
       try {
         file = await compressImageFile(selectedFile, compressionTarget)
-
-        // Compression must not drop below the 500 KB floor.
-        if (file.size < MIN_SCREENSHOT_BYTES) {
-          setCompressionMessage(null)
-          onValidationChange?.(
-            `Hasil kompresi terlalu kecil (${formatUploadFileSize(file.size)}). ` +
-            `Screenshot harus tetap minimal ${formatUploadFileSize(MIN_SCREENSHOT_BYTES)} setelah dikompresi.`
-          )
-          onFileChange?.(hasUsableScreenshot)
-          return
-        }
 
         if (file.size > maxFileSizeBytes) {
           throw new Error('Hasil kompresi masih terlalu besar.')
@@ -314,7 +291,7 @@ export default function ImageUpload({
           </svg>
           <span className="text-sm font-medium">Klik untuk pilih gambar</span>
           <span className="text-xs">
-            JPG, PNG, GIF, WebP — min 500 KB, maks {maxFileSizeLabel}
+            JPG, PNG, GIF, WebP — maks {maxFileSizeLabel}
             {compressionEnabled ? ', kompresi aktif' : ''}
           </span>
         </button>

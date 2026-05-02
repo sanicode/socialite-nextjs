@@ -97,7 +97,7 @@ Detail lengkap: [LOGIN_FLOW.md](LOGIN_FLOW.md)
 4. Post disimpan ke `blog_posts`, screenshot diunggah ke S3, metadata ke `media`
 5. Operator hanya dapat submit/edit di rentang jam operator yang diatur admin
 
-Kompresi upload web dapat diaktifkan atau dimatikan admin melalui Settings -> Security -> Image Compression. Saat aktif, file di bawah 500 KB ditolak, lalu screenshot yang melebihi target dikompresi memakai canvas browser. Target kompresi adalah batas upload admin atau 1 MB, mana yang lebih kecil. Aplikasi membandingkan kandidat JPEG, WebP, dan PNG lalu memilih hasil terbesar yang masih aman di bawah target. Sisi terpanjang gambar dibatasi mulai dari 1920px dan diturunkan bertahap sampai 1080px bila semua kandidat masih terlalu besar. Validasi server tetap berjalan setelah kompresi, sehingga file yang masih terlalu besar atau bukan gambar valid akan ditolak.
+Kompresi upload web dapat diaktifkan atau dimatikan admin melalui Settings -> Security -> Image Compression. Saat aktif, screenshot yang melebihi target dikompresi memakai canvas browser. Target kompresi adalah batas upload admin atau 1 MB, mana yang lebih kecil. Aplikasi membandingkan kandidat JPEG, WebP, dan PNG lalu memilih hasil terbesar yang masih aman di bawah target. Sisi terpanjang gambar dibatasi mulai dari 1920px dan diturunkan bertahap sampai 1080px bila semua kandidat masih terlalu besar. Validasi server tetap berjalan setelah kompresi, sehingga file yang masih terlalu besar atau bukan gambar valid akan ditolak.
 
 Format object key S3 untuk upload baru:
 
