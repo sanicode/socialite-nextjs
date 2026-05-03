@@ -69,6 +69,7 @@ export default function StatistikDashboardClient({
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [themeMounted, setThemeMounted] = useState(false)
   const [isFilterLoading, setIsFilterLoading] = useState(false)
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false)
 
   const loadData = useCallback(async (nextFilters: StatistikFilters, updateCities = true) => {
     const response = await fetch(buildApiUrl(accessId, nextFilters), { cache: 'no-store' })
@@ -352,9 +353,37 @@ export default function StatistikDashboardClient({
             borderColor: isDarkTheme ? '#28434b' : '#c7d8dc',
           }}
         >
-          <p className="mb-3.5 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-            Filter
-          </p>
+          <div className="mb-3.5 flex items-center justify-between gap-3">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
+              </svg>
+              Filter
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsFilterExpanded((expanded) => !expanded)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white sm:hidden"
+              aria-expanded={isFilterExpanded}
+              aria-controls="statistik-filter-form"
+              aria-label={isFilterExpanded ? 'Sembunyikan filter' : 'Tampilkan filter'}
+              style={{
+                backgroundColor: isDarkTheme ? '#10242a' : '#f8fbfb',
+                border: `1px solid ${isDarkTheme ? '#36535c' : '#cfdfe3'}`,
+                color: isDarkTheme ? '#b7c8cd' : '#6d858c',
+              }}
+            >
+              <svg
+                className={`h-4 w-4 transition-transform ${isFilterExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+          <div id="statistik-filter-form" className={`${isFilterExpanded ? 'block' : 'hidden'} sm:block`}>
           <form noValidate onSubmit={applyFilters} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
@@ -451,6 +480,7 @@ export default function StatistikDashboardClient({
               {rangeError}
             </p>
           )}
+          </div>
         </div>
 
         {/* Data / Skeleton */}
