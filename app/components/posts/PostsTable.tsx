@@ -20,6 +20,7 @@ type Props = {
   page: number
   isAdmin: boolean
   canVerify: boolean
+  canEdit?: boolean
   basePath?: string
   variant?: 'default' | 'upload' | 'amplifikasi'
   provinces?: { id: number; name: string }[]
@@ -56,6 +57,7 @@ export default function PostsTable({
   page,
   isAdmin,
   canVerify,
+  canEdit = canVerify,
   basePath = '/posts',
   variant = 'default',
   provinces,
@@ -70,6 +72,7 @@ export default function PostsTable({
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
   const showReadOnlyStatus = !canVerify
+  const showActions = canEdit || canVerify
   const columnCount =
     (isAdmin ? 1 : 0) +
     1 +
@@ -80,7 +83,7 @@ export default function PostsTable({
     (canVerify ? 1 : 0) +
     (isAdmin ? 2 : 0) +
     (canVerify || showReadOnlyStatus ? 1 : 0) +
-    (canVerify ? 1 : 0)
+    (showActions ? 1 : 0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -509,7 +512,7 @@ export default function PostsTable({
                     Status
                   </th>
                 )}
-                {canVerify && (
+                {showActions && (
                   <th className="text-right px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-28">
                     Aksi
                   </th>
@@ -716,24 +719,26 @@ export default function PostsTable({
                   )}
 
                   {/* Actions */}
-                  {canVerify && (
+                  {showActions && (
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {actionsDisabled ? (
-                          <span
-                            aria-disabled="true"
-                            title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
-                            className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
-                          >
-                            Edit
-                          </span>
-                        ) : (
-                          <Link
-                            href={buildEditHref(post.id)}
-                            className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-                          >
-                            Edit
-                          </Link>
+                        {canEdit && (
+                          actionsDisabled ? (
+                            <span
+                              aria-disabled="true"
+                              title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
+                              className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                            >
+                              Edit
+                            </span>
+                          ) : (
+                            <Link
+                              href={buildEditHref(post.id)}
+                              className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                            >
+                              Edit
+                            </Link>
+                          )
                         )}
                         {isAdmin && (
                           <button

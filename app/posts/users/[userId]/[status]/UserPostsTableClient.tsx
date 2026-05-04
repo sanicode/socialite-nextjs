@@ -1,9 +1,10 @@
 "use client"
 import { useState, useTransition } from "react"
+import Link from "next/link"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus } from '@/app/actions/posts'
 import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
-import { useRouter } from "next/navigation"
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
 
@@ -57,12 +58,26 @@ export default function UserPostsTableClient({
   actionsDisabledMessage?: string | null
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { showToast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [modalUrl, setModalUrl] = useState<string | null>(null)
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
   const bulkEnabled = Boolean(validationDateFrom && validationDateTo)
   const actionsLocked = actionsDisabled || !validationEnabled || isPending
+  const returnTo = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname
+
+  function buildEditHref(post: SerializedPost) {
+    const params = new URLSearchParams()
+    params.set('returnTo', returnTo)
+    const basePath = post.source_url === 'amplifikasi'
+      ? '/posts/amplifikasi'
+      : post.source_url === 'upload'
+        ? '/posts/upload'
+        : '/posts'
+    return `${basePath}/${post.id}/edit?${params.toString()}`
+  }
 
   const handleStatusChange = (postId: string, newStatus: PostStatus) => {
     if (actionsLocked) return
@@ -145,12 +160,13 @@ export default function UserPostsTableClient({
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Media Sosial</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Link Upload</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Status</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {optimisticPosts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
+                <td colSpan={7} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
                   Tidak ada data
                 </td>
               </tr>
@@ -248,6 +264,24 @@ export default function UserPostsTableClient({
                           <option className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-white" value="invalid">Invalid</option>
                         </select>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-right align-middle">
+                      {actionsDisabled ? (
+                        <span
+                          aria-disabled="true"
+                          title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
+                          className="inline-flex cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                        >
+                          Edit
+                        </span>
+                      ) : (
+                        <Link
+                          href={buildEditHref(post)}
+                          className="inline-flex rounded-lg border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        >
+                          Edit
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 )

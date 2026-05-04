@@ -235,18 +235,6 @@ export default function ImageUpload({
     onFileReady?.(file)
   }
 
-  function handleClear() {
-    if (preview && !isExisting) URL.revokeObjectURL(preview)
-    setPreview(null)
-    setIsExisting(false)
-    setCompressionMessage(null)
-    setFileSize(null)
-    if (inputRef.current) inputRef.current.value = ''
-    onValidationChange?.(null)
-    onFileChange?.(false)
-    onFileReady?.(null)
-  }
-
   return (
     <div className="space-y-2">
       {preview ? (
@@ -259,13 +247,6 @@ export default function ImageUpload({
               className="bg-white/90 dark:bg-neutral-800/90 hover:bg-white dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 text-xs px-2.5 py-1 rounded-md shadow transition"
             >
               Ganti
-            </button>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="bg-red-500 hover:bg-red-600 text-white text-xs px-2.5 py-1 rounded-md shadow transition"
-            >
-              Hapus
             </button>
           </div>
           {fileSize !== null && (

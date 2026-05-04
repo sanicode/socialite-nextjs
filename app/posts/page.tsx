@@ -120,7 +120,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
             </div>
           }
         >
-          <PostsTable posts={posts} total={total} categories={categories} page={page} pageSize={pageSize} isAdmin={isAdmin} canVerify={canVerify} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} createDisabled={reportingWindowClosed} createDisabledMessage={reportingWindowDecision.message} actionsDisabled={reportingWindowClosed} actionsDisabledMessage={reportingWindowDecision.message} />
+          <PostsTable posts={posts} total={total} categories={categories} page={page} pageSize={pageSize} isAdmin={isAdmin} canVerify={canVerify} canEdit={isAdmin || isManager} basePath="/posts" provinces={isAdmin ? provinces : undefined} defaultDateFrom={dateFrom} defaultDateTo={dateTo} createDisabled={reportingWindowClosed} createDisabledMessage={reportingWindowDecision.message} actionsDisabled={reportingWindowClosed} actionsDisabledMessage={reportingWindowDecision.message} />
         </Suspense>
       </div>
     </div>
