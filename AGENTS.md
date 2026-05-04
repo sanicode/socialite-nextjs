@@ -298,10 +298,30 @@ Every column that contains meaningful data (text, status, date) must have a corr
 3. **Persist active filter values** using `defaultValue={params.xxx ?? ''}` on every input.
 4. **Wrap the form in the same card style** as the rest of the page: `rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900`.
 
+### Filter loading UX rules
+
+These rules are mandatory for every CRUD/table page whose filters submit through a client component (`router.push`, `startTransition`, server action, or fetch):
+
+1. **Never cover or replace the filter section while applying filters.** The active filter form must remain visible so users keep context.
+2. **The Filter button must show a processing state** while the request/navigation is pending:
+   - text changes to `Memproses...`
+   - show a small spinner icon
+   - disable the button with `disabled:cursor-not-allowed disabled:opacity-50`
+3. **Show loading feedback only in the result area** (table/list/grid), not over the whole page. For data tables, replace the table body rows with skeleton rows while keeping the table header stable.
+4. **Do not use a full-page overlay for CRUD filtering.** `RequestLoadingOverlay` is reserved for flows where the whole page is intentionally blocked, not table filtering.
+5. **Reset the processing state when URL/search params or returned data update**, so the button returns to `Filter` after the new result has rendered.
+
+Skeleton rows should match the current table column count and use:
+
+```tsx
+<div className="animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 h-4 w-24" />
+```
+
 ### Reference implementation
 
 `app/settings/logs/page.tsx` — filter bar with search, event type, country, path, and date range.
 `app/settings/users/page.tsx` — filter bar with search (name/email) and status select.
+`app/components/posts/PostsTable.tsx` — client-side CRUD filter UX: `Memproses...` button state plus skeleton table body while keeping the filter section visible.
 
 ### Server-side filtering pattern (Next.js)
 

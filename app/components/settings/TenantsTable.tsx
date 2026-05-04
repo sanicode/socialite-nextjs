@@ -33,6 +33,7 @@ type Props = {
   sortBy: string
   sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
+  isLoading?: boolean
 }
 
 // ── Sort helpers ──────────────────────────────────────────────────────────────
@@ -908,7 +909,7 @@ function ManageUsersPanel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams }: Props) {
+export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams, isLoading = false }: Props) {
   const { showToast } = useToast()
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -1080,7 +1081,30 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
             </tr>
           </thead>
           <tbody>
-            {localTenants.map((t) => {
+            {isLoading && Array.from({ length: 6 }).map((_, index) => (
+              <tr key={`tenants-skeleton-${index}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
+                <td className="px-4 py-3">
+                  <div className="h-4 w-36 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-40 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-5 w-10 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-5 w-10 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-7 w-24 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+              </tr>
+            ))}
+
+            {!isLoading && localTenants.map((t) => {
               const hasUsers = t.manager_count + t.operator_count > 0
               return (
                 <tr
@@ -1146,7 +1170,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
               )
             })}
 
-            {localTenants.length === 0 && (
+            {!isLoading && localTenants.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400 dark:text-neutral-500">
                   Tidak ada tenant.

@@ -12,6 +12,7 @@ import { useToast } from '@/app/components/ToastContext'
 
 type Props = {
   operators: OperatorRow[]
+  isLoading?: boolean
 }
 
 function AttachDialog({ onClose }: { onClose: () => void }) {
@@ -142,7 +143,7 @@ function AttachDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function OperatorsTable({ operators }: Props) {
+export default function OperatorsTable({ operators, isLoading = false }: Props) {
   const [pending, startTransition] = useTransition()
   const { showToast } = useToast()
   const confirmRef = useRef<HTMLDialogElement>(null)
@@ -229,7 +230,31 @@ export default function OperatorsTable({ operators }: Props) {
           </button>
         </div>
 
-        {operators.length === 0 ? (
+        {isLoading ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-800/50">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Nama</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">No. Telp</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 6 }).map((_, rowIndex) => (
+                  <tr key={`operator-skeleton-${rowIndex}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
+                    {[0, 1, 2, 3].map((colIndex) => (
+                      <td key={`operator-skeleton-${rowIndex}-${colIndex}`} className="px-4 py-3">
+                        <div className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${colIndex === 3 ? 'ml-auto h-7 w-16' : 'h-4 w-28'}`} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : operators.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
             Belum ada operator.
           </div>

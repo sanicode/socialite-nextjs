@@ -207,7 +207,7 @@ export default function SearchInput({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
               </svg>
             )}
-            {isPending ? 'Memuat...' : 'Filter'}
+            {isPending ? 'Memproses...' : 'Filter'}
           </button>
         </form>
       )}

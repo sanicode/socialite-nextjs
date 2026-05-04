@@ -135,6 +135,11 @@ Login web mendukung Cloudflare Turnstile adaptif. Jika `CAPTCHA_SITE_KEY` dan `C
 - `/dashboard`, `/posts`, `/posts/upload`, `/posts/amplifikasi`, dan `/posts/users` default ke tanggal hari ini di timezone `Asia/Jakarta`.
 - `/posts`, `/posts/upload`, dan `/posts/amplifikasi` memiliki filter status `pending`, `valid`, `invalid`.
 - Filter provinsi/kota membaca provinsi dari relasi `city_id` pada `addresses`.
+- Standar UX filter CRUD:
+  - section filter tidak boleh tertutup overlay/skeleton saat tombol Filter diklik.
+  - tombol Filter wajib berubah menjadi `Memproses...`, menampilkan spinner kecil, dan disabled selama proses.
+  - skeleton hanya tampil pada area hasil/table body; header tabel dan filter tetap terlihat.
+  - hindari full-page loading overlay untuk proses filter tabel.
 
 ### Dashboard
 
@@ -230,7 +235,7 @@ Response: `[{ "id": "1", "name": "Instagram" }, ...]`
 
 - Setiap `'use server'` action wajib memanggil `requireUser()` / `requireAdmin()` / `requireManagerOrAdmin()` sebagai baris pertama
 - Setiap `page.tsx` wajib cek `getSessionUser()` + redirect jika tidak auth
-- Filter tabel: gunakan `force-dynamic` + `key` prop pada client component + `router.push` di `startTransition`
+- Filter tabel: gunakan `force-dynamic` + `key` prop pada client component + `router.push` di `startTransition`; tombol Filter harus menampilkan `Memproses...` dan skeleton hanya muncul di table body/result area
 - Sort tabel: gunakan `useRouter` + `startTransition`, bukan `<Link>`
 - Pagination: URL-based, page size dapat dipilih `5`, `10`, `20`, `50`, atau `all`, selalu preserve filter params
 - Upload file wajib divalidasi dari isi file, bukan dari header/nama file dari klien

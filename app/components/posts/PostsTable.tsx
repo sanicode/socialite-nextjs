@@ -9,7 +9,6 @@ import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
 import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
 import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
-import RequestLoadingOverlay from '@/app/components/RequestLoadingOverlay'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import { getPageSlice, type TablePageSize } from '@/app/lib/table-pagination'
 
@@ -100,6 +99,7 @@ export default function PostsTable({
   const [filterJenis, setFilterJenis] = useState(searchParams.get('jenis') ?? '')
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
   const [filterCategory, setFilterCategory] = useState(searchParams.get('category') ?? '')
+  const [isFilterProcessing, setIsFilterProcessing] = useState(false)
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
   const showRegionFilter = isAdmin && !!provinces
 
@@ -219,6 +219,7 @@ export default function PostsTable({
     setFilterJenis(searchParams.get('jenis') ?? '')
     setFilterStatus(searchParams.get('status') ?? '')
     setFilterCategory(searchParams.get('category') ?? '')
+    setIsFilterProcessing(false)
   }, [defaultDateFrom, defaultDateTo, searchParams])
 
   useEffect(() => {
@@ -270,21 +271,19 @@ export default function PostsTable({
     }
     params.delete('page')
 
+    const query = params.toString()
+    const nextHref = query ? `${basePath}?${query}` : basePath
+    const currentHref = searchParams.toString() ? `${basePath}?${searchParams.toString()}` : basePath
+    if (nextHref === currentHref) return
+
+    setIsFilterProcessing(true)
     startTransition(() => {
-      const query = params.toString()
-      router.push(query ? `${basePath}?${query}` : basePath)
+      router.push(nextHref)
     })
   }
 
   return (
     <div className="space-y-4">
-      {isPending && (
-        <RequestLoadingOverlay
-          title="Memuat data laporan..."
-          description="Perubahan filter atau halaman sedang diproses."
-        />
-      )}
-
       {/* Filters */}
       <form onSubmit={applyFilters} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <label className="flex flex-col gap-1">
@@ -389,13 +388,20 @@ export default function PostsTable({
         </label>
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isFilterProcessing}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6 12h12m-8 7.5h4" />
-          </svg>
-          Filter
+          {isFilterProcessing ? (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+            </svg>
+          ) : (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6 12h12m-8 7.5h4" />
+            </svg>
+          )}
+          {isFilterProcessing ? 'Memproses...' : 'Filter'}
         </button>
       </form>
 
@@ -520,29 +526,45 @@ export default function PostsTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {posts.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={columnCount}
-                    className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400"
-                  >
-                    Belum ada laporan.{' '}
-                    {createDisabled ? (
-                      <span
-                        title={createDisabledMessage ?? 'Pelaporan operator sedang ditutup.'}
-                        className="cursor-not-allowed text-neutral-400 dark:text-neutral-600"
+              {isFilterProcessing ? (
+                Array.from({ length: 6 }).map((_, rowIndex) => (
+                  <tr key={`filter-skeleton-${rowIndex}`} className="bg-white dark:bg-neutral-900">
+                    {Array.from({ length: columnCount }).map((__, colIndex) => (
+                      <td key={`filter-skeleton-${rowIndex}-${colIndex}`} className="px-4 py-3">
+                        <div
+                          className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${
+                            colIndex === 0 ? 'h-4 w-16' : colIndex === columnCount - 1 ? 'h-7 w-16' : 'h-4 w-24'
+                          }`}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <>
+                  {posts.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={columnCount}
+                        className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400"
                       >
-                        Buat laporan pertama Anda
-                      </span>
-                    ) : (
-                      <Link href={`${basePath}/new`} className="underline">
-                        Buat laporan pertama Anda
-                      </Link>
-                    )}
-                  </td>
-                </tr>
-              )}
-              {posts.map((post) => (
+                        Belum ada laporan.{' '}
+                        {createDisabled ? (
+                          <span
+                            title={createDisabledMessage ?? 'Pelaporan operator sedang ditutup.'}
+                            className="cursor-not-allowed text-neutral-400 dark:text-neutral-600"
+                          >
+                            Buat laporan pertama Anda
+                          </span>
+                        ) : (
+                          <Link href={`${basePath}/new`} className="underline">
+                            Buat laporan pertama Anda
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  {posts.map((post) => (
                 <tr
                   key={post.id}
                   className="bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
@@ -753,7 +775,9 @@ export default function PostsTable({
                     </td>
                   )}
                 </tr>
-              ))}
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>

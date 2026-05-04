@@ -2,9 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getOperators } from '@/app/actions/operators'
-import OperatorsTable from '@/app/components/operators/OperatorsTable'
-import TableSearchForm from '@/app/components/TableSearchForm'
-import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import OperatorsClientSection from '@/app/components/operators/OperatorsClientSection'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
@@ -57,55 +55,12 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
           </p>
         </div>
 
-        {/* Filter */}
-        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
-          {params.search && <input type="hidden" name="search" value={params.search} />}
-          {params.pageSize && <input type="hidden" name="pageSize" value={params.pageSize} />}
-          <input
-            type="search"
-            name="email"
-            defaultValue={params.email ?? ''}
-            placeholder="Email..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
-          <input
-            type="search"
-            name="phone"
-            defaultValue={params.phone ?? ''}
-            placeholder="Nomor telp..."
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-            >
-              Filter
-            </button>
-            <Link
-              href="/operators"
-              className="inline-flex items-center rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <TablePageSizeSelect value={pageSize} />
-          <TableSearchForm
-            action="/operators"
-            defaultValue={params.search}
-            placeholder="Cari nama..."
-            hiddenParams={{
-              pageSize: params.pageSize,
-              email: params.email,
-              phone: params.phone,
-            }}
-          />
-        </div>
-
-        <OperatorsTable operators={operators} />
+        <OperatorsClientSection
+          key={`${params.search ?? ''}-${params.email ?? ''}-${params.phone ?? ''}-${params.pageSize ?? ''}`}
+          operators={operators}
+          params={params}
+          pageSize={pageSize}
+        />
 
         {/* Pagination */}
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">

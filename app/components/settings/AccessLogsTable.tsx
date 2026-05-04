@@ -4,6 +4,7 @@ import type { AccessLogRow } from '@/app/lib/access-logs'
 
 type Props = {
   logs: AccessLogRow[]
+  isLoading?: boolean
 }
 
 function formatTimestamp(value: string) {
@@ -17,7 +18,7 @@ function formatTimestamp(value: string) {
   })
 }
 
-export default function AccessLogsTable({ logs }: Props) {
+export default function AccessLogsTable({ logs, isLoading = false }: Props) {
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
       <div className="overflow-x-auto">
@@ -34,14 +35,40 @@ export default function AccessLogsTable({ logs }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {logs.length === 0 && (
+            {isLoading && Array.from({ length: 8 }).map((_, index) => (
+              <tr key={`logs-skeleton-${index}`} className="bg-white align-top dark:bg-neutral-900">
+                <td className="px-4 py-3">
+                  <div className="h-4 w-32 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-48 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-5 w-16 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-24 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-36 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-44 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+              </tr>
+            ))}
+
+            {!isLoading && logs.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                   Belum ada log akses.
                 </td>
               </tr>
             )}
-            {logs.map((log) => (
+            {!isLoading && logs.map((log) => (
               <tr key={log.id} className="bg-white align-top transition hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/50">
                 <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                   {formatTimestamp(log.created_at)}
@@ -98,4 +125,3 @@ export default function AccessLogsTable({ logs }: Props) {
     </div>
   )
 }
-

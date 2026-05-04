@@ -14,6 +14,7 @@ type Props = {
   sortBy: string
   sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
+  isLoading?: boolean
 }
 
 function buildHref(
@@ -66,7 +67,7 @@ type ConfirmState =
   | { type: 'bulkReset'; emails: string[] }
   | null
 
-export default function UsersTable({ users, totalBlocked, totalUnderAttack, totalRateLimited, sortBy, sortDir, searchParams }: Props) {
+export default function UsersTable({ users, totalBlocked, totalUnderAttack, totalRateLimited, sortBy, sortDir, searchParams, isLoading = false }: Props) {
   const [pending, startTransition] = useTransition()
   const { showToast } = useToast()
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -266,7 +267,30 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {isLoading && Array.from({ length: 6 }).map((_, index) => (
+              <tr key={`users-skeleton-${index}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
+                <td className="px-4 py-3">
+                  <div className="h-4 w-4 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-32 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-48 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-5 w-16 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-4 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-7 w-36 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+              </tr>
+            ))}
+
+            {!isLoading && users.map((u) => {
               const underAttack = u.active_failed_attempts > 10
               const isSelected = selectedIds.has(u.id)
 
@@ -379,7 +403,7 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
               )
             })}
 
-            {users.length === 0 && (
+            {!isLoading && users.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400 dark:text-neutral-500">
                   Tidak ada user.

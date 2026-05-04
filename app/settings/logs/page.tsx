@@ -3,11 +3,9 @@ import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getAccessLogs } from '@/app/lib/access-logs'
 import { isAccessLoggingEnabled } from '@/app/actions/logs'
-import AccessLogsTable from '@/app/components/settings/AccessLogsTable'
+import LogsClientSection from '@/app/components/settings/LogsClientSection'
 import LogsToggle from '@/app/components/settings/LogsToggle'
 import LogsTruncateButton from '@/app/components/settings/LogsTruncateButton'
-import TableSearchForm from '@/app/components/TableSearchForm'
-import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
@@ -78,78 +76,12 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
           </div>
         </div>
 
-        <form className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 dark:border-neutral-800 dark:bg-neutral-900">
-          {params.search && <input type="hidden" name="search" value={params.search} />}
-          {params.pageSize && <input type="hidden" name="pageSize" value={params.pageSize} />}
-          <input
-            type="text"
-            name="eventType"
-            defaultValue={params.eventType ?? ''}
-            placeholder="Event type"
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
-          <input
-            type="text"
-            name="country"
-            defaultValue={params.country ?? ''}
-            placeholder="Country"
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm uppercase text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
-          <input
-            type="text"
-            name="path"
-            defaultValue={params.path ?? ''}
-            placeholder="Path"
-            className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-          />
-          <div className="flex gap-3 xl:col-span-2">
-            <input
-              type="date"
-              name="dateFrom"
-              defaultValue={params.dateFrom ?? ''}
-              className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-            />
-            <input
-              type="date"
-              name="dateTo"
-              defaultValue={params.dateTo ?? ''}
-              className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-            />
-          </div>
-          <div className="flex items-center gap-3 xl:col-span-6">
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-            >
-              Filter
-            </button>
-            <Link
-              href="/settings/logs"
-              className="inline-flex items-center rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <TablePageSizeSelect value={pageSize} />
-          <TableSearchForm
-            action="/settings/logs"
-            defaultValue={params.search}
-            placeholder="Cari IP, email, agent..."
-            hiddenParams={{
-              pageSize: params.pageSize,
-              eventType: params.eventType,
-              country: params.country,
-              path: params.path,
-              dateFrom: params.dateFrom,
-              dateTo: params.dateTo,
-            }}
-          />
-        </div>
-
-        <AccessLogsTable logs={rows} />
+        <LogsClientSection
+          key={`${params.search ?? ''}-${params.eventType ?? ''}-${params.country ?? ''}-${params.path ?? ''}-${params.dateFrom ?? ''}-${params.dateTo ?? ''}-${params.pageSize ?? ''}`}
+          logs={rows}
+          params={params}
+          pageSize={pageSize}
+        />
 
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
