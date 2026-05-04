@@ -1,14 +1,12 @@
 import { getSessionUser } from '@/app/lib/session'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/app/lib/prisma'
-import SearchInput from '@/app/components/posts/users/SearchInput'
 import Link from 'next/link'
 import PostsByUsersTable from '@/app/components/posts/users/PostsByUsersTable'
-import { getProvinces } from '@/app/actions/dashboard'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
-type SearchParams = Promise<{ search?: string; sortBy?: string; sortDir?: string; page?: string; pageSize?: string; provinceId?: string; cityId?: string; dateFrom?: string; dateTo?: string }>
+type SearchParams = Promise<{ sortBy?: string; sortDir?: string; page?: string; pageSize?: string }>
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -51,7 +49,7 @@ export default async function PostsByUsersPage({
     redirect('/posts/upload')
   }
 
-  const { search, sortBy: rawSortBy, sortDir: rawSortDir, page: pageParam, pageSize: pageSizeParam, provinceId, cityId, dateFrom: rawDateFrom, dateTo: rawDateTo } = await searchParams
+  const { sortBy: rawSortBy, sortDir: rawSortDir, page: pageParam, pageSize: pageSizeParam } = await searchParams
   const isAdmin = user.roles.includes('admin')
 
   const page    = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
@@ -60,10 +58,6 @@ export default async function PostsByUsersPage({
   const sortDir = rawSortDir === 'desc' ? 'DESC' : 'ASC'
   const orderCol = ALLOWED_SORT_COLS[sortBy]
   const today = getJakartaDateString()
-  const dateFrom = rawDateFrom ?? today
-  const dateTo = rawDateTo ?? today
-
-  const provinces = isAdmin ? await getProvinces() : []
 
   const tenantUser = await prisma.tenant_user.findFirst({
     where: { user_id: BigInt(user.id) },
@@ -74,23 +68,9 @@ export default async function PostsByUsersPage({
   const params: unknown[] = []
   let idx = 1
 
-  if (search) {
-    conditions.push(`(u.name ILIKE $${idx} OR u.email ILIKE $${idx})`)
-    params.push(`%${search}%`)
-    idx++
-  }
-
-  if (dateFrom) {
-    conditions.push(`date((post.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') >= $${idx}::date`)
-    params.push(dateFrom)
-    idx++
-  }
-
-  if (dateTo) {
-    conditions.push(`date((post.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') <= $${idx}::date`)
-    params.push(dateTo)
-    idx++
-  }
+  conditions.push(`date((post.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') = $${idx}::date`)
+  params.push(today)
+  idx++
 
   if (!isAdmin) {
     const tId = tenantUser?.tenant_id
@@ -98,22 +78,9 @@ export default async function PostsByUsersPage({
       conditions.push(`tu.tenant_id = $${idx}`)
       params.push(tId)
       idx++
+    } else {
+      conditions.push('1 = 0')
     }
-  }
-
-  const provinceIdNum = provinceId && isAdmin ? parseInt(provinceId, 10) : null
-  const cityIdNum = cityId && isAdmin && /^\d+$/.test(cityId) ? BigInt(cityId) : null
-
-  if (provinceIdNum) {
-    conditions.push(`c.province_id = $${idx}`)
-    params.push(provinceIdNum)
-    idx++
-  }
-
-  if (cityIdNum) {
-    conditions.push(`adr.city_id = $${idx}`)
-    params.push(cityIdNum)
-    idx++
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -171,14 +138,9 @@ export default async function PostsByUsersPage({
   `, ...params)
 
   const flatParams: Record<string, string | undefined> = {
-    search,
     sortBy:     rawSortBy,
     sortDir:    rawSortDir,
     pageSize:   pageSizeParam,
-    provinceId: isAdmin ? provinceId : undefined,
-    cityId:     isAdmin ? cityId : undefined,
-    dateFrom,
-    dateTo,
   }
 
   return (
@@ -192,43 +154,12 @@ export default async function PostsByUsersPage({
             {total > 0
               ? `${start}–${end} dari ${total.toLocaleString('id-ID')} operator`
               : '0 operator'}
+            <span className="ml-2 text-neutral-400 dark:text-neutral-500">Tanggal {new Date(`${today}T00:00:00+07:00`).toLocaleDateString('id-ID')}</span>
           </p>
-        </div>
-
-        {/* Filter */}
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <SearchInput
-              defaultValue={search ?? ''}
-              provinces={provinces}
-              isAdmin={isAdmin}
-              defaultDateFrom={dateFrom}
-              defaultDateTo={dateTo}
-              showSearch={false}
-            />
-            {(search || dateFrom !== today || dateTo !== today || (isAdmin && (provinceId || cityId))) && (
-              <Link
-                href="/posts/users"
-                className="px-4 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
-              >
-                Reset
-              </Link>
-            )}
-          </div>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TablePageSizeSelect value={pageSize} />
-          <div className="flex justify-end">
-            <SearchInput
-              defaultValue={search ?? ''}
-              provinces={provinces}
-              isAdmin={isAdmin}
-              defaultDateFrom={dateFrom}
-              defaultDateTo={dateTo}
-              showFilters={false}
-            />
-          </div>
         </div>
 
         {/* Table */}

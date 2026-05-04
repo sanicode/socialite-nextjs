@@ -65,12 +65,7 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
   }
 
   function buildViewHref(userId: number) {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('page')
-    params.delete('sortBy')
-    params.delete('sortDir')
-    const query = params.toString()
-    return query ? `/posts/users/${userId}?${query}` : `/posts/users/${userId}`
+    return `/posts/users/${userId}`
   }
 
   return (

@@ -9,11 +9,6 @@ import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting
 import AppAlert from '@/app/components/AppAlert'
 import UserPostsTableClient from './[status]/UserPostsTableClient'
 
-type SearchParams = Promise<{
-  dateFrom?: string
-  dateTo?: string
-}>
-
 type PostStatus = 'pending' | 'valid' | 'invalid'
 
 function getJakartaDateString(date = new Date()) {
@@ -31,17 +26,14 @@ function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
 
 export default async function UserPostsReviewPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ userId: string }>
-  searchParams: SearchParams
 }) {
   const actor = await getSessionUser()
   if (!actor) redirect('/login')
   if (!actor.roles.some((role) => ['admin', 'manager'].includes(role))) redirect('/posts/upload')
 
   const { userId } = await params
-  const { dateFrom: rawDateFrom, dateTo: rawDateTo } = await searchParams
   if (!userId || !/^\d+$/.test(userId)) {
     return <div className="min-h-screen bg-[var(--background)] px-4 py-5 text-neutral-500 sm:p-6">User ID tidak valid</div>
   }
@@ -61,8 +53,8 @@ export default async function UserPostsReviewPage({
   }
 
   const today = getJakartaDateString()
-  const dateFrom = rawDateFrom ?? today
-  const dateTo = rawDateTo ?? today
+  const dateFrom = today
+  const dateTo = today
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(actor.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
 
@@ -133,40 +125,6 @@ export default async function UserPostsReviewPage({
             Review Laporan — {targetUser.name}
           </h1>
         </div>
-
-        <form className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
-              <input
-                type="date"
-                name="dateFrom"
-                defaultValue={dateFrom}
-                className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
-              <input
-                type="date"
-                name="dateTo"
-                defaultValue={dateTo}
-                className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
-              />
-            </label>
-            <button className="rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100">
-              Filter
-            </button>
-            {(dateFrom !== today || dateTo !== today) && (
-              <Link
-                href={`/posts/users/${userId}`}
-                className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
-              >
-                Reset
-              </Link>
-            )}
-          </div>
-        </form>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
