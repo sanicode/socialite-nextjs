@@ -128,14 +128,13 @@ export default function SummaryExcelButton({
     <button
       type="button"
       onClick={handleDownload}
-      className="summary-no-print inline-flex items-center gap-2 rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+      className="summary-no-print inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
     >
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 8h8M8 12h8M8 16h4" />
       </svg>
-      Download Excel
+      Excel
     </button>
   )
 }
-

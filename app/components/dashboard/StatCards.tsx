@@ -20,6 +20,7 @@ type Props = {
   maskOperatorName?: boolean
   palette?: 'default' | 'statistik'
   theme?: 'light' | 'dark'
+  reportedStatus?: 'pending' | 'valid' | 'invalid' | ''
 }
 
 type DialogState =
@@ -307,9 +308,17 @@ export default function StatCards({
   maskOperatorName = false,
   palette = 'default',
   theme = 'light',
+  reportedStatus = '',
 }: Props) {
   const [dialog, setDialog] = useState<DialogState>(null)
   const useStatistikPalette = palette === 'statistik'
+  const reportedStatusLabel = reportedStatus === 'valid'
+    ? 'Valid'
+    : reportedStatus === 'pending'
+      ? 'Pending'
+      : reportedStatus === 'invalid'
+        ? 'Invalid'
+        : ''
   const statistikColors = theme === 'dark'
     ? {
         label: '#b7c8cd',
@@ -394,7 +403,7 @@ export default function StatCards({
       accentStyle: useStatistikPalette ? { backgroundColor: statistikColors.total.color } : undefined,
     },
     {
-      label: 'Sudah Lapor',
+      label: reportedStatusLabel ? `Jumlah Pelapor ${reportedStatusLabel}` : 'Jumlah Pelapor',
       value: summary.reportedOperators,
       icon: <ReportedIcon />,
       iconClassName: useStatistikPalette

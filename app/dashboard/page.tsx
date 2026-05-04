@@ -276,7 +276,7 @@ export default async function DashboardPage({ searchParams }: Props) {
           />
         </Suspense>
 
-        <StatCards summary={operatorReportSummary} />
+        <StatCards summary={operatorReportSummary} reportedStatus={filters.status ?? ''} />
 
         {isAdmin && (
           <>

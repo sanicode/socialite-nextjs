@@ -8,7 +8,7 @@ import SummaryPdfButton from '@/app/components/summary/SummaryPdfButton'
 import SummaryExcelButton from '@/app/components/summary/SummaryExcelButton'
 
 type Props = {
-  searchParams: Promise<{ month?: string; tab?: string }>
+  searchParams: Promise<{ month?: string; tab?: string; provinceId?: string }>
 }
 
 type QuotaRow = {
@@ -88,9 +88,10 @@ function getDailyCellClass(count: number, quota: number) {
   return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
 }
 
-function buildSummaryHref(month: string, tab: 'summary' | 'analytics') {
+function buildSummaryHref(month: string, tab: 'summary' | 'analytics', provinceId?: string) {
   const params = new URLSearchParams()
   params.set('month', month)
+  if (provinceId) params.set('provinceId', provinceId)
   if (tab !== 'summary') params.set('tab', tab)
   return `/summary?${params.toString()}`
 }
@@ -134,34 +135,88 @@ export default async function SummaryPage({ searchParams }: Props) {
   const params = await searchParams
   const month = normalizeMonth(params.month)
   const activeTab = params.tab === 'analytics' ? 'analytics' : 'summary'
+  const requestedProvinceId = params.provinceId && /^\d+$/.test(params.provinceId) ? params.provinceId : ''
   const dates = getMonthDates(month)
   const startDate = dates[0]
   const endDate = dates[dates.length - 1]
   const monthLabel = formatMonthLabel(month)
 
-  const [quotaRows, dailyRows] = await Promise.all([
-    prisma.$queryRaw<QuotaRow[]>`
+  const provinces = await prisma.reg_provinces.findMany({ orderBy: { name: 'asc' } })
+  const selectedProvince = requestedProvinceId
+    ? provinces.find((province) => province.id.toString() === requestedProvinceId)
+    : null
+  const selectedProvinceId = selectedProvince ? requestedProvinceId : ''
+  const selectedProvinceName = selectedProvince?.name ?? null
+
+  const quotaRows = await prisma.$queryRaw<QuotaRow[]>`
       SELECT
         propinsi,
         kota,
         COALESCE(SUM(jumlah), 0)::bigint AS kuota
       FROM v_kuota_per_kota
+      WHERE (${selectedProvinceName}::text IS NULL OR propinsi = ${selectedProvinceName}::text)
       GROUP BY propinsi, kota
       ORDER BY propinsi ASC, kota ASC
-    `,
-    prisma.$queryRaw<DailyRow[]>`
+    `
+  const dailyWhereProvince = selectedProvinceId ? `AND rc.province_id = $3::int` : ''
+  const dailyQueryParams: unknown[] = selectedProvinceId
+    ? [startDate, endDate, selectedProvinceId]
+    : [startDate, endDate]
+  const dailyRows = await prisma.$queryRawUnsafe<DailyRow[]>(
+    `
+      WITH daily_valid_complete AS (
+        SELECT
+          date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') AS tanggal_pelaporan,
+          bp.user_id,
+          bp.tenant_id,
+          rp.name AS propinsi,
+          rc.name AS kota
+        FROM blog_posts bp
+        INNER JOIN users u ON u.id = bp.user_id
+        INNER JOIN tenant_user tu
+          ON tu.user_id = bp.user_id
+         AND tu.tenant_id = bp.tenant_id
+        INNER JOIN model_has_roles mhr
+          ON mhr.model_id = tu.id
+         AND mhr.model_type = 'App\\Models\\TenantUser'
+        INNER JOIN roles r
+          ON r.id = mhr.role_id
+         AND r.name = 'operator'
+        LEFT JOIN LATERAL (
+          SELECT a.city_id
+          FROM addresses a
+          WHERE a.tenant_id = tu.tenant_id
+          ORDER BY a.id ASC
+          LIMIT 1
+        ) addr ON true
+        LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+        LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+        WHERE bp.source_url IN ('upload', 'amplifikasi')
+          AND bp.status::text = 'valid'
+          AND COALESCE(u.is_blocked, false) = false
+          AND date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') >= $1::date
+          AND date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') <= $2::date
+          ${dailyWhereProvince}
+        GROUP BY
+          date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta'),
+          bp.user_id,
+          bp.tenant_id,
+          rp.name,
+          rc.name
+        HAVING COUNT(*) FILTER (WHERE bp.source_url = 'upload') > 0
+           AND COUNT(*) FILTER (WHERE bp.source_url = 'amplifikasi') > 0
+      )
       SELECT
         propinsi,
-        kabupaten_kota AS kota,
+        kota,
         to_char(tanggal_pelaporan, 'YYYY-MM-DD') AS date,
         COUNT(*)::bigint AS total
-      FROM v_rekapitulasi_pelaporan
-      WHERE tanggal_pelaporan >= CAST(${startDate} AS date)
-        AND tanggal_pelaporan <= CAST(${endDate} AS date)
-      GROUP BY propinsi, kabupaten_kota, tanggal_pelaporan
-      ORDER BY propinsi ASC, kabupaten_kota ASC, tanggal_pelaporan ASC
+      FROM daily_valid_complete
+      GROUP BY propinsi, kota, tanggal_pelaporan
+      ORDER BY propinsi ASC, kota ASC, tanggal_pelaporan ASC
     `,
-  ])
+    ...dailyQueryParams
+  )
 
   const summariesByCity = new Map<string, CitySummary>()
 
@@ -258,7 +313,7 @@ export default async function SummaryPage({ searchParams }: Props) {
             </p>
           </div>
 
-          <form className="summary-no-print flex flex-wrap items-end gap-3">
+          <form className="summary-no-print grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(10rem,12rem)_minmax(14rem,18rem)_auto] lg:w-auto lg:grid-cols-[minmax(10rem,12rem)_minmax(14rem,18rem)_auto_auto_auto]">
             {activeTab === 'analytics' && <input type="hidden" name="tab" value="analytics" />}
             <label className="flex flex-col gap-1">
               <span className="text-xs text-neutral-500 dark:text-neutral-400">Bulan</span>
@@ -266,12 +321,27 @@ export default async function SummaryPage({ searchParams }: Props) {
                 type="month"
                 name="month"
                 defaultValue={month}
-                className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:focus:ring-white"
+                className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:focus:ring-white"
               />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Provinsi</span>
+              <select
+                name="provinceId"
+                defaultValue={selectedProvinceId}
+                className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:focus:ring-white"
+              >
+                <option value="">Semua Provinsi</option>
+                {provinces.map((province) => (
+                  <option key={province.id} value={province.id}>
+                    {province.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <button
               type="submit"
-              className="rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
             >
               Tampilkan
             </button>
@@ -293,7 +363,7 @@ export default async function SummaryPage({ searchParams }: Props) {
         <div className="summary-no-print border-b border-neutral-200 dark:border-neutral-800">
           <nav className="-mb-px flex gap-5">
             <Link
-              href={buildSummaryHref(month, 'summary')}
+              href={buildSummaryHref(month, 'summary', selectedProvinceId)}
               className={`border-b-2 px-1 py-3 text-sm font-semibold transition ${
                 activeTab === 'summary'
                   ? 'border-neutral-900 text-neutral-900 dark:border-white dark:text-white'
@@ -303,7 +373,7 @@ export default async function SummaryPage({ searchParams }: Props) {
               Summary
             </Link>
             <Link
-              href={buildSummaryHref(month, 'analytics')}
+              href={buildSummaryHref(month, 'analytics', selectedProvinceId)}
               className={`border-b-2 px-1 py-3 text-sm font-semibold transition ${
                 activeTab === 'analytics'
                   ? 'border-neutral-900 text-neutral-900 dark:border-white dark:text-white'

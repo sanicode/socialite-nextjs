@@ -229,6 +229,7 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
     `COALESCE(u.is_blocked, false) = false`,
   ]
   const postConditions: string[] = []
+  const missingPostConditions: string[] = []
   const params: unknown[] = []
   let idx = 1
 
@@ -243,12 +244,16 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
     idx++
   }
   if (filters.dateFrom) {
-    postConditions.push(`${BLOG_POST_JAKARTA_DATE_SQL} >= $${idx}::date`)
+    const condition = `${BLOG_POST_JAKARTA_DATE_SQL} >= $${idx}::date`
+    postConditions.push(condition)
+    missingPostConditions.push(condition)
     params.push(filters.dateFrom)
     idx++
   }
   if (filters.dateTo) {
-    postConditions.push(`${BLOG_POST_JAKARTA_DATE_SQL} <= $${idx}::date`)
+    const condition = `${BLOG_POST_JAKARTA_DATE_SQL} <= $${idx}::date`
+    postConditions.push(condition)
+    missingPostConditions.push(condition)
     params.push(filters.dateTo)
     idx++
   }
@@ -259,6 +264,7 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
   }
 
   const postWhere = postConditions.length > 0 ? `AND ${postConditions.join(' AND ')}` : ''
+  const missingPostWhere = missingPostConditions.length > 0 ? `AND ${missingPostConditions.join(' AND ')}` : ''
   const rows = await prisma.$queryRawUnsafe<{
     tenant_user_id: bigint
     user_id: bigint
@@ -269,6 +275,8 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
     city: string | null
     upload_count: bigint
     amplifikasi_count: bigint
+    missing_upload_count: bigint
+    missing_amplifikasi_count: bigint
   }[]>(
     `
     WITH operator_scope AS (
@@ -309,6 +317,20 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
       WHERE bp.source_url IN ('upload', 'amplifikasi')
       ${postWhere}
       GROUP BY bp.user_id, bp.tenant_id
+    ),
+    missing_status_counts AS (
+      SELECT
+        bp.user_id,
+        bp.tenant_id,
+        COUNT(*) FILTER (WHERE bp.source_url = 'upload') AS upload_count,
+        COUNT(*) FILTER (WHERE bp.source_url = 'amplifikasi') AS amplifikasi_count
+      FROM blog_posts bp
+      INNER JOIN operator_scope os
+        ON os.user_id = bp.user_id
+       AND os.tenant_id = bp.tenant_id
+      WHERE bp.source_url IN ('upload', 'amplifikasi')
+      ${missingPostWhere}
+      GROUP BY bp.user_id, bp.tenant_id
     )
     SELECT
       os.tenant_user_id,
@@ -319,11 +341,16 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
       os.province,
       os.city,
       COALESCE(pc.upload_count, 0)::bigint AS upload_count,
-      COALESCE(pc.amplifikasi_count, 0)::bigint AS amplifikasi_count
+      COALESCE(pc.amplifikasi_count, 0)::bigint AS amplifikasi_count,
+      COALESCE(msc.upload_count, 0)::bigint AS missing_upload_count,
+      COALESCE(msc.amplifikasi_count, 0)::bigint AS missing_amplifikasi_count
     FROM operator_scope os
     LEFT JOIN post_counts pc
       ON pc.user_id = os.user_id
      AND pc.tenant_id = os.tenant_id
+    LEFT JOIN missing_status_counts msc
+      ON msc.user_id = os.user_id
+     AND msc.tenant_id = os.tenant_id
     ORDER BY os.province NULLS LAST, os.city NULLS LAST, os.name ASC
     `,
     ...params
@@ -332,7 +359,10 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
   const allRows = rows.map((row) => {
     const uploadCount = Number(row.upload_count)
     const amplifikasiCount = Number(row.amplifikasi_count)
+    const missingUploadCount = Number(row.missing_upload_count)
+    const missingAmplifikasiCount = Number(row.missing_amplifikasi_count)
     const hasReported = uploadCount > 0 && amplifikasiCount > 0
+    const hasReportedIgnoringStatus = missingUploadCount > 0 && missingAmplifikasiCount > 0
     return {
       tenantUserId: row.tenant_user_id.toString(),
       userId: row.user_id.toString(),
@@ -346,11 +376,27 @@ async function getOperatorReportSummary(filters: StatistikFilters): Promise<Stat
       missingUpload: uploadCount === 0,
       missingAmplifikasi: amplifikasiCount === 0,
       hasReported,
+      missingStatusRow: {
+        tenantUserId: row.tenant_user_id.toString(),
+        userId: row.user_id.toString(),
+        name: row.name,
+        email: row.email,
+        phoneNumber: row.phone_number,
+        province: row.province,
+        city: row.city,
+        uploadCount: missingUploadCount,
+        amplifikasiCount: missingAmplifikasiCount,
+        missingUpload: missingUploadCount === 0,
+        missingAmplifikasi: missingAmplifikasiCount === 0,
+        hasReported: hasReportedIgnoringStatus,
+      },
     }
   })
 
   const reportedRows = allRows.filter((row) => row.hasReported)
-  const missingRows = allRows.filter((row) => !row.hasReported)
+  const missingRows = allRows
+    .filter((row) => !row.missingStatusRow.hasReported)
+    .map((row) => row.missingStatusRow)
 
   return {
     totalOperators: allRows.length,

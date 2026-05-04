@@ -486,7 +486,14 @@ export default function StatistikDashboardClient({
         {/* Data / Skeleton */}
         {data ? (
           <>
-            <StatCards summary={data.summary} hideOperatorEmail hideOperatorContact palette="statistik" theme={theme} />
+            <StatCards
+              summary={data.summary}
+              hideOperatorEmail
+              hideOperatorContact
+              palette="statistik"
+              theme={theme}
+              reportedStatus={filters.status ?? ''}
+            />
             <ProvinceDonutChart data={data.provinceData} variant="statistik" theme={theme} />
             <CityBarChart data={data.cityData} variant="statistik" theme={theme} />
             <DailyPostsChart data={data.dailyData} variant="statistik" theme={theme} />
