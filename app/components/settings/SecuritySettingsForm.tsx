@@ -40,6 +40,9 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
   const [allowedCountriesText, setAllowedCountriesText] = useState(initialState.settings.allowedCountriesText)
   const [allowUnknownCountries, setAllowUnknownCountries] = useState(initialState.settings.allowUnknownCountries)
   const [apiEnabled, setApiEnabled] = useState(initialState.settings.apiEnabled)
+  const [socialMediaConnectionsEnabled, setSocialMediaConnectionsEnabled] = useState(
+    initialState.settings.socialMediaConnectionsEnabled
+  )
   const [maxUploadedFileSizeBytes, setMaxUploadedFileSizeBytes] = useState(
     initialState.settings.maxUploadedFileSizeBytes
   )
@@ -344,6 +347,27 @@ export default function SecuritySettingsForm({ initialState, currentIp, currentC
             </span>
           </label>
           <input type="hidden" name="apiEnabled" value={apiEnabled ? '1' : '0'} />
+        </div>
+
+        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={socialMediaConnectionsEnabled}
+              onChange={(event) => setSocialMediaConnectionsEnabled(event.target.checked)}
+              disabled={pending}
+              className="mt-1 h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+            />
+            <span>
+              <span className="block text-sm font-medium text-neutral-900 dark:text-white">
+                Aktifkan akun medsos operator
+              </span>
+              <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                Jika aktif, operator dapat melihat menu Akun Medsos dan menghubungkan akun media sosial melalui OAuth.
+              </span>
+            </span>
+          </label>
+          <input type="hidden" name="socialMediaConnectionsEnabled" value={socialMediaConnectionsEnabled ? '1' : '0'} />
         </div>
       </div>
 

@@ -22,6 +22,7 @@ export type SecuritySettingsState =
         allowedCountriesText: string
         allowUnknownCountries: boolean
         apiEnabled: boolean
+        socialMediaConnectionsEnabled: boolean
         maxUploadedFileSizeBytes: number
         imageCompressionEnabled: boolean
         operatorReportingWindowEnabled: boolean
@@ -53,6 +54,7 @@ export async function getSecuritySettingsFormState(): Promise<NonNullable<Securi
       allowedCountriesText: settings.allowedCountries.join(', '),
       allowUnknownCountries: settings.allowUnknownCountries,
       apiEnabled: settings.apiEnabled,
+      socialMediaConnectionsEnabled: settings.socialMediaConnectionsEnabled,
       maxUploadedFileSizeBytes: settings.maxUploadedFileSizeBytes,
       imageCompressionEnabled: settings.imageCompressionEnabled,
       operatorReportingWindowEnabled: settings.operatorReportingWindowEnabled,
@@ -76,6 +78,7 @@ export async function saveSecuritySettings(
     allowedCountries: parseList(formData.get('allowedCountries')),
     allowUnknownCountries: formData.get('allowUnknownCountries') === '1',
     apiEnabled: formData.get('apiEnabled') === '1',
+    socialMediaConnectionsEnabled: formData.get('socialMediaConnectionsEnabled') === '1',
     maxUploadedFileSizeBytes: formData.get('maxUploadedFileSizeBytes'),
     imageCompressionEnabled: formData.get('imageCompressionEnabled') === '1',
     operatorReportingWindowEnabled: formData.get('operatorReportingWindowEnabled') === '1',
@@ -98,6 +101,7 @@ export async function saveSecuritySettings(
         allowedCountriesText: nextSettings.allowedCountries.join(', '),
         allowUnknownCountries: nextSettings.allowUnknownCountries,
         apiEnabled: nextSettings.apiEnabled,
+        socialMediaConnectionsEnabled: nextSettings.socialMediaConnectionsEnabled,
         maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
         imageCompressionEnabled: nextSettings.imageCompressionEnabled,
         operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
@@ -117,6 +121,7 @@ export async function saveSecuritySettings(
     allowedCountriesCount: nextSettings.allowedCountries.length,
     allowUnknownCountries: nextSettings.allowUnknownCountries,
     apiEnabled: nextSettings.apiEnabled,
+    socialMediaConnectionsEnabled: nextSettings.socialMediaConnectionsEnabled,
     maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
     imageCompressionEnabled: nextSettings.imageCompressionEnabled,
     operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,
@@ -128,6 +133,7 @@ export async function saveSecuritySettings(
   })
 
   revalidatePath('/settings/security')
+  revalidatePath('/social-medias')
 
   return {
     status: 'success',
@@ -137,6 +143,7 @@ export async function saveSecuritySettings(
       allowedCountriesText: nextSettings.allowedCountries.join(', '),
       allowUnknownCountries: nextSettings.allowUnknownCountries,
       apiEnabled: nextSettings.apiEnabled,
+      socialMediaConnectionsEnabled: nextSettings.socialMediaConnectionsEnabled,
       maxUploadedFileSizeBytes: nextSettings.maxUploadedFileSizeBytes,
       imageCompressionEnabled: nextSettings.imageCompressionEnabled,
       operatorReportingWindowEnabled: nextSettings.operatorReportingWindowEnabled,

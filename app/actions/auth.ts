@@ -15,6 +15,12 @@ import {
   clearLoginFailures,
   shouldRequireLoginCaptcha,
 } from '@/app/lib/login-rate-limit'
+import {
+  getDatabaseConnectionErrorMessage,
+  getDatabaseSchemaErrorMessage,
+  isDatabaseConnectionError,
+  isDatabaseSchemaError,
+} from '@/app/lib/database-errors'
 
 export type LoginFormState =
   | {
@@ -33,6 +39,7 @@ export async function login(
   state: LoginFormState,
   formData: FormData
 ): Promise<LoginFormState> {
+  try {
   const decision = await getRequestSecurityDecision()
   if (!decision.allowed) {
     logEvent('warn', 'auth.login.blocked_by_security_policy', {
@@ -160,6 +167,15 @@ export async function login(
     userEmail: email,
   })
   redirect('/dashboard')
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return { message: getDatabaseConnectionErrorMessage() }
+    }
+    if (isDatabaseSchemaError(error)) {
+      return { message: getDatabaseSchemaErrorMessage() }
+    }
+    throw error
+  }
 }
 
 export async function logout(): Promise<void> {

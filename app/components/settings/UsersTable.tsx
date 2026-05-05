@@ -250,17 +250,20 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
               {[
                 { label: 'Nama',           col: 'name' },
                 { label: 'Email',          col: 'email' },
+                { label: 'Tenant',         col: null },
                 { label: 'Status',         col: 'is_blocked' },
                 { label: 'Terakhir Aktif', col: 'last_seen_at' },
               ].map(({ label, col }) => (
-                <th key={col} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                  <Link
-                    href={sortLink(col)}
-                    className="inline-flex items-center gap-0.5 hover:text-neutral-900 dark:hover:text-white transition-colors"
-                  >
-                    {label}
-                    <SortIcon active={sortBy === col} dir={sortDir} />
-                  </Link>
+                <th key={label} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  {col ? (
+                    <Link
+                      href={sortLink(col)}
+                      className="inline-flex items-center gap-0.5 hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      {label}
+                      <SortIcon active={sortBy === col} dir={sortDir} />
+                    </Link>
+                  ) : label}
                 </th>
               ))}
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Aksi</th>
@@ -277,6 +280,9 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
                 </td>
                 <td className="px-4 py-3">
                   <div className="h-4 w-48 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="h-5 w-36 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
                 </td>
                 <td className="px-4 py-3">
                   <div className="h-5 w-16 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
@@ -349,6 +355,25 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
 
                   {/* Status */}
                   <td className="px-4 py-3">
+                    {u.tenants.length > 0 ? (
+                      <div className="flex max-w-xs flex-wrap gap-1.5">
+                        {u.tenants.map((tenant) => (
+                          <span
+                            key={tenant}
+                            className="inline-flex max-w-[12rem] items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                            title={tenant}
+                          >
+                            <span className="truncate">{tenant}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500">—</span>
+                    )}
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         u.is_blocked
@@ -405,7 +430,7 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
 
             {!isLoading && users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400 dark:text-neutral-500">
+                <td colSpan={7} className="px-4 py-10 text-center text-sm text-neutral-400 dark:text-neutral-500">
                   Tidak ada user.
                 </td>
               </tr>

@@ -3,8 +3,10 @@ import { getSessionUserId } from '@/app/lib/session'
 import { getUserRoles } from '@/app/lib/permissions'
 import { prisma } from '@/app/lib/prisma'
 import ShellClient from './ShellClient'
-import { redirectIfRequestBlocked } from '@/app/lib/request-security'
+import { getSecuritySettings, redirectIfRequestBlocked } from '@/app/lib/request-security'
 import { getRequestMetadata, writeAccessLog } from '@/app/lib/access-logs'
+import { isDatabaseConnectionError, isDatabaseSchemaError } from '@/app/lib/database-errors'
+import DatabaseUnavailableScreen from '@/app/components/DatabaseUnavailableScreen'
 
 async function getSessionUser() {
   const userId = await getSessionUserId()
@@ -38,30 +40,54 @@ async function getSessionUser() {
 }
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
-  await redirectIfRequestBlocked()
-  const user = await getSessionUser()
+  let shellProps!: Parameters<typeof ShellClient>[0]
 
-  if (!user) {
-    redirect('/login')
+  try {
+    await redirectIfRequestBlocked()
+    const user = await getSessionUser()
+
+    if (!user) {
+      redirect('/login')
+    }
+
+    const securitySettings = await getSecuritySettings()
+    const appName = process.env.APP_NAME ?? 'Admin Panel'
+    const showSummary = user.isAdmin
+    const showDashboard = user.isAdmin || user.isManager || user.isOperator
+    const showOperators = user.isManager
+    const showLaporanPerOperator = user.isAdmin || user.isManager
+    const showLaporanSemua = user.isAdmin || user.isManager
+    const requestMetadata = await getRequestMetadata()
+    const showLaporanUpload = user.isOperator
+    const showLaporanAmplifikasi = user.isOperator
+    const showSocialMedias = user.isOperator && securitySettings.socialMediaConnectionsEnabled
+    await writeAccessLog({
+      eventType: 'page_view',
+      status: 'allowed',
+      requestPath: requestMetadata.requestPath,
+      method: requestMetadata.method ?? 'GET',
+      userId: user.id.toString(),
+      userEmail: user.email,
+    })
+
+    shellProps = {
+      user,
+      appName,
+      showSummary,
+      showDashboard,
+      showSettings: user.isAdmin,
+      showOperators,
+      showLaporanPerOperator,
+      showLaporanSemua,
+      showLaporanUpload,
+      showLaporanAmplifikasi,
+      showSocialMedias,
+      children,
+    }
+  } catch (error) {
+    if (isDatabaseConnectionError(error) || isDatabaseSchemaError(error)) return <DatabaseUnavailableScreen error={error} />
+    throw error
   }
 
-  const appName = process.env.APP_NAME ?? 'Admin Panel'
-  const showSummary = user.isAdmin
-  const showDashboard = user.isAdmin || user.isManager || user.isOperator
-  const showOperators = user.isManager
-  const showLaporanPerOperator = user.isAdmin || user.isManager
-  const showLaporanSemua = user.isAdmin || user.isManager
-  const requestMetadata = await getRequestMetadata()
-  const showLaporanUpload = user.isOperator
-  const showLaporanAmplifikasi = user.isOperator
-  await writeAccessLog({
-    eventType: 'page_view',
-    status: 'allowed',
-    requestPath: requestMetadata.requestPath,
-    method: requestMetadata.method ?? 'GET',
-    userId: user.id.toString(),
-    userEmail: user.email,
-  })
-
-  return <ShellClient user={user} appName={appName} showSummary={showSummary} showDashboard={showDashboard} showSettings={user.isAdmin} showOperators={showOperators} showLaporanPerOperator={showLaporanPerOperator} showLaporanSemua={showLaporanSemua} showLaporanUpload={showLaporanUpload} showLaporanAmplifikasi={showLaporanAmplifikasi}>{children}</ShellClient>
+  return <ShellClient {...shellProps} />
 }

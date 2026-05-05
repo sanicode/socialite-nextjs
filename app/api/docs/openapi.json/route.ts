@@ -484,6 +484,7 @@ const spec: OpenApiSpec = {
           allowedCountries: { type: 'array', items: { type: 'string' }, example: ['ID'] },
           allowUnknownCountries: { type: 'boolean', default: true },
           apiEnabled: { type: 'boolean', default: true },
+          socialMediaConnectionsEnabled: { type: 'boolean', default: false },
           maxUploadedFileSizeBytes: { type: 'integer', example: 5242880 },
           imageCompressionEnabled: { type: 'boolean', default: true },
           operatorReportingWindowEnabled: { type: 'boolean', default: false },

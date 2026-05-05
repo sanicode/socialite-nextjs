@@ -2,6 +2,12 @@ import { verifyJwt, type JwtPayload } from './jwt'
 import { getSecuritySettings } from './request-security'
 import { prisma } from '@/app/lib/prisma'
 import { getUserRoles } from '@/app/lib/permissions'
+import {
+  getDatabaseConnectionErrorMessage,
+  getDatabaseSchemaErrorMessage,
+  isDatabaseConnectionError,
+  isDatabaseSchemaError,
+} from '@/app/lib/database-errors'
 
 export function getBearerToken(request: Request): string | null {
   const auth = request.headers.get('Authorization')
@@ -53,6 +59,26 @@ export class ApiError extends Error {
 export function apiError(error: unknown): Response {
   if (error instanceof ApiError) {
     return Response.json({ error: error.message }, { status: error.status })
+  }
+  if (isDatabaseConnectionError(error)) {
+    console.error(error)
+    return Response.json(
+      {
+        error: getDatabaseConnectionErrorMessage(),
+        code: 'DATABASE_UNAVAILABLE',
+      },
+      { status: 503 }
+    )
+  }
+  if (isDatabaseSchemaError(error)) {
+    console.error(error)
+    return Response.json(
+      {
+        error: getDatabaseSchemaErrorMessage(),
+        code: 'DATABASE_SCHEMA_NOT_READY',
+      },
+      { status: 503 }
+    )
   }
   console.error(error)
   return Response.json({ error: 'Internal server error' }, { status: 500 })

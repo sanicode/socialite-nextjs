@@ -14,6 +14,7 @@ export type SecuritySettings = {
   allowedCountries: string[]
   allowUnknownCountries: boolean
   apiEnabled: boolean
+  socialMediaConnectionsEnabled: boolean
   maxUploadedFileSizeBytes: number
   imageCompressionEnabled: boolean
   operatorReportingWindowEnabled: boolean
@@ -68,6 +69,7 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   allowedCountries: [],
   allowUnknownCountries: true,
   apiEnabled: true,
+  socialMediaConnectionsEnabled: false,
   maxUploadedFileSizeBytes: DEFAULT_MAX_UPLOADED_FILE_SIZE_BYTES,
   imageCompressionEnabled: true,
   operatorReportingWindowEnabled: false,
@@ -116,6 +118,7 @@ export function normalizeSecuritySettings(input: SecuritySettingsInput): Securit
     allowedCountries: Array.from(new Set((input.allowedCountries ?? []).map(normalizeCountry).filter(Boolean))),
     allowUnknownCountries: input.allowUnknownCountries ?? true,
     apiEnabled: input.apiEnabled ?? true,
+    socialMediaConnectionsEnabled: input.socialMediaConnectionsEnabled ?? false,
     maxUploadedFileSizeBytes: normalizeUploadFileSizeBytes(input.maxUploadedFileSizeBytes),
     imageCompressionEnabled: input.imageCompressionEnabled ?? true,
     operatorReportingWindowEnabled: input.operatorReportingWindowEnabled ?? input.reportingWindowEnabled ?? false,

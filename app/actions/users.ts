@@ -22,6 +22,7 @@ export type UserRow = {
   name: string
   email: string
   phone_number: string | null
+  tenants: string[]
   is_blocked: boolean
   is_admin: boolean
   direct_role_id: string | null
@@ -330,9 +331,7 @@ export async function getUsers(params: {
   `
 
   const countMap = new Map(counts.map((r) => [r.email.toLowerCase(), Number(r.count)]))
-  const totalUnderAttack = counts.filter((r) => Number(r.count) > 10).length
   const rateLimitedEmails = new Set(rateLimitedRows.map((row) => row.email.toLowerCase()))
-  const totalRateLimited = rateLimitedEmails.size
 
   if (params.loginSecurity) {
     const matchingEmails =
@@ -352,8 +351,8 @@ export async function getUsers(params: {
       return {
         total: 0,
         totalBlocked: await prisma.users.count({ where: { is_blocked: true } }),
-        totalUnderAttack,
-        totalRateLimited,
+        totalUnderAttack: 0,
+        totalRateLimited: 0,
         users: [],
       }
     }
@@ -373,6 +372,14 @@ export async function getUsers(params: {
     prisma.users.count({ where: { is_blocked: true } }),
   ])
 
+  const filteredSecurityUsers = await prisma.users.findMany({
+    where,
+    select: { email: true },
+  })
+  const filteredSecurityEmails = filteredSecurityUsers.map((user) => user.email.toLowerCase())
+  const totalUnderAttack = filteredSecurityEmails.filter((email) => (countMap.get(email) ?? 0) > 10).length
+  const totalRateLimited = filteredSecurityEmails.filter((email) => rateLimitedEmails.has(email)).length
+
   const roleAssignments = await prisma.model_has_roles.findMany({
     where: { model_type: MODEL_TYPE_USER, model_id: { in: users.map((u) => u.id) } },
     include: { roles: { select: { id: true, name: true } } },
@@ -380,6 +387,22 @@ export async function getUsers(params: {
   const roleMap = new Map(
     roleAssignments.map((r) => [r.model_id.toString(), { id: r.role_id.toString(), name: r.roles.name }])
   )
+  const tenantRows = users.length > 0
+    ? await prisma.$queryRaw<{ user_id: bigint; tenant_name: string }[]>`
+        SELECT tu.user_id, t.name AS tenant_name
+        FROM tenant_user tu
+        INNER JOIN tenants t ON t.id = tu.tenant_id
+        WHERE tu.user_id = ANY(${users.map((u) => u.id)}::bigint[])
+        ORDER BY t.name ASC
+      `
+    : []
+  const tenantMap = new Map<string, string[]>()
+  for (const row of tenantRows) {
+    const userId = row.user_id.toString()
+    const tenantNames = tenantMap.get(userId) ?? []
+    tenantNames.push(row.tenant_name)
+    tenantMap.set(userId, tenantNames)
+  }
 
   return {
     total,
@@ -391,6 +414,7 @@ export async function getUsers(params: {
       name: u.name,
       email: u.email,
       phone_number: u.phone_number ?? null,
+      tenants: tenantMap.get(u.id.toString()) ?? [],
       is_blocked: u.is_blocked,
       is_admin: u.is_admin,
       direct_role_id: roleMap.get(u.id.toString())?.id ?? null,

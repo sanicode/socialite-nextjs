@@ -18,12 +18,13 @@ type Props = {
   showLaporanSemua: boolean
   showLaporanUpload: boolean
   showLaporanAmplifikasi: boolean
+  showSocialMedias: boolean
   children: React.ReactNode
 }
 
 
 
-export default function ShellClient({ user, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, children }: Props) {
+export default function ShellClient({ user, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, showSocialMedias, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -46,6 +47,7 @@ export default function ShellClient({ user, appName, showSummary, showDashboard,
         showLaporanSemua={showLaporanSemua}
         showLaporanUpload={showLaporanUpload}
         showLaporanAmplifikasi={showLaporanAmplifikasi}
+        showSocialMedias={showSocialMedias}
       />
 
       {/* Main area */}

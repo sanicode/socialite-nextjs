@@ -72,6 +72,7 @@ type Props = {
   showLaporanSemua: boolean
   showLaporanUpload: boolean
   showLaporanAmplifikasi: boolean
+  showSocialMedias: boolean
 }
 
 function LinkPendingHint() {
@@ -81,7 +82,7 @@ function LinkPendingHint() {
   )
 }
 
-export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi }: Props) {
+export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, appName, showSummary, showDashboard, showSettings, showOperators, showLaporanPerOperator, showLaporanSemua, showLaporanUpload, showLaporanAmplifikasi, showSocialMedias }: Props) {
   const pathname = usePathname()
 
   // Filter dashboard item
@@ -221,6 +222,21 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, a
             )}
           </div>
           {/* )} */}
+
+          {showSocialMedias && (
+            <Link
+              href="/social-medias"
+              onClick={onClose}
+              title="Akun Medsos"
+              className={navLinkClass(pathname.startsWith('/social-medias'), 'mt-4')}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13.19 8.688a4.5 4.5 0 010 6.364l-2.122 2.121a4.5 4.5 0 01-6.364-6.364l1.06-1.06m12.728 4.242 1.06-1.06a4.5 4.5 0 00-6.364-6.364l-2.122 2.121a4.5 4.5 0 000 6.364" />
+              </svg>
+              <span className={labelClass}>Akun Medsos</span>
+              <span className={pendingClass}><LinkPendingHint /></span>
+            </Link>
+          )}
 
           {/* Settings Section */}
           {showSettings && (
