@@ -951,25 +951,31 @@ model users {
 }
 
 model user_social_medias {
-  id                   BigInt    @id @default(autoincrement())
-  user_id              BigInt
-  platform             String    @db.VarChar(50)
-  provider_account_id  String    @db.VarChar(255)
-  username             String?   @db.VarChar(255)
-  display_name         String?   @db.VarChar(255)
-  profile_url          String?   @db.VarChar(2048)
-  avatar_url           String?   @db.VarChar(2048)
-  access_token         String?
-  refresh_token        String?
-  token_expires_at     DateTime? @db.Timestamp(0)
-  scopes               Json?
-  metadata             Json?
-  connected_at         DateTime? @db.Timestamp(0)
-  disconnected_at      DateTime? @db.Timestamp(0)
-  last_synced_at       DateTime? @db.Timestamp(0)
-  created_at           DateTime? @db.Timestamp(0)
-  updated_at           DateTime? @db.Timestamp(0)
-  users                users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_social_medias_user_id_foreign")
+  id                  BigInt    @id @default(autoincrement())
+  user_id             BigInt
+  platform            String    @db.VarChar(50)
+  provider_account_id String    @db.VarChar(255)
+  username            String?   @db.VarChar(255)
+  email               String?   @db.VarChar(255)
+  phone               String?   @db.VarChar(50)
+  gender              String?   @db.VarChar(50)
+  birthday            DateTime? @db.Date
+  first_name          String?   @db.VarChar(255)
+  last_name           String?   @db.VarChar(255)
+  display_name        String?   @db.VarChar(255)
+  profile_url         String?   @db.VarChar(2048)
+  avatar_url          String?   @db.VarChar(2048)
+  access_token        String?
+  refresh_token       String?
+  token_expires_at    DateTime? @db.Timestamp(0)
+  scopes              Json?
+  metadata            Json?
+  connected_at        DateTime? @db.Timestamp(0)
+  disconnected_at     DateTime? @db.Timestamp(0)
+  last_synced_at      DateTime? @db.Timestamp(0)
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_social_medias_user_id_foreign")
 
   @@unique([platform, provider_account_id], map: "user_social_medias_platform_provider_account_id_unique")
   @@index([user_id], map: "user_social_medias_user_id_index")

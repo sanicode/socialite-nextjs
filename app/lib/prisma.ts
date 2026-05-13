@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/app/generated/prisma/client'
+import { Prisma, PrismaClient } from '@/app/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 function createPrismaClient() {
@@ -6,10 +6,32 @@ function createPrismaClient() {
   return new PrismaClient({ adapter })
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined
+const prismaSchemaSignature = Object.entries(Prisma)
+  .filter(([key, value]) => key.endsWith('ScalarFieldEnum') && value && typeof value === 'object')
+  .map(([key, value]) => `${key}:${Object.values(value as Record<string, string>).join(',')}`)
+  .sort()
+  .join('|')
+
+type CachedPrismaClient = ReturnType<typeof createPrismaClient> & {
+  __schemaSignature?: string
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+const globalForPrisma = globalThis as unknown as {
+  prisma: CachedPrismaClient | undefined
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+function getPrismaClient() {
+  if (process.env.NODE_ENV === 'production') return createPrismaClient()
+
+  const cached = globalForPrisma.prisma
+  if (cached?.__schemaSignature === prismaSchemaSignature) return cached
+
+  if (cached) void cached.$disconnect().catch(() => {})
+
+  const client = createPrismaClient() as CachedPrismaClient
+  client.__schemaSignature = prismaSchemaSignature
+  globalForPrisma.prisma = client
+  return client
+}
+
+export const prisma = getPrismaClient()

@@ -36,6 +36,26 @@ function formatDate(value: string | null) {
   })
 }
 
+function formatBirthday(value: string | null) {
+  if (!value) return null
+  return new Date(`${value}T00:00:00`).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function getAccountDetails(account: ConnectedSocialMediaRow) {
+  const fullName = [account.firstName, account.lastName].filter(Boolean).join(' ')
+  return [
+    fullName ? `Nama: ${fullName}` : null,
+    account.email ? `Email: ${account.email}` : null,
+    account.phone ? `Telepon: ${account.phone}` : null,
+    account.gender ? `Gender: ${account.gender}` : null,
+    account.birthday ? `Tanggal lahir: ${formatBirthday(account.birthday)}` : null,
+  ].filter((detail): detail is string => Boolean(detail))
+}
+
 export default function SocialMediaAccountsClient({ accounts, providers }: Props) {
   const [pending, startTransition] = useTransition()
 
@@ -101,12 +121,18 @@ export default function SocialMediaAccountsClient({ accounts, providers }: Props
                       <p className="font-medium text-neutral-900 dark:text-white">
                         {account.displayName ?? account.username ?? '-'}
                       </p>
+                      {account.accountKind && (
+                        <p className="text-xs font-medium text-neutral-600 dark:text-neutral-300">{account.accountKind}</p>
+                      )}
                       {account.username && (
                         <p className="text-xs text-neutral-500 dark:text-neutral-400">{account.username}</p>
                       )}
                       <p className="font-mono text-xs text-neutral-500 dark:text-neutral-400">
                         ID: {account.providerAccountId}
                       </p>
+                      {getAccountDetails(account).map((detail) => (
+                        <p key={detail} className="text-xs text-neutral-500 dark:text-neutral-400">{detail}</p>
+                      ))}
                       {account.profileUrl && (
                         <a
                           href={account.profileUrl}

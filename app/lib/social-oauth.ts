@@ -42,6 +42,21 @@ function getConfiguredScopes(envName: string, fallback: string[]) {
     .filter(Boolean)
 }
 
+function getFacebookScopes() {
+  const baseScopes = ['public_profile', 'email']
+  const pageScopes = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts']
+  const pagePublishingEnabled = process.env.FACEBOOK_ENABLE_PAGE_PUBLISHING === 'true'
+  const configuredScopes = getConfiguredScopes(
+    'FACEBOOK_SCOPES',
+    pagePublishingEnabled ? [...baseScopes, ...pageScopes] : baseScopes
+  )
+
+  if (pagePublishingEnabled) return configuredScopes
+
+  const pagePermissionPrefixes = ['pages_', 'ads_', 'business_management']
+  return configuredScopes.filter((scope) => !pagePermissionPrefixes.some((prefix) => scope.startsWith(prefix)))
+}
+
 function parseUrl(value: string) {
   try {
     return new URL(value)
@@ -96,12 +111,28 @@ export function extractSocialAccountFromUrl(platform: SocialPlatform, value: str
 export type SocialProfile = {
   platform: SocialPlatform
   providerAccountId: string
+  accessToken?: string | null
   username: string | null
+  email: string | null
+  phone: string | null
+  gender: string | null
+  birthday: string | null
+  firstName: string | null
+  lastName: string | null
   displayName: string | null
   profileUrl: string | null
   avatarUrl: string | null
   metadata: Record<string, unknown>
 }
+
+const emptySocialProfileDetails = {
+  email: null,
+  phone: null,
+  gender: null,
+  birthday: null,
+  firstName: null,
+  lastName: null,
+} satisfies Pick<SocialProfile, 'email' | 'phone' | 'gender' | 'birthday' | 'firstName' | 'lastName'>
 
 export function isSocialOAuthDebugEnabled() {
   return process.env.SOCIAL_OAUTH_DEBUG === 'true'
@@ -147,7 +178,7 @@ export function getSocialProviderConfigs(): SocialProviderConfig[] {
       tokenUrl: 'https://graph.facebook.com/v19.0/oauth/access_token',
       clientId: process.env.FACEBOOK_CLIENT_ID,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-      scopes: getConfiguredScopes('FACEBOOK_SCOPES', ['public_profile']),
+      scopes: getFacebookScopes(),
     },
     {
       platform: 'instagram',
@@ -265,6 +296,7 @@ export async function fetchSocialProfiles(platform: SocialPlatform, accessToken:
           platform,
           providerAccountId: channel.id,
           username: handle,
+          ...emptySocialProfileDetails,
           displayName: channel.snippet?.title ?? handle,
           profileUrl: handle ? `https://www.youtube.com/${handle}` : `https://www.youtube.com/channel/${channel.id}`,
           avatarUrl: channel.snippet?.thumbnails?.default?.url ?? null,
@@ -275,28 +307,112 @@ export async function fetchSocialProfiles(platform: SocialPlatform, accessToken:
   }
 
   if (platform === 'facebook') {
-    const response = await fetch('https://graph.facebook.com/v19.0/me?fields=id,name,email,link,picture', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: 'no-store',
-    })
+    type FacebookProfilePayload = {
+      id: string
+      name?: string
+      email?: string
+      first_name?: string
+      last_name?: string
+      gender?: string
+      birthday?: string
+      link?: string
+      picture?: { data?: { url?: string } }
+    }
+    type FacebookPagesPayload = {
+      data?: Array<{
+        id: string
+        name?: string
+        access_token?: string
+        link?: string
+        category?: string
+        tasks?: string[]
+        picture?: { data?: { url?: string } }
+      }>
+    }
+
+    async function fetchFacebookProfile(fields: string) {
+      const params = new URLSearchParams({ fields })
+      return await fetch(`https://graph.facebook.com/v19.0/me?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      })
+    }
+
+    let response = await fetchFacebookProfile('id,name,email,first_name,last_name,gender,birthday,link,picture')
+    if (!response.ok) {
+      response = await fetchFacebookProfile('id,name,email,link,picture')
+    }
     if (!response.ok) throw new Error('Gagal mengambil profil Facebook.')
-    const payload = await response.json() as { id: string; name?: string; email?: string; link?: string; picture?: { data?: { url?: string } } }
+
+    const payload = await response.json() as FacebookProfilePayload
     if (isSocialOAuthDebugEnabled()) {
       console.info('[facebook-oauth:raw:/me]', payload)
     }
 
-    return [{
+    async function fetchFacebookPages() {
+      const params = new URLSearchParams({
+        fields: 'id,name,access_token,link,category,tasks,picture',
+        limit: '100',
+      })
+      return await fetch(`https://graph.facebook.com/v19.0/me/accounts?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      })
+    }
+
+    let pagesPayload: FacebookPagesPayload | null = null
+    const pagesResponse = await fetchFacebookPages()
+    if (pagesResponse.ok) {
+      pagesPayload = await pagesResponse.json() as FacebookPagesPayload
+      if (isSocialOAuthDebugEnabled()) {
+        console.info('[facebook-oauth:raw:/me/accounts]', sanitizeSocialOAuthPayload(pagesPayload))
+      }
+    } else if (isSocialOAuthDebugEnabled()) {
+      console.info('[facebook-oauth:raw:/me/accounts:error]', sanitizeSocialOAuthPayload(await pagesResponse.json().catch(() => null)))
+    }
+
+    const profiles: SocialProfile[] = [{
       platform,
       providerAccountId: payload.id,
+      accessToken: accessToken,
       username: null,
+      email: payload.email ?? null,
+      phone: null,
+      gender: payload.gender ?? null,
+      birthday: payload.birthday ?? null,
+      firstName: payload.first_name ?? null,
+      lastName: payload.last_name ?? null,
       displayName: payload.name ?? null,
       profileUrl: payload.link ?? `https://facebook.com/${payload.id}`,
       avatarUrl: payload.picture?.data?.url ?? null,
       metadata: {
         account_id_type: 'facebook_me_id',
+        account_type: 'facebook_profile',
         facebook_user: payload,
       },
     }]
+
+    for (const page of pagesPayload?.data ?? []) {
+      if (!page.id || !page.access_token) continue
+      profiles.push({
+        platform,
+        providerAccountId: page.id,
+        accessToken: page.access_token,
+        username: null,
+        ...emptySocialProfileDetails,
+        displayName: page.name ?? null,
+        profileUrl: page.link ?? `https://www.facebook.com/${page.id}`,
+        avatarUrl: page.picture?.data?.url ?? null,
+        metadata: {
+          account_id_type: 'facebook_page_id',
+          account_type: 'facebook_page',
+          facebook_page: page,
+          facebook_user_id: payload.id,
+        },
+      })
+    }
+
+    return profiles
   }
 
   if (platform === 'instagram') {
@@ -310,6 +426,7 @@ export async function fetchSocialProfiles(platform: SocialPlatform, accessToken:
       platform,
       providerAccountId: payload.id,
       username: payload.username ?? null,
+      ...emptySocialProfileDetails,
       displayName: payload.username ?? null,
       profileUrl: payload.username ? `https://www.instagram.com/${payload.username}` : null,
       avatarUrl: null,
@@ -331,6 +448,7 @@ export async function fetchSocialProfiles(platform: SocialPlatform, accessToken:
     platform,
     providerAccountId: profile.open_id,
     username: profile.username ?? null,
+    ...emptySocialProfileDetails,
     displayName: profile.display_name ?? profile.username ?? null,
     profileUrl: profile.profile_deep_link ?? null,
     avatarUrl: profile.avatar_url ?? null,
@@ -349,4 +467,22 @@ export function encryptSocialToken(value: string | undefined) {
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
   return `${iv.toString('base64url')}.${tag.toString('base64url')}.${encrypted.toString('base64url')}`
+}
+
+export function decryptSocialToken(value: string | null | undefined) {
+  if (!value) return null
+  const [ivValue, tagValue, encryptedValue] = value.split('.')
+  if (!ivValue || !tagValue || !encryptedValue) return null
+
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    tokenKey(),
+    Buffer.from(ivValue, 'base64url')
+  )
+  decipher.setAuthTag(Buffer.from(tagValue, 'base64url'))
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encryptedValue, 'base64url')),
+    decipher.final(),
+  ])
+  return decrypted.toString('utf8')
 }

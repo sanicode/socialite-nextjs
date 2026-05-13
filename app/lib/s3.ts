@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { randomBytes } from 'crypto'
 
-export type ReportObjectKeyKind = 'default' | 'upload' | 'amplifikasi' | 'pending'
+export type ReportObjectKeyKind = 'default' | 'upload' | 'amplifikasi' | 'social-media' | 'pending'
 export type ReportObjectKeyLocation = {
   province?: string | null
   city?: string | null

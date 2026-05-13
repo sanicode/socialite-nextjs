@@ -220,6 +220,18 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, a
               <span className={labelClass}>Amplifikasi</span> <span className={pendingClass}><LinkPendingHint /></span>
             </Link>
             )}
+
+            {showSocialMedias && (
+              <Link
+                href="/posts/social-media"
+                onClick={onClose}
+                title="Posting Medsos"
+                className={navLinkClass(pathname.startsWith('/posts/social-media'))}
+              >
+                <div className="w-5 flex justify-center"><div className={`w-1.5 h-1.5 rounded-full ${pathname.startsWith('/posts/social-media') ? 'bg-current' : 'bg-neutral-400'}`} /></div>
+                <span className={labelClass}>Posting Medsos</span> <span className={pendingClass}><LinkPendingHint /></span>
+              </Link>
+            )}
           </div>
           {/* )} */}
 

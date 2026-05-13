@@ -15,11 +15,24 @@ import {
 
 type Ctx = { params: Promise<{ platform: string }> }
 
-export async function GET(request: Request, { params }: Ctx) {
-  const redirectTarget = new URL('/social-medias', request.url)
+function parseSocialProfileBirthday(value: string | null) {
+  if (!value) return null
 
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00.000Z`)
+  }
+
+  const facebookDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value)
+  if (!facebookDate) return null
+
+  const [, month, day, year] = facebookDate
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+}
+
+export async function GET(request: Request, { params }: Ctx) {
   try {
     const user = await requireUser()
+    const redirectTarget = new URL('/social-medias', request.url)
     if (!user.roles.includes('operator')) {
       return NextResponse.redirect(new URL('/posts', request.url))
     }
@@ -89,10 +102,16 @@ export async function GET(request: Request, { params }: Ctx) {
         platform: provider.platform,
         provider_account_id: profile.providerAccountId,
         username: profile.username,
+        email: profile.email,
+        phone: profile.phone,
+        gender: profile.gender,
+        birthday: parseSocialProfileBirthday(profile.birthday),
+        first_name: profile.firstName,
+        last_name: profile.lastName,
         display_name: profile.displayName,
         profile_url: profile.profileUrl,
         avatar_url: profile.avatarUrl,
-        access_token: encryptSocialToken(token.access_token),
+        access_token: encryptSocialToken(profile.accessToken ?? token.access_token),
         refresh_token: encryptSocialToken(token.refresh_token),
         token_expires_at: expiresAt,
         scopes: (token.scope ? token.scope.split(/\s+/) : provider.scopes) as Prisma.InputJsonValue,
@@ -128,6 +147,7 @@ export async function GET(request: Request, { params }: Ctx) {
     redirectTarget.searchParams.set('connected', provider.platform)
     return NextResponse.redirect(redirectTarget)
   } catch (error) {
+    const redirectTarget = new URL('/social-medias', request.url)
     logEvent('error', 'social_media.oauth_failed', {
       error: error instanceof Error ? error.message : 'Unknown OAuth error',
     })
