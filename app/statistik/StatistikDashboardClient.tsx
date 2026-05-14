@@ -16,6 +16,7 @@ type Props = {
   initialFilters: StatistikFilters
   provinces: { id: number; name: string }[]
   accessId: string
+  statistikToken: string
 }
 
 type ApiPayload = PublicStatistikDashboardPayload & {
@@ -55,6 +56,7 @@ export default function StatistikDashboardClient({
   initialFilters,
   provinces,
   accessId,
+  statistikToken,
 }: Props) {
   const [data, setData] = useState<PublicStatistikDashboardPayload | null>(null)
   const [cities, setCities] = useState(initialCities)
@@ -72,7 +74,16 @@ export default function StatistikDashboardClient({
   const [isFilterExpanded, setIsFilterExpanded] = useState(false)
 
   const loadData = useCallback(async (nextFilters: StatistikFilters, updateCities = true) => {
-    const response = await fetch(buildApiUrl(accessId, nextFilters), { cache: 'no-store' })
+    const response = await fetch(buildApiUrl(accessId, nextFilters), {
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${statistikToken}`,
+      },
+    })
+    if (response.status === 401) {
+      window.location.reload()
+      return
+    }
     if (!response.ok) throw new Error('Gagal memuat statistik')
     const payload = await response.json() as ApiPayload
     setData({
@@ -83,7 +94,7 @@ export default function StatistikDashboardClient({
     })
     if (updateCities) setCities(payload.cities)
     setLastUpdated(new Date())
-  }, [accessId])
+  }, [accessId, statistikToken])
 
   useEffect(() => {
     void loadData(filters).catch(() => {})

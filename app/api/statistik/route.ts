@@ -6,6 +6,8 @@ import {
   stripDashboardPii,
   type StatistikFilters,
 } from '@/app/lib/statistik-data'
+import { getBearerToken } from '@/app/lib/api-auth'
+import { getStatistikRequestFingerprint, verifyStatistikToken } from '@/app/lib/statistik-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +24,15 @@ function parseFilters(searchParams: URLSearchParams): StatistikFilters {
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  if (url.searchParams.get('id') !== 'bmi') {
+  const accessId = url.searchParams.get('id')
+  if (accessId !== 'bmi') {
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  }
+
+  const token = getBearerToken(request)
+  const fingerprint = getStatistikRequestFingerprint(request.headers)
+  if (!token || !verifyStatistikToken(token, accessId, fingerprint)) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
   const provinceId = url.searchParams.get('provinceId') ?? undefined

@@ -3,28 +3,15 @@ import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { JwtPayload } from '@/app/lib/jwt'
 import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
+import { getSocialLinkMetadata } from '@/app/lib/link-metadata'
+import { parseLinkPreviewDescription, stringifyLinkPreviewDescription } from '@/app/lib/link-preview-description'
 import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { getUserTenantIds } from '@/app/lib/tenant-access'
 import { queryPosts } from '@/app/lib/posts-query'
+import { normalizeSocialUrl, validateSocialUrlForCategory } from '@/app/lib/social-platform'
+import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-const PLATFORM_PATTERNS: Record<string, { pattern: RegExp; label: string }> = {
-  tiktok:    { pattern: /tiktok\.com/i,                       label: 'TikTok' },
-  instagram: { pattern: /instagram\.com/i,                    label: 'Instagram' },
-  facebook:  { pattern: /(facebook\.com|fb\.com|fb\.watch)/i, label: 'Facebook' },
-  youtube:   { pattern: /(youtube\.com|youtu\.be)/i,          label: 'YouTube' },
-}
-
-function validateUrlForCategory(url: string, categoryName: string): string | null {
-  const lower = categoryName.toLowerCase()
-  for (const [key, { pattern, label }] of Object.entries(PLATFORM_PATTERNS)) {
-    if (lower.includes(key)) {
-      return pattern.test(url) ? null : `Link harus berupa URL ${label} yang valid.`
-    }
-  }
-  return null
-}
 
 function generateSlug(title: string): string {
   const base = title
@@ -117,8 +104,9 @@ export async function POST(request: Request) {
     const requireTitle  = post_type !== 'amplifikasi'
     const requireMedia  = post_type === 'amplifikasi' || post_type === undefined
     const sourceUrl: string | null = post_type === 'upload' ? 'upload' : post_type === 'amplifikasi' ? 'amplifikasi' : null
+    const rawTitle = typeof title === 'string' ? title.trim() : ''
 
-    if (requireTitle && !title) errors.title = 'Link upload tidak boleh kosong.'
+    if (requireTitle && !rawTitle) errors.title = 'Link upload tidak boleh kosong.'
     if (requireMedia && !media_id) errors.media_id = 'Screenshot wajib diupload terlebih dahulu.'
 
     if (Object.keys(errors).length > 0) {
@@ -126,14 +114,23 @@ export async function POST(request: Request) {
     }
 
     // ── validasi URL per kategori ──
-    if (requireTitle && title && category_id) {
+    let categoryName: string | null = null
+    if (requireTitle && rawTitle && category_id) {
       const cat = await prisma.blog_post_categories.findUnique({
         where: { id: BigInt(category_id) },
         select: { name: true },
       })
       if (cat) {
-        const urlError = validateUrlForCategory(title, cat.name)
+        categoryName = cat.name
+        const urlError = validateSocialUrlForCategory(rawTitle, cat.name)
         if (urlError) return Response.json({ errors: { title: urlError } }, { status: 422 })
+      }
+    }
+
+    if (sourceUrl === 'upload' && rawTitle) {
+      const duplicate = await findDuplicateUploadLink(rawTitle)
+      if (duplicate) {
+        return Response.json({ errors: { title: DUPLICATE_UPLOAD_LINK_MESSAGE }, duplicate: true }, { status: 409 })
       }
     }
 
@@ -179,13 +176,26 @@ export async function POST(request: Request) {
       where: { user_id: userId },
       select: { tenant_id: true },
     })
+    const storedTitle = sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : (rawTitle || '-')
+    const metadata = sourceUrl === 'upload' && rawTitle && categoryName
+      ? await getSocialLinkMetadata(rawTitle, categoryName)
+      : null
+    const inputDescription = typeof description === 'string' && description.trim() ? description.trim() : null
+    const storedDescription = sourceUrl === 'upload'
+      ? (
+          stringifyLinkPreviewDescription({
+            text: metadata?.description,
+            thumbnailUrl: metadata?.thumbnailUrl,
+          }) ?? stringifyLinkPreviewDescription({ text: parseLinkPreviewDescription(inputDescription).text })
+        )
+      : inputDescription
 
     const post = await prisma.blog_posts.create({
       data: {
-        title: title || '-',
-        slug: generateSlug(title || 'laporan'),
+        title: storedTitle,
+        slug: generateSlug(storedTitle || 'laporan'),
         body: postBody || '-',
-        description: description || null,
+        description: storedDescription,
         status: 'pending',
         is_published: Boolean(is_published),
         published_at: is_published ? new Date() : null,

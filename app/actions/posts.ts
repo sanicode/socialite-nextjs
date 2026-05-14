@@ -16,8 +16,12 @@ import { deleteSession } from '@/app/lib/session'
 import type { TablePageSize } from '@/app/lib/table-pagination'
 import { canActorReadPost, canActorValidatePost, getUserTenantIds } from '@/app/lib/tenant-access'
 import { detectAllowedImage } from '@/app/lib/file-validation'
+import { getSocialLinkMetadata } from '@/app/lib/link-metadata'
+import { parseLinkPreviewDescription, stringifyLinkPreviewDescription } from '@/app/lib/link-preview-description'
 import { queryPostById, queryPosts } from '@/app/lib/posts-query'
 import { getReportLocationByTenantId, type ReportObjectLocation } from '@/app/lib/report-location'
+import { normalizeSocialUrl, validateSocialUrlForCategory } from '@/app/lib/social-platform'
+import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
 import {
   getNonAdminReportingWindowDecision,
   getOperatorReportingWindowDecision,
@@ -290,23 +294,6 @@ const getCategoriesCached = cache(async () => {
 
 function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
   return new Date(`${dateString}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+07:00`)
-}
-
-const PLATFORM_PATTERNS: Record<string, { pattern: RegExp; label: string }> = {
-  tiktok:    { pattern: /tiktok\.com/i,                       label: 'TikTok' },
-  instagram: { pattern: /instagram\.com/i,                    label: 'Instagram' },
-  facebook:  { pattern: /(facebook\.com|fb\.com|fb\.watch)/i, label: 'Facebook' },
-  youtube:   { pattern: /(youtube\.com|youtu\.be)/i,          label: 'YouTube' },
-}
-
-function validateUrlForCategory(url: string, categoryName: string): string | null {
-  const lower = categoryName.toLowerCase()
-  for (const [key, { pattern, label }] of Object.entries(PLATFORM_PATTERNS)) {
-    if (lower.includes(key)) {
-      return pattern.test(url) ? null : `Link harus berupa URL ${label} yang valid.`
-    }
-  }
-  return null
 }
 
 function generateSlug(title: string): string {
@@ -666,7 +653,7 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
   const rawTitle = (formData.get('title') as string)?.trim()
   const title = rawTitle || '-'
   const body = (formData.get('body') as string)?.trim()
-  const description = (formData.get('description') as string)?.trim() || null
+  const inputDescription = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
   const screenshot = formData.get('screenshot') as File | null
@@ -691,15 +678,22 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
   if (Object.keys(errors).length > 0) return { errors }
 
+  let categoryName: string | null = null
   if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
       select: { name: true },
     })
     if (category) {
-      const urlError = validateUrlForCategory(rawTitle, category.name)
+      categoryName = category.name
+      const urlError = validateSocialUrlForCategory(rawTitle, category.name)
       if (urlError) return { errors: { title: [urlError] } }
     }
+  }
+
+  if (opts.sourceUrl === 'upload' && rawTitle) {
+    const duplicate = await findDuplicateUploadLink(rawTitle)
+    if (duplicate) return { errors: { title: [DUPLICATE_UPLOAD_LINK_MESSAGE] }, duplicate: true }
   }
 
   const userId = BigInt(sessionUser.id)
@@ -742,12 +736,25 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
     }
   }
 
+  const storedTitle = opts.sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : title
+  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryName
+    ? await getSocialLinkMetadata(rawTitle, categoryName)
+    : null
+  const storedDescription = opts.sourceUrl === 'upload'
+    ? (
+        stringifyLinkPreviewDescription({
+          text: metadata?.description,
+          thumbnailUrl: metadata?.thumbnailUrl,
+        }) ?? stringifyLinkPreviewDescription({ text: parseLinkPreviewDescription(inputDescription).text })
+      )
+    : inputDescription
+
   const post = await prisma.blog_posts.create({
     data: {
-      title,
-      slug: generateSlug(title),
+      title: storedTitle,
+      slug: generateSlug(storedTitle),
       body: body || '-',
-      description,
+      description: storedDescription,
       status: 'pending',
       is_published: isPublished,
       published_at: isPublished ? new Date() : null,
@@ -783,7 +790,7 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
   const rawTitle = (formData.get('title') as string)?.trim()
   const title = rawTitle || '-'
   const body = (formData.get('body') as string)?.trim()
-  const description = (formData.get('description') as string)?.trim() || null
+  const inputDescription = (formData.get('description') as string)?.trim() || null
   const categoryId = formData.get('category_id') as string | null
   const isPublished = formData.get('is_published') === '1'
   const oldMediaId = formData.get('old_media_id') as string | null
@@ -826,24 +833,44 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
     return { message: 'Anda tidak memiliki akses untuk mengedit laporan ini.' }
   }
 
+  let categoryName: string | null = null
   if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
       select: { name: true },
     })
     if (category) {
-      const urlError = validateUrlForCategory(rawTitle, category.name)
+      categoryName = category.name
+      const urlError = validateSocialUrlForCategory(rawTitle, category.name)
       if (urlError) return { errors: { title: [urlError] } }
     }
   }
 
+  if (opts.sourceUrl === 'upload' && rawTitle) {
+    const duplicate = await findDuplicateUploadLink(rawTitle, BigInt(id))
+    if (duplicate) return { errors: { title: [DUPLICATE_UPLOAD_LINK_MESSAGE] }, duplicate: true }
+  }
+
+  const storedTitle = opts.sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : title
+  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryName
+    ? await getSocialLinkMetadata(rawTitle, categoryName)
+    : null
+  const storedDescription = opts.sourceUrl === 'upload'
+    ? (
+        stringifyLinkPreviewDescription({
+          text: metadata?.description,
+          thumbnailUrl: metadata?.thumbnailUrl,
+        }) ?? stringifyLinkPreviewDescription({ text: parseLinkPreviewDescription(inputDescription).text })
+      )
+    : inputDescription
+
   await prisma.blog_posts.update({
     where: { id: BigInt(id) },
     data: {
-      title,
-      slug: generateSlug(title),
+      title: storedTitle,
+      slug: generateSlug(storedTitle),
       body: body || '-',
-      description,
+      description: storedDescription,
       is_published: isPublished,
       published_at: isPublished && !existingPost.is_published ? new Date() : isPublished ? undefined : null,
       blog_post_category_id: categoryId ? BigInt(categoryId) : null,
@@ -898,6 +925,29 @@ export async function createUpload(_state: PostFormState, formData: FormData): P
 export async function createAmplifikasi(_state: PostFormState, formData: FormData): Promise<PostFormState> {
   await requireUser().catch(redirectToLoginIfUnauthorized)
   return processCreate(formData, AMPLIF_OPTS)
+}
+
+export async function previewUploadLinkMetadata(categoryId: string, title: string) {
+  await requireUser().catch(redirectToLoginIfUnauthorized)
+
+  const rawTitle = title.trim()
+  if (!categoryId || !rawTitle) return { description: null }
+
+  const category = await prisma.blog_post_categories.findUnique({
+    where: { id: BigInt(categoryId) },
+    select: { name: true },
+  })
+  if (!category) return { description: null, error: 'Kategori tidak ditemukan.' }
+
+  const urlError = validateSocialUrlForCategory(rawTitle, category.name)
+  if (urlError) return { description: null, error: urlError }
+
+  const metadata = await getSocialLinkMetadata(rawTitle, category.name)
+  const description = stringifyLinkPreviewDescription({
+    text: metadata?.description,
+    thumbnailUrl: metadata?.thumbnailUrl,
+  })
+  return { description }
 }
 
 export async function updatePost(_state: PostFormState, formData: FormData): Promise<PostFormState> {

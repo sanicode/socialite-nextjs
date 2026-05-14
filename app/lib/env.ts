@@ -6,6 +6,10 @@ function readRequiredEnv(name: string): string {
   return value
 }
 
+export function getOptionalEnv(name: string): string | null {
+  return process.env[name]?.trim() || null
+}
+
 export function getSessionSecret(): string {
   return readRequiredEnv('SESSION_SECRET')
 }
@@ -13,4 +17,3 @@ export function getSessionSecret(): string {
 export function getPublicMediaBaseUrl(): string {
   return readRequiredEnv('NEXT_PUBLIC_S3_PUBLIC_URL').replace(/\/+$/, '')
 }
-

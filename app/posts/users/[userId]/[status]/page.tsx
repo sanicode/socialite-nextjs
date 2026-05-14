@@ -101,6 +101,7 @@ export default async function UserPostsByStatusPage({
   const serializedPosts = posts.map((post) => ({
     id: post.id.toString(),
     title: post.title,
+    description: post.description,
     created_at: post.created_at?.toISOString() ?? null,
     source_url: post.source_url,
     status: post.status as PostStatus,

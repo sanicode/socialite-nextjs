@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import {
   getStatistikCities,
@@ -5,6 +6,7 @@ import {
   normalizeStatistikFilters,
   type StatistikFilters,
 } from '@/app/lib/statistik-data'
+import { getStatistikRequestFingerprint, signStatistikToken } from '@/app/lib/statistik-token'
 import StatistikDashboardClient from './StatistikDashboardClient'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +38,8 @@ export default async function StatistikPage({ searchParams }: Props) {
     getStatistikProvinces(),
     filters.provinceId ? getStatistikCities(filters.provinceId) : Promise.resolve([]),
   ])
+  const headerStore = await headers()
+  const statistikToken = signStatistikToken(params.id, getStatistikRequestFingerprint(headerStore))
 
   return (
     <StatistikDashboardClient
@@ -43,6 +47,7 @@ export default async function StatistikPage({ searchParams }: Props) {
       initialFilters={filters}
       provinces={provinces}
       accessId={params.id}
+      statistikToken={statistikToken}
     />
   )
 }

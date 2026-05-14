@@ -5,6 +5,8 @@ import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus } from '@/app/actions/posts'
 import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
+import LinkPreviewDescription from '@/app/components/posts/LinkPreviewDescription'
+import { isSafeHttpUrl } from '@/app/lib/social-platform'
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
 
@@ -18,6 +20,7 @@ type SerializedMedia = {
 type SerializedPost = {
   id: string
   title: string | null
+  description: string | null
   created_at: string | null
   source_url: string | null
   status: PostStatus
@@ -151,7 +154,7 @@ export default function UserPostsTableClient({
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="min-w-max w-full text-sm">
           <thead>
             <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800">
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Tanggal</th>
@@ -159,6 +162,7 @@ export default function UserPostsTableClient({
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Jenis</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Media Sosial</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Link Upload</th>
+              <th className="w-72 min-w-72 max-w-72 px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Metadata</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Status</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Aksi</th>
             </tr>
@@ -166,7 +170,7 @@ export default function UserPostsTableClient({
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {optimisticPosts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
+                <td colSpan={8} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
                   Tidak ada data
                 </td>
               </tr>
@@ -231,7 +235,7 @@ export default function UserPostsTableClient({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs">
-                      {post.source_url === 'upload' && post.title ? (
+                      {post.source_url === 'upload' && isSafeHttpUrl(post.title) ? (
                         <a
                           href={post.title}
                           target="_blank"
@@ -242,6 +246,13 @@ export default function UserPostsTableClient({
                         </a>
                       ) : (
                         <span className="block truncate">{post.title ?? '-'}</span>
+                      )}
+                    </td>
+                    <td className="w-72 min-w-72 max-w-72 overflow-hidden px-4 py-3 align-top">
+                      {post.source_url === 'upload' ? (
+                        <LinkPreviewDescription value={post.description} />
+                      ) : (
+                        <span className="text-xs text-neutral-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center align-middle">

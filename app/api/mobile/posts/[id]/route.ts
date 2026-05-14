@@ -2,10 +2,14 @@ import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api
 import { prisma } from '@/app/lib/prisma'
 import { deleteFromS3 } from '@/app/lib/s3'
 import { logEvent } from '@/app/lib/logger'
+import { getSocialLinkMetadata } from '@/app/lib/link-metadata'
+import { parseLinkPreviewDescription, stringifyLinkPreviewDescription } from '@/app/lib/link-preview-description'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { canActorReadPost } from '@/app/lib/tenant-access'
 import { queryPostById } from '@/app/lib/posts-query'
+import { normalizeSocialUrl, validateSocialUrlForCategory } from '@/app/lib/social-platform'
+import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -36,23 +40,6 @@ export async function GET(request: Request, { params }: Ctx) {
 }
 
 // ── PUT /api/mobile/posts/[id] ────────────────────────────────────────────────
-
-const PLATFORM_PATTERNS: Record<string, { pattern: RegExp; label: string }> = {
-  tiktok:    { pattern: /tiktok\.com/i,                       label: 'TikTok' },
-  instagram: { pattern: /instagram\.com/i,                    label: 'Instagram' },
-  facebook:  { pattern: /(facebook\.com|fb\.com|fb\.watch)/i, label: 'Facebook' },
-  youtube:   { pattern: /(youtube\.com|youtu\.be)/i,          label: 'YouTube' },
-}
-
-function validateUrlForCategory(url: string, categoryName: string): string | null {
-  const lower = categoryName.toLowerCase()
-  for (const [key, { pattern, label }] of Object.entries(PLATFORM_PATTERNS)) {
-    if (lower.includes(key)) {
-      return pattern.test(url) ? null : `Link harus berupa URL ${label} yang valid.`
-    }
-  }
-  return null
-}
 
 function generateSlug(title: string): string {
   const base = title.toLowerCase().trim()
@@ -111,9 +98,10 @@ export async function PUT(request: Request, { params }: Ctx) {
     const sourceUrl = post.source_url
     const requireTitle = sourceUrl !== 'amplifikasi'
     const requireScreenshot = sourceUrl !== 'upload'
+    const rawTitle = typeof title === 'string' ? title.trim() : ''
 
     if (!category_id) errors.category_id = 'Kategori wajib dipilih.'
-    if (requireTitle && !title) errors.title = 'Link upload tidak boleh kosong.'
+    if (requireTitle && !rawTitle) errors.title = 'Link upload tidak boleh kosong.'
     if (requireScreenshot && !media_id && !existingMedia) {
       errors.media_id = 'Bukti screenshot wajib diupload.'
     }
@@ -123,14 +111,23 @@ export async function PUT(request: Request, { params }: Ctx) {
     }
 
     // Validasi URL per kategori
-    if (requireTitle && title && category_id) {
+    let categoryName: string | null = null
+    if (requireTitle && rawTitle && category_id) {
       const cat = await prisma.blog_post_categories.findUnique({
         where: { id: BigInt(category_id) },
         select: { name: true },
       })
       if (cat) {
-        const urlError = validateUrlForCategory(title, cat.name)
+        categoryName = cat.name
+        const urlError = validateSocialUrlForCategory(rawTitle, cat.name)
         if (urlError) return Response.json({ errors: { title: urlError } }, { status: 422 })
+      }
+    }
+
+    if (sourceUrl === 'upload' && rawTitle) {
+      const duplicate = await findDuplicateUploadLink(rawTitle, BigInt(id))
+      if (duplicate) {
+        return Response.json({ errors: { title: DUPLICATE_UPLOAD_LINK_MESSAGE }, duplicate: true }, { status: 409 })
       }
     }
 
@@ -138,14 +135,27 @@ export async function PUT(request: Request, { params }: Ctx) {
       where: { id: BigInt(id) },
       select: { is_published: true },
     })
+    const storedTitle = sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : (rawTitle || '-')
+    const metadata = sourceUrl === 'upload' && rawTitle && categoryName
+      ? await getSocialLinkMetadata(rawTitle, categoryName)
+      : null
+    const inputDescription = typeof description === 'string' && description.trim() ? description.trim() : null
+    const storedDescription = sourceUrl === 'upload'
+      ? (
+          stringifyLinkPreviewDescription({
+            text: metadata?.description,
+            thumbnailUrl: metadata?.thumbnailUrl,
+          }) ?? stringifyLinkPreviewDescription({ text: parseLinkPreviewDescription(inputDescription).text })
+        )
+      : inputDescription
 
     await prisma.blog_posts.update({
       where: { id: BigInt(id) },
       data: {
-        title: title || '-',
-        slug: generateSlug(title || 'laporan'),
+        title: storedTitle,
+        slug: generateSlug(storedTitle || 'laporan'),
         body: postBody || '-',
-        description: description || null,
+        description: storedDescription,
         is_published: Boolean(is_published),
         published_at:
           is_published && !currentPost?.is_published ? new Date() : is_published ? undefined : null,

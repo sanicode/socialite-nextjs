@@ -2,8 +2,10 @@
 
 import { useActionState, useState, useEffect, useRef, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { previewUploadLinkMetadata } from '@/app/actions/posts'
 import type { PostFormState, SerializedCategory, SerializedPost } from '@/app/actions/posts'
 import ImageUpload from './ImageUpload'
+import LinkPreviewDescription from './LinkPreviewDescription'
 import { useToast } from '@/app/components/ToastContext'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
 
@@ -77,9 +79,13 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
 
   const showUrl        = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
+  const showMetadataPreview = variant === 'upload'
 
   const [title, setTitle] = useState(showUrl ? (post?.title ?? '') : '-')
   const [categoryId, setCategoryId] = useState(post?.blog_post_category_id ?? '')
+  const [metadataPreview, setMetadataPreview] = useState(post?.description ?? '')
+  const [metadataPreviewError, setMetadataPreviewError] = useState<string | null>(null)
+  const [metadataPreviewLoading, setMetadataPreviewLoading] = useState(false)
   const [hasScreenshot, setHasScreenshot] = useState<boolean>(!!post?.thumbnail)
   const [screenshotClientError, setScreenshotClientError] = useState<string | null>(null)
 
@@ -123,6 +129,46 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
       ? `Link harus berupa URL ${platformHint.label} yang valid.`
       : null
 
+  useEffect(() => {
+    if (!showMetadataPreview) return
+
+    const rawTitle = title.trim()
+    if (!categoryId || !rawTitle || urlClientError) {
+      const resetTimer = window.setTimeout(() => {
+        setMetadataPreview(post?.description ?? '')
+        setMetadataPreviewError(null)
+        setMetadataPreviewLoading(false)
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
+    }
+
+    let cancelled = false
+
+    const timer = window.setTimeout(() => {
+      setMetadataPreviewLoading(true)
+      setMetadataPreviewError(null)
+      void previewUploadLinkMetadata(categoryId, rawTitle)
+        .then((result) => {
+          if (cancelled) return
+          setMetadataPreview(result.description ?? '')
+          setMetadataPreviewError(result.error ?? null)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setMetadataPreview('')
+          setMetadataPreviewError('Metadata tidak dapat dimuat.')
+        })
+        .finally(() => {
+          if (!cancelled) setMetadataPreviewLoading(false)
+        })
+    }, 600)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [categoryId, post?.description, showMetadataPreview, title, urlClientError])
+
   const hasExistingScreenshot = Boolean(post?.thumbnail)
   const screenshotFieldError = showScreenshot ? (screenshotClientError ?? state?.errors?.screenshot?.[0] ?? null) : null
   const screenshotMessages = showScreenshot
@@ -160,6 +206,7 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
       <input type="hidden" name="is_published" value="0" />
       <input type="hidden" name="body" value="-" />
       {!showUrl && <input type="hidden" name="title" value="-" />}
+      {showMetadataPreview && <input type="hidden" name="description" value={metadataPreview} />}
 
       {(state?.message || formMessages.length > 0) && (
         <div
@@ -225,7 +272,8 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
               </label>
               <input
                 name="title"
-                type="url"
+                type="text"
+                inputMode="url"
                 value={title}
                 required
                 onChange={(e) => setTitle(e.target.value)}
@@ -236,6 +284,35 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
               />
               {(state?.errors?.title || urlClientError) && (
                 <p className="mt-1.5 text-xs text-red-500">{state?.errors?.title?.[0] ?? urlClientError}</p>
+              )}
+            </div>
+          )}
+
+          {showMetadataPreview && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Metadata (otomatis diambil dari link upload)
+              </label>
+              <div className="min-h-24 max-w-full overflow-hidden rounded-lg border border-neutral-300 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/60">
+                {metadataPreviewLoading ? (
+                  <div className="flex gap-3">
+                    <div className="h-20 w-20 shrink-0 animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-700" />
+                    <div className="min-w-0 flex-1 space-y-2 pt-1">
+                      <div className="h-4 w-3/4 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                      <div className="h-4 w-full animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                      <div className="h-4 w-1/2 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                    </div>
+                  </div>
+                ) : (
+                  <LinkPreviewDescription
+                    value={metadataPreview}
+                    variant="form"
+                    emptyLabel="Metadata belum tersedia."
+                  />
+                )}
+              </div>
+              {metadataPreviewError && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">{metadataPreviewError}</p>
               )}
             </div>
           )}

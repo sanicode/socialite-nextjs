@@ -10,6 +10,8 @@ import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
 import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import LinkPreviewDescription from '@/app/components/posts/LinkPreviewDescription'
+import { isSafeHttpUrl } from '@/app/lib/social-platform'
 import { getPageSlice, type TablePageSize } from '@/app/lib/table-pagination'
 
 type Props = {
@@ -26,6 +28,7 @@ type Props = {
   defaultDateFrom?: string
   defaultDateTo?: string
   pageSize: TablePageSize
+  showMetadataColumn?: boolean
   createDisabled?: boolean
   createDisabledMessage?: string | null
   actionsDisabled?: boolean
@@ -63,6 +66,7 @@ export default function PostsTable({
   defaultDateFrom = '',
   defaultDateTo = '',
   pageSize,
+  showMetadataColumn = false,
   createDisabled = false,
   createDisabledMessage,
   actionsDisabled = false,
@@ -70,6 +74,7 @@ export default function PostsTable({
 }: Props) {
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
+  const showUploadMetadata = variant === 'upload' || showMetadataColumn
   const showReadOnlyStatus = !canVerify
   const showActions = canEdit || canVerify
   const columnCount =
@@ -79,6 +84,7 @@ export default function PostsTable({
     1 +
     1 +
     (showUrl ? 1 : 0) +
+    (showUploadMetadata ? 1 : 0) +
     (canVerify ? 1 : 0) +
     (isAdmin ? 2 : 0) +
     (canVerify || showReadOnlyStatus ? 1 : 0) +
@@ -493,6 +499,11 @@ export default function PostsTable({
                     Link Upload
                   </th>
                 )}
+                {showUploadMetadata && (
+                  <th className="w-72 min-w-72 max-w-72 text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
+                    Metadata
+                  </th>
+                )}
                 {canVerify && (
                   <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-36">
                     Author
@@ -654,7 +665,7 @@ export default function PostsTable({
                   {/* Link Upload */}
                   {showUrl && (
                     <td className="px-4 py-3">
-                      {post.source_url === 'upload' && post.title ? (
+                      {post.source_url === 'upload' && isSafeHttpUrl(post.title) ? (
                         <a
                           href={post.title}
                           target="_blank"
@@ -671,6 +682,17 @@ export default function PostsTable({
                         >
                           {post.title}
                         </button>
+                      ) : (
+                        <span className="text-neutral-400 text-xs">—</span>
+                      )}
+                    </td>
+                  )}
+
+                  {/* Description */}
+                  {showUploadMetadata && (
+                    <td className="w-72 min-w-72 max-w-72 overflow-hidden px-4 py-3 align-top">
+                      {post.source_url === 'upload' ? (
+                        <LinkPreviewDescription value={post.description} />
                       ) : (
                         <span className="text-neutral-400 text-xs">—</span>
                       )}
@@ -875,17 +897,19 @@ export default function PostsTable({
                   <p className="text-sm text-neutral-600 dark:text-neutral-400 break-all font-mono bg-neutral-50 dark:bg-neutral-800 px-4 py-3 rounded-lg">
                     {modal.url}
                   </p>
-                  <a
-                    href={modal.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
-                  >
-                    Buka Link
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
+                  {isSafeHttpUrl(modal.url) && (
+                    <a
+                      href={modal.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
+                    >
+                      Buka Link
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
                 </div>
               )}
             </div>
