@@ -6,6 +6,29 @@ type Props = {
   emptyLabel?: string
 }
 
+const SOFT_BREAK = '\u200B'
+const SOFT_BREAK_INTERVAL = 18
+
+function getDisplayText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength).trimEnd()}...`
+}
+
+function renderWithWordBreaks(value: string, maxLength: number) {
+  const text = getDisplayText(value, maxLength)
+  const parts = text
+    .split(/(\s+)/)
+    .flatMap((part, partIndex) => {
+      if (/^\s+$/.test(part) || part.length <= SOFT_BREAK_INTERVAL) return [part]
+      return part
+        .replace(new RegExp(`(.{${SOFT_BREAK_INTERVAL}})(?=.)`, 'g'), `$1${SOFT_BREAK}`)
+        .split(SOFT_BREAK)
+        .flatMap((chunk, index, chunks) => index < chunks.length - 1 ? [chunk, <wbr key={`${partIndex}-${index}`} />] : [chunk])
+    })
+
+  return parts
+}
+
 function removeLabel(line: string, label: string) {
   return line.startsWith(`${label}:`) ? line.slice(label.length + 1).trim() : null
 }
@@ -48,8 +71,10 @@ export default function LinkPreviewDescription({
   }
 
   const wrapperClass = isForm
-    ? 'flex min-w-0 max-w-full items-start gap-3 overflow-hidden'
-    : 'flex w-full min-w-0 max-w-full items-start gap-3 overflow-hidden'
+    ? 'flex min-w-0 max-w-full items-start gap-3'
+    : 'flex w-full min-w-0 max-w-full items-start gap-3'
+  const authorMaxLength = isForm ? 96 : 52
+  const captionMaxLength = isForm ? 180 : 96
 
   return (
     <div className={wrapperClass}>
@@ -66,21 +91,21 @@ export default function LinkPreviewDescription({
         </div>
       )}
       {display.author || display.caption ? (
-        <div className="w-0 min-w-0 flex-1 space-y-1">
+        <div className={`${isForm ? 'space-y-1' : 'space-y-0.5'} w-0 min-w-0 flex-1`}>
           {display.author && (
             <p
               title={display.author}
-              className={`${isForm ? 'text-sm' : 'text-xs'} min-w-0 max-w-full whitespace-normal break-all font-semibold leading-relaxed text-neutral-900 [overflow-wrap:anywhere] dark:text-white`}
+              className={`${isForm ? 'text-sm' : 'text-xs'} min-w-0 max-w-full whitespace-normal font-semibold leading-tight text-neutral-900 dark:text-white`}
             >
-              {display.author}
+              {renderWithWordBreaks(display.author, authorMaxLength)}
             </p>
           )}
           {display.caption && (
             <p
               title={display.caption}
-              className={`${isForm ? 'text-sm line-clamp-3' : 'text-xs line-clamp-2'} min-w-0 max-w-full whitespace-normal break-all leading-relaxed text-neutral-500 [overflow-wrap:anywhere] dark:text-neutral-400`}
+              className={`${isForm ? 'text-sm' : 'text-xs'} min-w-0 max-w-full whitespace-normal leading-tight text-neutral-500 dark:text-neutral-400`}
             >
-              {display.caption}
+              {renderWithWordBreaks(display.caption, captionMaxLength)}
             </p>
           )}
         </div>

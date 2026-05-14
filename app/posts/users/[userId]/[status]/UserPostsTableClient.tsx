@@ -249,11 +249,13 @@ export default function UserPostsTableClient({
                       )}
                     </td>
                     <td className="w-72 min-w-72 max-w-72 overflow-hidden px-4 py-3 align-top">
-                      {post.source_url === 'upload' ? (
-                        <LinkPreviewDescription value={post.description} />
-                      ) : (
-                        <span className="text-xs text-neutral-400">—</span>
-                      )}
+                      <div className="w-72 max-w-72 overflow-hidden">
+                        {post.source_url === 'upload' ? (
+                          <LinkPreviewDescription value={post.description} />
+                        ) : (
+                          <span className="text-xs text-neutral-400">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">

@@ -310,6 +310,19 @@ Setiap perubahan aplikasi harus dicatat di file ini, terutama perubahan yang men
 - Link share Facebook yang mengembalikan metadata publik kembali menampilkan struktur thumbnail, author, dan caption sesuai UI.
 - **File terdampak:** `app/lib/link-metadata.ts`, `docs/laporan-pekerjaan.md`.
 
+#### 14.19 Soft Break Metadata untuk Safari
+- Menambahkan word break berbasis JavaScript dengan elemen `<wbr />` pada author dan caption metadata agar token panjang tetap bisa patah baris di Safari.
+- Menghapus ketergantungan utama pada `break-all`, `overflow-wrap:anywhere`, dan `line-clamp` untuk teks metadata; data asli tetap tidak berubah karena pemotongan dan break hanya dipasang saat render.
+- Memasang wrapper fixed-width pada kolom metadata tabel `/posts` dan validasi `/posts/users/[userId]` supaya Safari tidak memperlebar kolom berdasarkan isi.
+- Perubahan berlaku untuk seluruh role karena halaman metadata memakai renderer dan wrapper tabel yang sama.
+- **File terdampak:** `app/components/posts/LinkPreviewDescription.tsx`, `app/components/posts/PostsTable.tsx`, `app/posts/users/[userId]/[status]/UserPostsTableClient.tsx`, `docs/laporan-pekerjaan.md`.
+
+#### 14.20 Tinggi Metadata Setara Thumbnail
+- Membatalkan penguncian tinggi renderer metadata karena caption dapat terlihat terpotong tidak jelas.
+- Membatasi panjang teks dengan `maxLength` saat render dan menampilkan akhiran `...` eksplisit agar pemotongan mudah dipahami pengguna.
+- Tetap memakai `<wbr />` untuk token panjang, tetapi tinggi metadata kembali mengikuti isi teks yang sudah dipendekkan.
+- **File terdampak:** `app/components/posts/LinkPreviewDescription.tsx`, `docs/laporan-pekerjaan.md`.
+
 ---
 
 ## Ringkasan Statistik
