@@ -10,6 +10,14 @@ function getDatabaseConnectionString() {
   return connectionString
 }
 
+function getPositiveIntegerEnv(name: string, fallback: number) {
+  const value = process.env[name]?.trim()
+  if (!value) return fallback
+
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 function normalizeCertificate(certificate: string) {
   return certificate
     .trim()
@@ -81,6 +89,9 @@ function getPrismaConnectionSignature(connectionString: string) {
     .update(process.env.DATABASE_SSL_CA || '')
     .update(process.env.DATABASE_SSL_CA_BASE64 || '')
     .update(process.env.DATABASE_SSL_CA_FILE || '')
+    .update(process.env.DATABASE_POOL_MAX || '')
+    .update(process.env.DATABASE_POOL_IDLE_TIMEOUT_MS || '')
+    .update(process.env.DATABASE_POOL_CONNECTION_TIMEOUT_MS || '')
     .digest('hex')
 }
 
@@ -89,6 +100,9 @@ function createPrismaClient() {
   const ssl = getDatabaseSslConfig(connectionString)
   const adapter = new PrismaPg({
     connectionString: ssl ? removeSslModeFromConnectionString(connectionString) : connectionString,
+    max: getPositiveIntegerEnv('DATABASE_POOL_MAX', process.env.NODE_ENV === 'production' ? 2 : 5),
+    idleTimeoutMillis: getPositiveIntegerEnv('DATABASE_POOL_IDLE_TIMEOUT_MS', 10_000),
+    connectionTimeoutMillis: getPositiveIntegerEnv('DATABASE_POOL_CONNECTION_TIMEOUT_MS', 10_000),
     ...(ssl ? { ssl } : {}),
   })
 
