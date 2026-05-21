@@ -49,9 +49,9 @@ function removeSslModeFromConnectionString(connectionString: string) {
   }
 }
 
-function getPrismaConnectionSignature() {
+function getPrismaConnectionSignature(connectionString: string) {
   return createHash('sha256')
-    .update(getDatabaseConnectionString())
+    .update(connectionString)
     .update(process.env.DATABASE_SSL_CA || '')
     .digest('hex')
 }
@@ -83,9 +83,9 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function getPrismaClient() {
-  if (process.env.NODE_ENV === 'production') return createPrismaClient()
+  const connectionString = getDatabaseConnectionString()
+  const connectionSignature = getPrismaConnectionSignature(connectionString)
 
-  const connectionSignature = getPrismaConnectionSignature()
   const cached = globalForPrisma.prisma
   if (
     cached?.__schemaSignature === prismaSchemaSignature &&
@@ -103,4 +103,23 @@ function getPrismaClient() {
   return client
 }
 
-export const prisma = getPrismaClient()
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient()
+    const value = Reflect.get(client, prop, client)
+
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+  set(_target, prop, value) {
+    return Reflect.set(getPrismaClient(), prop, value)
+  },
+  has(_target, prop) {
+    return prop in getPrismaClient()
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getPrismaClient())
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    return Reflect.getOwnPropertyDescriptor(getPrismaClient(), prop)
+  },
+})
