@@ -3,15 +3,42 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 
-const DEFAULT_DATABASE_SSL_CA_FILE = decodeURIComponent(
-  new URL('../../prisma/ca-certificate.crt', import.meta.url).pathname
-)
-
 function getDatabaseConnectionString() {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) throw new Error('DATABASE_URL is not configured')
 
   return connectionString
+}
+
+function normalizeCertificate(certificate: string) {
+  return certificate
+    .trim()
+    .replace(/^"|"$/g, '')
+    .replace(/^'|'$/g, '')
+    .replace(/\\n/g, '\n')
+}
+
+function getDatabaseSslCa() {
+  const encodedCa = process.env.DATABASE_SSL_CA_BASE64?.trim()
+  if (encodedCa) return Buffer.from(encodedCa, 'base64').toString('utf8')
+
+  const inlineCa = process.env.DATABASE_SSL_CA?.trim()
+  if (inlineCa) return normalizeCertificate(inlineCa)
+
+  const caFiles = [process.env.DATABASE_SSL_CA_FILE?.trim()].filter((file): file is string => Boolean(file))
+
+  for (const caFile of caFiles) {
+    if (existsSync(caFile)) return readFileSync(caFile, 'utf8')
+  }
+
+  return undefined
+}
+
+function shouldSkipDatabaseSslVerification(sslMode: string | null) {
+  return (
+    sslMode === 'no-verify' ||
+    process.env.DATABASE_SSL_REJECT_UNAUTHORIZED?.trim().toLowerCase() === 'false'
+  )
 }
 
 function getDatabaseSslConfig(connectionString: string) {
@@ -25,12 +52,11 @@ function getDatabaseSslConfig(connectionString: string) {
 
   if (sslMode === 'disable') return undefined
 
-  const ca = process.env.DATABASE_SSL_CA || (
-    existsSync(DEFAULT_DATABASE_SSL_CA_FILE)
-      ? readFileSync(DEFAULT_DATABASE_SSL_CA_FILE, 'utf8')
-      : undefined
-  )
+  if (shouldSkipDatabaseSslVerification(sslMode)) {
+    return { rejectUnauthorized: false }
+  }
 
+  const ca = getDatabaseSslCa()
   if (!ca) return undefined
 
   return {
@@ -53,6 +79,8 @@ function getPrismaConnectionSignature(connectionString: string) {
   return createHash('sha256')
     .update(connectionString)
     .update(process.env.DATABASE_SSL_CA || '')
+    .update(process.env.DATABASE_SSL_CA_BASE64 || '')
+    .update(process.env.DATABASE_SSL_CA_FILE || '')
     .digest('hex')
 }
 
