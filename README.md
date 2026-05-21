@@ -257,6 +257,8 @@ CAPTCHA_SITE_KEY=            # opsional, Cloudflare Turnstile login web
 CAPTCHA_SECRET_KEY=          # opsional, Cloudflare Turnstile login web
 ```
 
+Backup database harian ke server lain didokumentasikan di `docs/database-backup.md`.
+
 ## Menjalankan Aplikasi
 
 ```bash

@@ -3,6 +3,14 @@
 import { useEffect } from 'react'
 import AppErrorScreen from '@/app/components/AppErrorScreen'
 
+function formatErrorForConsole(error: Error & { digest?: string }) {
+  return [
+    error.name,
+    error.message,
+    error.digest ? `digest=${error.digest}` : '',
+  ].filter(Boolean).join(' | ')
+}
+
 export default function ErrorPage({
   error,
   reset,
@@ -11,7 +19,7 @@ export default function ErrorPage({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error(error)
+    console.error(formatErrorForConsole(error))
   }, [error])
 
   return <AppErrorScreen error={error} reset={reset} />
