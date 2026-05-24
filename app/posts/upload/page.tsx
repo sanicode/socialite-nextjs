@@ -9,7 +9,7 @@ import { prisma } from '@/app/lib/prisma'
 import { parseTablePageSize } from '@/app/lib/table-pagination'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 
-type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; status?: string; reportingWindow?: string }>
+type SearchParams = Promise<{ search?: string; category?: string; page?: string; pageSize?: string; dateFrom?: string; dateTo?: string; sort?: string; status?: string; trending?: string; reportingWindow?: string }>
 
 function getJakartaDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -18,6 +18,10 @@ function getJakartaDateString(date = new Date()) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
+}
+
+function isUrlSearch(value: string | undefined) {
+  return /^https?:\/\//i.test(value?.trim() ?? '')
 }
 
 export default async function UploadPage({ searchParams }: { searchParams: SearchParams }) {
@@ -34,8 +38,9 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
   const reportingWindowClosed = !reportingWindowDecision.allowed
   const reportingWindowTitle = isManager && !isAdmin ? 'Validasi Pelaporan Ditutup' : 'Jam Pelaporan Ditutup'
   const today = getJakartaDateString()
-  const dateFrom = params.dateFrom ?? today
-  const dateTo = params.dateTo ?? today
+  const useDefaultDateRange = !isUrlSearch(params.search)
+  const dateFrom = params.dateFrom ?? (useDefaultDateRange ? today : '')
+  const dateTo = params.dateTo ?? (useDefaultDateRange ? today : '')
 
   let tenantId: string | undefined
   if (isManager && !isAdmin && sessionUser) {
@@ -57,10 +62,11 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
       pageSize,
       userId: isAdmin || isManager ? undefined : sessionUser?.id,
       tenantId,
-      dateFrom,
-      dateTo,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
       sortOrder,
       postType: 'upload',
+      isTrending: params.trending === 'true' ? true : params.trending === 'false' ? false : undefined,
     }),
     getCategories(),
   ])
@@ -114,6 +120,7 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
             variant="upload"
             defaultDateFrom={dateFrom}
             defaultDateTo={dateTo}
+            canManageTrending={isAdmin || isManager}
             createDisabled={reportingWindowClosed}
             createDisabledMessage={reportingWindowDecision.message}
             actionsDisabled={reportingWindowClosed}

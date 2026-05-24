@@ -269,6 +269,7 @@ export type SerializedPost = {
   description: string | null
   status: string
   is_published: boolean
+  is_trending: boolean
   published_at: string | null
   blog_post_category_id: string | null
   created_at: string | null
@@ -351,6 +352,7 @@ export async function getPosts(params: {
   dateTo?: string
   sortOrder?: 'asc' | 'desc'
   postType?: 'upload' | 'amplifikasi'
+  isTrending?: boolean
   provinceId?: string
   cityId?: string
 }): Promise<{ posts: SerializedPost[]; total: number }> {
@@ -374,7 +376,7 @@ export async function getPosts(params: {
   delete scopedParams.tenantIds
   return queryPosts(scopedParams) as Promise<{ posts: SerializedPost[]; total: number }>
 
-  const { search, categoryId, status, page = 1, pageSize = 10, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, provinceId, cityId } = params
+  const { search, categoryId, status, page = 1, pageSize = 10, userId, tenantId, dateFrom, dateTo, sortOrder = 'desc', postType, isTrending, provinceId, cityId } = params
   const numericPageSize = pageSize === 'all' ? undefined : pageSize
   const skip = numericPageSize === undefined ? undefined : (page - 1) * Number(numericPageSize)
   const take = numericPageSize === undefined ? undefined : Number(numericPageSize)
@@ -436,7 +438,10 @@ export async function getPosts(params: {
       OR: [
         { title: { contains: search, mode: 'insensitive' as const } },
         { slug: { contains: search, mode: 'insensitive' as const } },
+        { body: { contains: search, mode: 'insensitive' as const } },
         { description: { contains: search, mode: 'insensitive' as const } },
+        { status: { contains: search, mode: 'insensitive' as const } },
+        { source_url: { contains: search, mode: 'insensitive' as const } },
         { blog_post_categories: { name: { contains: search, mode: 'insensitive' as const } } },
         { users_blog_posts_user_idTousers: { name: { contains: search, mode: 'insensitive' as const } } },
       ],
@@ -454,6 +459,7 @@ export async function getPosts(params: {
       },
     }),
     ...(postType ? { source_url: postType } : {}),
+    ...(typeof isTrending === 'boolean' ? { is_trending: isTrending } : {}),
   }
 
   const [posts, total] = await Promise.all([
@@ -531,6 +537,7 @@ export async function getPosts(params: {
         description: p.description ?? null,
         status: p.status ?? 'pending',
         is_published: p.is_published,
+        is_trending: p.is_trending,
         published_at: p.published_at?.toISOString() ?? null,
         blog_post_category_id: p.blog_post_category_id?.toString() ?? null,
         created_at: p.created_at?.toISOString() ?? null,
@@ -1053,6 +1060,38 @@ export async function updateStatus(id: string, status: 'pending' | 'valid' | 'in
     postId: id,
     userId: sessionUser.id,
     status,
+  })
+  revalidatePosts()
+}
+
+export async function updateTrending(id: string, isTrending: boolean): Promise<void> {
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  if (!/^\d+$/.test(id) || typeof isTrending !== 'boolean') {
+    throw new Error('Payload trending tidak valid')
+  }
+  const post = await prisma.blog_posts.findUnique({
+    where: { id: BigInt(id) },
+    select: { user_id: true, tenant_id: true },
+  })
+  if (!post) throw new Error('Laporan tidak ditemukan')
+
+  const canUpdate = await canActorValidatePost(sessionUser, {
+    userId: post.user_id.toString(),
+    tenantId: post.tenant_id?.toString() ?? null,
+  })
+  if (!canUpdate) throw new Error('Anda tidak memiliki akses untuk mengubah status trending laporan ini')
+
+  await prisma.blog_posts.update({
+    where: { id: BigInt(id) },
+    data: {
+      is_trending: isTrending,
+      updated_at: new Date(),
+    },
+  })
+  logEvent('info', 'posts.update_trending', {
+    postId: id,
+    userId: sessionUser.id,
+    isTrending,
   })
   revalidatePosts()
 }

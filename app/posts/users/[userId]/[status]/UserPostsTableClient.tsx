@@ -1,11 +1,12 @@
 "use client"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus } from '@/app/actions/posts'
+import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus, updateTrending } from '@/app/actions/posts'
 import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
 import LinkPreviewDescription from '@/app/components/posts/LinkPreviewDescription'
+import TrendingSwitch from '@/app/components/posts/TrendingSwitch'
 import { isSafeHttpUrl } from '@/app/lib/social-platform'
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
@@ -24,6 +25,7 @@ type SerializedPost = {
   created_at: string | null
   source_url: string | null
   status: PostStatus
+  is_trending: boolean
   blog_post_categories?: { name: string } | null
 }
 
@@ -69,7 +71,12 @@ export default function UserPostsTableClient({
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
   const bulkEnabled = Boolean(validationDateFrom && validationDateTo)
   const actionsLocked = actionsDisabled || !validationEnabled || isPending
+  const trendingLocked = actionsDisabled || isPending
   const returnTo = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname
+
+  useEffect(() => {
+    setOptimisticPosts(posts)
+  }, [posts])
 
   function buildEditHref(post: SerializedPost) {
     const params = new URLSearchParams()
@@ -126,6 +133,25 @@ export default function UserPostsTableClient({
     })
   }
 
+  const handleTrendingToggle = (postId: string) => {
+    if (trendingLocked) return
+    const currentPost = optimisticPosts.find((post) => post.id.toString() === postId)
+    if (!currentPost) return
+
+    const nextValue = !currentPost.is_trending
+    setOptimisticPosts(prev => prev.map((post) => post.id.toString() === postId ? { ...post, is_trending: nextValue } : post))
+    startTransition(async () => {
+      try {
+        await updateTrending(postId, nextValue)
+        showToast('success', 'Trending Diperbarui', `Laporan ditandai ${nextValue ? 'Ya' : 'Tidak'}.`)
+        router.refresh()
+      } catch {
+        showToast('error', 'Gagal Memperbarui', 'Terjadi kesalahan saat mengubah status trending.')
+        router.refresh()
+      }
+    })
+  }
+
   return (
     <>
       {bulkEnabled && (
@@ -163,6 +189,7 @@ export default function UserPostsTableClient({
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Media Sosial</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Link Upload</th>
               <th className="w-72 min-w-72 max-w-72 px-4 py-3 text-left text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Metadata</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Trending</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Status</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Aksi</th>
             </tr>
@@ -170,7 +197,7 @@ export default function UserPostsTableClient({
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {optimisticPosts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
+                <td colSpan={9} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
                   Tidak ada data
                 </td>
               </tr>
@@ -256,6 +283,14 @@ export default function UserPostsTableClient({
                           <span className="text-xs text-neutral-400">—</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-center align-middle">
+                      <TrendingSwitch
+                        checked={post.is_trending}
+                        onClick={() => handleTrendingToggle(post.id.toString())}
+                        disabled={trendingLocked}
+                        title={actionsDisabled ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.') : undefined}
+                      />
                     </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">

@@ -16,6 +16,7 @@ type SearchParams = Promise<{
   category?: string
   dateFrom?: string
   dateTo?: string
+  trending?: string
 }>
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
@@ -32,7 +33,7 @@ export default async function UserPostsByStatusPage({
   if (!user.roles.some(role => ['admin', 'manager'].includes(role))) redirect('/posts/upload')
 
   const { userId, status } = await params
-  const { jenis, category, dateFrom, dateTo } = await searchParams
+  const { jenis, category, dateFrom, dateTo, trending } = await searchParams
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
 
@@ -61,6 +62,7 @@ export default async function UserPostsByStatusPage({
     status,
     ...(jenis === 'upload' || jenis === 'amplifikasi' ? { source_url: jenis } : {}),
     ...(category ? { blog_post_category_id: BigInt(category) } : {}),
+    ...(trending === 'true' ? { is_trending: true } : trending === 'false' ? { is_trending: false } : {}),
     ...(dateFrom || dateTo ? {
       created_at: {
         ...(dateFrom ? { gte: new Date(dateFrom + 'T00:00:00') } : {}),
@@ -105,6 +107,7 @@ export default async function UserPostsByStatusPage({
     created_at: post.created_at?.toISOString() ?? null,
     source_url: post.source_url,
     status: post.status as PostStatus,
+    is_trending: post.is_trending,
     blog_post_categories: post.blog_post_categories ? { name: post.blog_post_categories.name } : null,
   }))
   const serializedMediaByPostId = Object.fromEntries(
@@ -147,6 +150,7 @@ export default async function UserPostsByStatusPage({
           category={category ?? ''}
           dateFrom={dateFrom ?? ''}
           dateTo={dateTo ?? ''}
+          trending={trending ?? ''}
         />
 
         {/* Jumlah hasil */}
@@ -165,7 +169,7 @@ export default async function UserPostsByStatusPage({
         {/* Table */}
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
           <UserPostsTableClient
-            key={`${jenis}-${category}-${dateFrom}-${dateTo}`}
+            key={`${jenis}-${category}-${dateFrom}-${dateTo}-${trending}`}
             posts={serializedPosts}
             mediaByPostId={serializedMediaByPostId}
             userData={serializedUserData}

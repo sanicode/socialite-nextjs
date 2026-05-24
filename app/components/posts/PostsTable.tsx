@@ -6,11 +6,12 @@ import type { FormEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
-import { deletePost, updateStatus, bulkDeletePosts } from '@/app/actions/posts'
+import { deletePost, updateStatus, bulkDeletePosts, updateTrending } from '@/app/actions/posts'
 import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import LinkPreviewDescription from '@/app/components/posts/LinkPreviewDescription'
+import TrendingSwitch from '@/app/components/posts/TrendingSwitch'
 import { isSafeHttpUrl } from '@/app/lib/social-platform'
 import { getPageSlice, type TablePageSize } from '@/app/lib/table-pagination'
 
@@ -29,6 +30,7 @@ type Props = {
   defaultDateTo?: string
   pageSize: TablePageSize
   showMetadataColumn?: boolean
+  canManageTrending?: boolean
   createDisabled?: boolean
   createDisabledMessage?: string | null
   actionsDisabled?: boolean
@@ -52,6 +54,10 @@ function getStatusClass(status: string) {
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
 }
 
+function isUrlSearch(value: string) {
+  return /^https?:\/\//i.test(value.trim())
+}
+
 export default function PostsTable({
   posts,
   total,
@@ -67,6 +73,7 @@ export default function PostsTable({
   defaultDateTo = '',
   pageSize,
   showMetadataColumn = false,
+  canManageTrending = false,
   createDisabled = false,
   createDisabledMessage,
   actionsDisabled = false,
@@ -75,6 +82,7 @@ export default function PostsTable({
   const showUrl = variant !== 'amplifikasi'
   const showScreenshot = variant !== 'upload'
   const showUploadMetadata = variant === 'upload' || showMetadataColumn
+  const showTrendingColumn = canManageTrending
   const showReadOnlyStatus = !canVerify
   const showActions = canEdit || canVerify
   const columnCount =
@@ -85,6 +93,7 @@ export default function PostsTable({
     1 +
     (showUrl ? 1 : 0) +
     (showUploadMetadata ? 1 : 0) +
+    (showTrendingColumn ? 1 : 0) +
     (canVerify ? 1 : 0) +
     (isAdmin ? 2 : 0) +
     (canVerify || showReadOnlyStatus ? 1 : 0) +
@@ -96,6 +105,10 @@ export default function PostsTable({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const handledSuccess = useRef<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [trendingByPostId, setTrendingByPostId] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(posts.map((post) => [post.id, post.is_trending]))
+  )
+  const [updatingTrendingIds, setUpdatingTrendingIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? defaultDateFrom)
@@ -105,6 +118,7 @@ export default function PostsTable({
   const [filterJenis, setFilterJenis] = useState(searchParams.get('jenis') ?? '')
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
   const [filterCategory, setFilterCategory] = useState(searchParams.get('category') ?? '')
+  const [filterTrending, setFilterTrending] = useState(searchParams.get('trending') ?? '')
   const [isFilterProcessing, setIsFilterProcessing] = useState(false)
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
   const showRegionFilter = isAdmin && !!provinces
@@ -171,6 +185,10 @@ export default function PostsTable({
 
   const allSelected = posts.length > 0 && selectedIds.size === posts.length
 
+  useEffect(() => {
+    setTrendingByPostId(Object.fromEntries(posts.map((post) => [post.id, post.is_trending])))
+  }, [posts])
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -225,6 +243,7 @@ export default function PostsTable({
     setFilterJenis(searchParams.get('jenis') ?? '')
     setFilterStatus(searchParams.get('status') ?? '')
     setFilterCategory(searchParams.get('category') ?? '')
+    setFilterTrending(searchParams.get('trending') ?? '')
     setIsFilterProcessing(false)
   }, [defaultDateFrom, defaultDateTo, searchParams])
 
@@ -254,18 +273,52 @@ export default function PostsTable({
     })
   }
 
+  function handleTrendingToggle(post: SerializedPost) {
+    if (!showTrendingColumn || actionsDisabled || updatingTrendingIds.has(post.id)) return
+    const currentValue = trendingByPostId[post.id] ?? post.is_trending
+    const nextValue = !currentValue
+    setTrendingByPostId((prev) => ({ ...prev, [post.id]: nextValue }))
+    setUpdatingTrendingIds((prev) => new Set(prev).add(post.id))
+
+    startTransition(async () => {
+      try {
+        await updateTrending(post.id, nextValue)
+        showToast('success', 'Trending Diperbarui', `Laporan ditandai ${nextValue ? 'Ya' : 'Tidak'}.`)
+      } catch {
+        setTrendingByPostId((prev) => ({ ...prev, [post.id]: currentValue }))
+        showToast('error', 'Gagal Memperbarui', 'Terjadi kesalahan saat mengubah status trending.')
+      } finally {
+        setUpdatingTrendingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(post.id)
+          return next
+        })
+      }
+    })
+  }
+
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const params = new URLSearchParams(searchParams.toString())
+    const searchLooksLikeUrl = isUrlSearch(searchValue)
+    const dateFromValue =
+      searchLooksLikeUrl && !searchParams.has('dateFrom') && filterDateFrom === defaultDateFrom
+        ? ''
+        : filterDateFrom
+    const dateToValue =
+      searchLooksLikeUrl && !searchParams.has('dateTo') && filterDateTo === defaultDateTo
+        ? ''
+        : filterDateTo
     const entries: Array<[string, string]> = [
-      ['dateFrom', filterDateFrom],
-      ['dateTo', filterDateTo],
+      ['dateFrom', dateFromValue],
+      ['dateTo', dateToValue],
       ['status', filterStatus],
       ['category', filterCategory],
       ['search', searchValue],
     ]
 
     if (variant === 'default') entries.push(['jenis', filterJenis])
+    if (showTrendingColumn) entries.push(['trending', filterTrending])
     if (showRegionFilter) {
       entries.push(['provinceId', filterProvinceId])
       entries.push(['cityId', filterProvinceId ? filterCityId : ''])
@@ -291,7 +344,7 @@ export default function PostsTable({
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <form onSubmit={applyFilters} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <form onSubmit={applyFilters} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
           <input
@@ -392,6 +445,21 @@ export default function PostsTable({
             ))}
           </select>
         </label>
+        {showTrendingColumn && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">Trending</span>
+            <select
+              value={filterTrending}
+              disabled={isPending}
+              onChange={(e) => setFilterTrending(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+            >
+              <option value="">Semua</option>
+              <option value="true">Ya</option>
+              <option value="false">Tidak</option>
+            </select>
+          </label>
+        )}
         <button
           type="submit"
           disabled={isFilterProcessing}
@@ -502,6 +570,11 @@ export default function PostsTable({
                 {showUploadMetadata && (
                   <th className="w-72 min-w-72 max-w-72 text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400">
                     Metadata
+                  </th>
+                )}
+                {showTrendingColumn && (
+                  <th className="w-24 px-4 py-3 text-center font-medium text-neutral-600 dark:text-neutral-400">
+                    Trending
                   </th>
                 )}
                 {canVerify && (
@@ -698,6 +771,18 @@ export default function PostsTable({
                           <span className="text-neutral-400 text-xs">—</span>
                         )}
                       </div>
+                    </td>
+                  )}
+
+                  {/* Trending */}
+                  {showTrendingColumn && (
+                    <td className="px-4 py-3 text-center align-middle">
+                      <TrendingSwitch
+                        checked={trendingByPostId[post.id] ?? post.is_trending}
+                        onClick={() => handleTrendingToggle(post)}
+                        disabled={actionsDisabled || updatingTrendingIds.has(post.id)}
+                        title={actionsDisabled ? (actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.') : undefined}
+                      />
                     </td>
                   )}
 

@@ -10,6 +10,7 @@ export type QueryPost = {
   description: string | null
   status: string
   is_published: boolean
+  is_trending: boolean
   published_at: string | null
   blog_post_category_id: string | null
   created_at: string | null
@@ -35,6 +36,7 @@ export type QueryPostsParams = {
   dateTo?: string
   sortOrder?: 'asc' | 'desc'
   postType?: 'upload' | 'amplifikasi'
+  isTrending?: boolean
   provinceId?: string
   cityId?: string
 }
@@ -47,6 +49,45 @@ function getS3Key(media: { file_name: string; custom_properties: unknown }): str
 
 function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
   return new Date(`${dateString}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+07:00`)
+}
+
+function getSearchTerms(search?: string) {
+  const value = search?.trim()
+  if (!value) return []
+
+  const terms = new Set([value])
+
+  try {
+    const url = new URL(value)
+    url.hash = ''
+    const normalized = url.toString()
+    terms.add(normalized)
+
+    if (!url.search && normalized.endsWith('/')) {
+      terms.add(normalized.slice(0, -1))
+    }
+
+    const withoutWww = new URL(url)
+    withoutWww.hostname = withoutWww.hostname.replace(/^www\./i, '')
+    terms.add(withoutWww.toString())
+    if (!withoutWww.search && withoutWww.toString().endsWith('/')) {
+      terms.add(withoutWww.toString().slice(0, -1))
+    }
+
+    if (!/^www\./i.test(url.hostname)) {
+      const withWww = new URL(url)
+      withWww.hostname = `www.${withWww.hostname}`
+      terms.add(withWww.toString())
+      if (!withWww.search && withWww.toString().endsWith('/')) {
+        terms.add(withWww.toString().slice(0, -1))
+      }
+    }
+
+    const videoId = url.searchParams.get('v') ?? url.pathname.split('/').filter(Boolean).at(-1)
+    if (videoId) terms.add(videoId)
+  } catch {}
+
+  return [...terms]
 }
 
 export async function queryPosts(params: QueryPostsParams): Promise<{ posts: QueryPost[]; total: number }> {
@@ -63,6 +104,7 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
     dateTo,
     sortOrder = 'desc',
     postType,
+    isTrending,
     provinceId,
     cityId,
   } = params
@@ -119,17 +161,22 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
     provinceCityTenantFilter = { tenant_id: { in: matchingTenantIds } }
   }
 
+  const searchTerms = getSearchTerms(search)
+
   const where = {
     ...userIdFilter,
     ...provinceCityTenantFilter,
-    ...(search && {
-      OR: [
-        { title: { contains: search, mode: 'insensitive' as const } },
-        { slug: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } },
-        { blog_post_categories: { name: { contains: search, mode: 'insensitive' as const } } },
-        { users_blog_posts_user_idTousers: { name: { contains: search, mode: 'insensitive' as const } } },
-      ],
+    ...(searchTerms.length > 0 && {
+      OR: searchTerms.flatMap((term) => [
+        { title: { contains: term, mode: 'insensitive' as const } },
+        { slug: { contains: term, mode: 'insensitive' as const } },
+        { body: { contains: term, mode: 'insensitive' as const } },
+        { description: { contains: term, mode: 'insensitive' as const } },
+        { status: { contains: term, mode: 'insensitive' as const } },
+        { source_url: { contains: term, mode: 'insensitive' as const } },
+        { blog_post_categories: { name: { contains: term, mode: 'insensitive' as const } } },
+        { users_blog_posts_user_idTousers: { name: { contains: term, mode: 'insensitive' as const } } },
+      ]),
     }),
     ...(categoryId && { blog_post_category_id: BigInt(categoryId) }),
     ...(status && { status }),
@@ -140,6 +187,7 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
       },
     }),
     ...(postType ? { source_url: postType } : {}),
+    ...(typeof isTrending === 'boolean' ? { is_trending: isTrending } : {}),
   }
 
   const [posts, total] = await Promise.all([
@@ -213,6 +261,7 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
         description: p.description ?? null,
         status: p.status ?? 'pending',
         is_published: p.is_published,
+        is_trending: p.is_trending,
         published_at: p.published_at?.toISOString() ?? null,
         blog_post_category_id: p.blog_post_category_id?.toString() ?? null,
         created_at: p.created_at?.toISOString() ?? null,
@@ -283,6 +332,7 @@ export async function queryPostById(id: string): Promise<QueryPost | null> {
     description: post.description ?? null,
     status: post.status ?? 'pending',
     is_published: post.is_published,
+    is_trending: post.is_trending,
     published_at: post.published_at?.toISOString() ?? null,
     blog_post_category_id: post.blog_post_category_id?.toString() ?? null,
     created_at: post.created_at?.toISOString() ?? null,

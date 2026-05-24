@@ -11,9 +11,10 @@ type Props = {
   category: string
   dateFrom: string
   dateTo: string
+  trending: string
 }
 
-export default function UserPostsFilterClient({ categories, jenis, category, dateFrom, dateTo }: Props) {
+export default function UserPostsFilterClient({ categories, jenis, category, dateFrom, dateTo, trending }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
@@ -35,7 +36,7 @@ export default function UserPostsFilterClient({ categories, jenis, category, dat
     })
   }
 
-  const hasFilter = !!(jenis || category || dateFrom || dateTo)
+  const hasFilter = !!(jenis || category || dateFrom || dateTo || trending)
 
   return (
     <form
@@ -89,6 +90,19 @@ export default function UserPostsFilterClient({ categories, jenis, category, dat
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">Trending</span>
+          <select
+            name="trending"
+            defaultValue={trending}
+            className="px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+          >
+            <option value="">Semua</option>
+            <option value="true">Ya</option>
+            <option value="false">Tidak</option>
           </select>
         </div>
 

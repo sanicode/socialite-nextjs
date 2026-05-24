@@ -30,9 +30,9 @@ export default function DashboardLoading() {
         </div>
 
         <SkeletonBlock className="h-80" />
+        <SkeletonBlock className="h-80" />
         <SkeletonBlock className="h-96" />
       </div>
     </div>
   )
 }
-

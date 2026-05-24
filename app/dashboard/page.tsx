@@ -8,6 +8,7 @@ import {
   getProvinceChartData,
   getTopCitiesByPosts,
   getReportData,
+  getTrendingReportData,
   getPostsByDate,
 } from '@/app/actions/dashboard'
 import DashboardFilters from '@/app/components/dashboard/DashboardFilters'
@@ -16,6 +17,7 @@ import ProvinceDonutChart from '@/app/components/dashboard/ProvinceDonutChart'
 import CityBarChart from '@/app/components/dashboard/CityBarChart'
 import DailyPostsChart from '@/app/components/dashboard/DailyPostsChart'
 import ReportTable from '@/app/components/dashboard/ReportTable'
+import TrendingReportTable from '@/app/components/dashboard/TrendingReportTable'
 import OperatorDailyChecklist, {
   type OperatorChecklistRow,
   type OperatorChecklistStatus,
@@ -248,11 +250,12 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const canSeeRecap = isAdmin || isManager
 
-  const [provinces, operatorReportSummary, provinceData, cityData, reportData, dailyData] = await Promise.all([
+  const [provinces, operatorReportSummary, provinceData, cityData, trendingReportData, reportData, dailyData] = await Promise.all([
     getProvinces(),
     getOperatorReportSummary(filters),
     isAdmin ? getProvinceChartData(filters) : Promise.resolve([]),
     isAdmin ? getTopCitiesByPosts(filters) : Promise.resolve([] as Awaited<ReturnType<typeof getTopCitiesByPosts>>),
+    canSeeRecap ? getTrendingReportData(filters) : Promise.resolve([]),
     canSeeRecap ? getReportData(filters) : Promise.resolve([]),
     getPostsByDate(filters),
   ])
@@ -287,6 +290,8 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
 
         <DailyPostsChart data={dailyData} />
+
+        {canSeeRecap && <TrendingReportTable data={trendingReportData} />}
 
         {canSeeRecap && <ReportTable data={reportData} />}
       </div>

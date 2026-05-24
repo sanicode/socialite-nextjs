@@ -58,6 +58,7 @@ model blog_posts {
   slug                              String?               @unique(map: "blog_posts_slug_unique") @db.VarChar(255)
   body                              String?
   is_published                      Boolean               @default(false)
+  is_trending                       Boolean               @default(false)
   published_at                      DateTime?             @db.Timestamp(0)
   user_id                           BigInt
   author_id                         BigInt?

@@ -62,6 +62,16 @@ export type OperatorReportSummary = {
 
 export type ReportRow = Record<string, unknown>
 
+export type TrendingReportRow = {
+  id: string
+  tanggal: string | null
+  nama: string
+  provinsi: string | null
+  kabupatenKota: string | null
+  jenisMedsos: string | null
+  link: string | null
+}
+
 const BLOG_POST_JAKARTA_DATE_SQL = `date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
 
 function buildBlogPostReportFilters(filters: DashboardFilters) {
@@ -617,6 +627,81 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
     }
     return serialized
   })
+}
+
+export async function getTrendingReportData(filters: DashboardFilters): Promise<TrendingReportRow[]> {
+  const user = await requireManagerOrAdmin()
+  filters = await scopeDashboardFilters(user, filters)
+  const { whereClause, params } = buildBlogPostReportFilters(filters)
+
+  const result = await prisma.$queryRawUnsafe<{
+    id: string
+    tanggal: string | null
+    nama: string
+    provinsi: string | null
+    kabupaten_kota: string | null
+    jenis_medsos: string | null
+    link: string | null
+  }[]>(
+    `
+    SELECT
+      bp.id::text AS id,
+      to_char(${BLOG_POST_JAKARTA_DATE_SQL}, 'YYYY-MM-DD') AS tanggal,
+      u.name AS nama,
+      rp.name AS provinsi,
+      rc.name AS kabupaten_kota,
+      c.name AS jenis_medsos,
+      CASE
+        WHEN bp.source_url = 'upload' THEN NULLIF(bp.title, '-')
+        ELSE COALESCE(NULLIF(bp.title, '-'), media.source_url)
+      END AS link
+    FROM blog_posts bp
+    INNER JOIN users u ON u.id = bp.user_id
+    INNER JOIN tenant_user tu
+      ON tu.user_id = bp.user_id
+     AND tu.tenant_id = bp.tenant_id
+    INNER JOIN model_has_roles mhr
+      ON mhr.model_id = tu.id
+     AND mhr.model_type = 'App\\Models\\TenantUser'
+    INNER JOIN roles r
+      ON r.id = mhr.role_id
+     AND r.name = 'operator'
+    LEFT JOIN LATERAL (
+      SELECT a.city_id
+      FROM addresses a
+      WHERE a.tenant_id = tu.tenant_id
+      ORDER BY a.id ASC
+      LIMIT 1
+    ) addr ON true
+    LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+    LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+    LEFT JOIN blog_post_categories c ON c.id = bp.blog_post_category_id
+    LEFT JOIN LATERAL (
+      SELECT m.custom_properties ->> 'source_url' AS source_url
+      FROM media m
+      WHERE m.model_type = 'App\\Models\\BlogPost'
+        AND m.model_id = bp.id
+        AND m.collection_name = 'blog-images'
+      ORDER BY m.order_column ASC NULLS LAST, m.id ASC
+      LIMIT 1
+    ) media ON true
+    ${whereClause}
+      AND bp.is_trending = true
+      AND COALESCE(u.is_blocked, false) = false
+    ORDER BY ${BLOG_POST_JAKARTA_DATE_SQL} DESC, u.name ASC, bp.created_at DESC NULLS LAST, bp.id DESC
+    `,
+    ...params
+  )
+
+  return result.map((row) => ({
+    id: row.id,
+    tanggal: row.tanggal,
+    nama: row.nama,
+    provinsi: row.provinsi,
+    kabupatenKota: row.kabupaten_kota,
+    jenisMedsos: row.jenis_medsos,
+    link: row.link,
+  }))
 }
 
 export async function getPostsByDate(filters: DashboardFilters): Promise<ChartItem[]> {

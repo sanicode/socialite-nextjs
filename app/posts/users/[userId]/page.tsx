@@ -111,6 +111,7 @@ export default async function UserPostsReviewPage({
     created_at: post.created_at?.toISOString() ?? null,
     source_url: post.source_url,
     status: post.status as PostStatus,
+    is_trending: post.is_trending,
     blog_post_categories: post.blog_post_categories ? { name: post.blog_post_categories.name } : null,
   }))
 
