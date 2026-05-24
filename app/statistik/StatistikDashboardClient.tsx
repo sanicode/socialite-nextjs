@@ -505,7 +505,7 @@ export default function StatistikDashboardClient({
               theme={theme}
               reportedStatus={filters.status ?? ''}
             />
-            <ProvinceDonutChart data={data.provinceData} variant="statistik" theme={theme} />
+            <ProvinceDonutChart data={data.provinceData} summary={data.summary} variant="statistik" theme={theme} />
             <CityBarChart data={data.cityData} variant="statistik" theme={theme} />
             <DailyPostsChart data={data.dailyData} variant="statistik" theme={theme} />
           </>

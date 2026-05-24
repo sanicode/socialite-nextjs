@@ -1,0 +1,4 @@
+# Backup database Socialite setiap hari jam 22:00 waktu server.
+# Pasang dengan: crontab -e
+
+0 22 * * * cd /path/ke/Socialite && BACKUP_ENV_FILE=/etc/socialite-backup.env ./scripts/backup/backup-postgres.sh >> /var/log/socialite-db-backup.log 2>&1

@@ -280,7 +280,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
         {isAdmin && (
           <>
-            <ProvinceDonutChart data={provinceData} />
+            <ProvinceDonutChart data={provinceData} summary={operatorReportSummary} />
 
             <CityBarChart data={cityData} />
           </>
