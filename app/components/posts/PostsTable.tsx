@@ -247,17 +247,6 @@ export default function PostsTable({
     setIsFilterProcessing(false)
   }, [defaultDateFrom, defaultDateTo, searchParams])
 
-  useEffect(() => {
-    const currentSearch = searchParams.get('search') ?? ''
-    if (searchValue === currentSearch) return
-
-    const timeoutId = window.setTimeout(() => {
-      updateParam('search', searchValue)
-    }, 300)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [searchValue, searchParams, updateParam])
-
   function handleDelete(id: string) {
     if (!confirm('Hapus post ini? Tindakan tidak bisa dibatalkan.')) return
     setDeletingId(id)
@@ -339,6 +328,14 @@ export default function PostsTable({
     startTransition(() => {
       router.push(nextHref)
     })
+  }
+
+  function applySearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const currentSearch = searchParams.get('search') ?? ''
+    if (searchValue === currentSearch) return
+
+    updateParam('search', searchValue)
   }
 
   return (
@@ -503,16 +500,23 @@ export default function PostsTable({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <TablePageSizeSelect value={pageSize} />
-        <div className="flex justify-end">
+        <form onSubmit={applySearch} className="flex w-full justify-end gap-2 sm:w-auto">
           <input
             type="search"
             placeholder="Cari..."
             value={searchValue}
             disabled={isPending}
             onChange={(e) => setSearchValue(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
+            className="min-w-0 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:w-72 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
           />
-        </div>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex w-auto flex-none items-center justify-center whitespace-nowrap rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+          >
+            Cari
+          </button>
+        </form>
       </div>
 
       {/* Table */}
