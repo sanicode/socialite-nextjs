@@ -36,6 +36,161 @@ type ReportStatusSummary = {
 
 const ACTIONABLE_PAGE_SIZE = 7
 
+const statistikLeadPanelStyle: CSSProperties = {
+  background: 'var(--stat-surface-2)',
+  border: '1px solid var(--stat-line)',
+  borderRadius: 'var(--stat-radius-sm)',
+  padding: 18,
+}
+
+const statistikLeadRowStyle: CSSProperties = {
+  alignItems: 'center',
+  columnGap: 12,
+  display: 'grid',
+  gridTemplateColumns: '20px minmax(0, 1fr) 90px 48px',
+  padding: '8px 0',
+}
+
+const statistikLeadHeadingStyle: CSSProperties = {
+  alignItems: 'center',
+  columnGap: 8,
+  display: 'flex',
+  fontSize: 12.5,
+  fontWeight: 800,
+  letterSpacing: '0.05em',
+  marginBottom: 14,
+  textTransform: 'uppercase',
+}
+
+const statistikLeadRankStyle: CSSProperties = {
+  color: 'var(--stat-faint)',
+  fontFamily: 'var(--stat-mono)',
+  fontSize: 12,
+  fontWeight: 700,
+  textAlign: 'right',
+}
+
+const statistikLeadNameStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  minWidth: 0,
+}
+
+const statistikLeadSmallStyle: CSSProperties = {
+  color: 'var(--stat-muted)',
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 500,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const statistikLeadBarStyle: CSSProperties = {
+  background: 'var(--stat-line-2)',
+  borderRadius: 99,
+  display: 'block',
+  height: 7,
+  overflow: 'hidden',
+  width: 90,
+}
+
+const statistikLeadFillStyle: CSSProperties = {
+  borderRadius: 99,
+  display: 'block',
+  height: '100%',
+  transformOrigin: 'left',
+}
+
+const statistikLeadPercentStyle: CSSProperties = {
+  fontFamily: 'var(--stat-mono)',
+  fontSize: 13,
+  fontWeight: 700,
+  textAlign: 'right',
+}
+
+const statistikActionTableWrapStyle: CSSProperties = {
+  border: '1px solid var(--stat-line)',
+  borderRadius: 'var(--stat-radius-sm)',
+  marginTop: 16,
+  overflowX: 'auto',
+  overflowY: 'hidden',
+}
+
+const statistikActionTableStyle: CSSProperties = {
+  borderCollapse: 'collapse',
+  fontSize: 13,
+  minWidth: 680,
+  width: '100%',
+}
+
+const statistikActionThStyle: CSSProperties = {
+  background: 'var(--stat-surface-2)',
+  borderBottom: '1px solid var(--stat-line)',
+  color: 'var(--stat-muted)',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  padding: '11px 16px',
+  textAlign: 'left',
+  textTransform: 'uppercase',
+  whiteSpace: 'nowrap',
+}
+
+const statistikActionTdStyle: CSSProperties = {
+  borderBottom: '1px solid var(--stat-line-2)',
+  padding: '11px 16px',
+  verticalAlign: 'middle',
+}
+
+const statistikActionRightStyle: CSSProperties = {
+  fontFamily: 'var(--stat-mono)',
+  fontWeight: 600,
+  textAlign: 'right',
+  whiteSpace: 'nowrap',
+}
+
+const statistikActionPlaceStyle: CSSProperties = {
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+}
+
+const statistikActionPlaceSmallStyle: CSSProperties = {
+  color: 'var(--stat-muted)',
+  fontWeight: 500,
+}
+
+const statistikGapPillStyle: CSSProperties = {
+  background: 'var(--stat-warn-tint)',
+  borderRadius: 7,
+  color: 'var(--stat-warn)',
+  display: 'inline-block',
+  fontFamily: 'var(--stat-mono)',
+  fontSize: 12.5,
+  fontWeight: 700,
+  minWidth: 42,
+  padding: '3px 10px',
+  textAlign: 'center',
+}
+
+const statistikActionFooterStyle: CSSProperties = {
+  color: 'var(--stat-muted)',
+  display: 'flex',
+  flexWrap: 'wrap',
+  fontSize: 12,
+  justifyContent: 'space-between',
+  marginTop: 14,
+  rowGap: 10,
+}
+
+const statistikActionFooterItemStyle: CSSProperties = {
+  marginRight: 18,
+}
+
+const statistikActionAlertStyle: CSSProperties = {
+  color: 'var(--stat-danger)',
+}
+
 function getChartColors(variant: Props['variant'], theme: Props['theme']) {
   if (variant !== 'statistik') {
     return {
@@ -331,6 +486,13 @@ function ReportStatusDonut({
 function StatistikCityLeaderboard({ cityGroups }: { cityGroups: CityChartGroup[] }) {
   const { highest, lowest, provinceLabel } = getCityLeaderboardItems(cityGroups)
   const hasItems = highest.length > 0 || lowest.length > 0
+  const isSingle = highest.length === 0 || lowest.length === 0
+  const gridStyle: CSSProperties = {
+    display: 'grid',
+    gap: 16,
+    gridTemplateColumns: isSingle ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+    marginTop: 18,
+  }
 
   return (
     <section className="statistik-card statistik-card-pad statistik-anim" style={{ animationDelay: '.34s' }}>
@@ -342,39 +504,39 @@ function StatistikCityLeaderboard({ cityGroups }: { cityGroups: CityChartGroup[]
       </div>
 
       {hasItems ? (
-        <div className={`statistik-lead-grid ${highest.length === 0 || lowest.length === 0 ? 'single' : ''}`}>
+        <div className={`statistik-lead-grid ${isSingle ? 'single' : ''}`} style={gridStyle}>
           {highest.length > 0 && (
-            <div className="statistik-lead top">
-              <div className="statistik-lead-heading">▲ Performa Tertinggi</div>
+            <div className="statistik-lead top" style={statistikLeadPanelStyle}>
+              <div className="statistik-lead-heading" style={{ ...statistikLeadHeadingStyle, color: 'var(--stat-good)' }}>▲ Performa Tertinggi</div>
               {highest.map((item, index) => (
-                <div key={`${item.province}-${item.city}-top`} className="statistik-lead-row">
-                  <span className="statistik-lead-rank">{index + 1}</span>
-                  <span className="statistik-lead-name">
+                <div key={`${item.province}-${item.city}-top`} className="statistik-lead-row" style={statistikLeadRowStyle}>
+                  <span className="statistik-lead-rank" style={statistikLeadRankStyle}>{index + 1}</span>
+                  <span className="statistik-lead-name" style={statistikLeadNameStyle}>
                     {item.city}
-                    <small>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
+                    <small style={statistikLeadSmallStyle}>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
                   </span>
-                  <span className="statistik-lead-bar">
-                    <i style={{ background: 'var(--stat-good)', width: `${clampPercent(item.percentage)}%` }} />
+                  <span className="statistik-lead-bar" style={statistikLeadBarStyle}>
+                    <i style={{ ...statistikLeadFillStyle, background: 'var(--stat-good)', width: `${clampPercent(item.percentage)}%` }} />
                   </span>
-                  <span className="statistik-lead-percent" style={{ color: 'var(--stat-good)' }}>{formatPercent(item.percentage, 0)}</span>
+                  <span className="statistik-lead-percent" style={{ ...statistikLeadPercentStyle, color: 'var(--stat-good)' }}>{formatPercent(item.percentage, 0)}</span>
                 </div>
               ))}
             </div>
           )}
           {lowest.length > 0 && (
-            <div className="statistik-lead bottom">
-              <div className="statistik-lead-heading">▼ Performa Terendah</div>
+            <div className="statistik-lead bottom" style={statistikLeadPanelStyle}>
+              <div className="statistik-lead-heading" style={{ ...statistikLeadHeadingStyle, color: 'var(--stat-warn)' }}>▼ Performa Terendah</div>
               {lowest.map((item, index) => (
-                <div key={`${item.province}-${item.city}-bottom`} className="statistik-lead-row">
-                  <span className="statistik-lead-rank">{index + 1}</span>
-                  <span className="statistik-lead-name">
+                <div key={`${item.province}-${item.city}-bottom`} className="statistik-lead-row" style={statistikLeadRowStyle}>
+                  <span className="statistik-lead-rank" style={statistikLeadRankStyle}>{index + 1}</span>
+                  <span className="statistik-lead-name" style={statistikLeadNameStyle}>
                     {item.city}
-                    <small>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
+                    <small style={statistikLeadSmallStyle}>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
                   </span>
-                  <span className="statistik-lead-bar">
-                    <i style={{ background: 'var(--stat-warn)', width: `${clampPercent(item.percentage)}%` }} />
+                  <span className="statistik-lead-bar" style={statistikLeadBarStyle}>
+                    <i style={{ ...statistikLeadFillStyle, background: 'var(--stat-warn)', width: `${clampPercent(item.percentage)}%` }} />
                   </span>
-                  <span className="statistik-lead-percent" style={{ color: 'var(--stat-warn)' }}>{formatPercent(item.percentage, 0)}</span>
+                  <span className="statistik-lead-percent" style={{ ...statistikLeadPercentStyle, color: 'var(--stat-warn)' }}>{formatPercent(item.percentage, 0)}</span>
                 </div>
               ))}
             </div>
@@ -422,44 +584,51 @@ function StatistikActionableMissingTable({ cityGroups }: { cityGroups: CityChart
 
       {rows.length > 0 ? (
         <>
-          <div className="statistik-table-wrap">
-            <table className="statistik-action-table">
+          <div className="statistik-table-wrap" style={statistikActionTableWrapStyle}>
+            <table className="statistik-action-table" style={statistikActionTableStyle}>
               <thead>
                 <tr>
-                  <th>Kota / Kabupaten</th>
-                  <th className="statistik-table-right">Kuota</th>
-                  <th className="statistik-table-right">Sudah Lapor</th>
-                  <th className="statistik-table-right">Belum Lapor</th>
-                  <th className="statistik-table-right">Performa</th>
+                  <th style={statistikActionThStyle}>Kota / Kabupaten</th>
+                  <th className="statistik-table-right" style={{ ...statistikActionThStyle, ...statistikActionRightStyle }}>Kuota</th>
+                  <th className="statistik-table-right" style={{ ...statistikActionThStyle, ...statistikActionRightStyle }}>Sudah Lapor</th>
+                  <th className="statistik-table-right" style={{ ...statistikActionThStyle, ...statistikActionRightStyle }}>Belum Lapor</th>
+                  <th className="statistik-table-right" style={{ ...statistikActionThStyle, ...statistikActionRightStyle }}>Performa</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleRows.map((row) => (
                   <tr key={`${row.province}-${row.city}`}>
-                    <td className="statistik-action-place">
-                      {row.city} <small>· {formatProvinceShortName(row.province)}</small>
+                    <td className="statistik-action-place" style={{ ...statistikActionTdStyle, ...statistikActionPlaceStyle }}>
+                      {row.city} <small style={statistikActionPlaceSmallStyle}>· {formatProvinceShortName(row.province)}</small>
                     </td>
-                    <td className="statistik-table-right">{formatNumber(row.operators)}</td>
-                    <td className="statistik-table-right">{formatNumber(row.posts)}</td>
-                    <td className="statistik-table-right">
-                      <span className={`statistik-gap-pill ${row.missing >= 60 ? 'hi' : ''}`}>
+                    <td className="statistik-table-right" style={{ ...statistikActionTdStyle, ...statistikActionRightStyle }}>{formatNumber(row.operators)}</td>
+                    <td className="statistik-table-right" style={{ ...statistikActionTdStyle, ...statistikActionRightStyle }}>{formatNumber(row.posts)}</td>
+                    <td className="statistik-table-right" style={{ ...statistikActionTdStyle, ...statistikActionRightStyle }}>
+                      <span
+                        className={`statistik-gap-pill ${row.missing >= 60 ? 'hi' : ''}`}
+                        style={{
+                          ...statistikGapPillStyle,
+                          background: row.missing >= 60 ? 'var(--stat-danger-tint)' : 'var(--stat-warn-tint)',
+                          color: row.missing >= 60 ? 'var(--stat-danger)' : 'var(--stat-warn)',
+                        }}
+                      >
                         {formatNumber(row.missing)}
                       </span>
                     </td>
-                    <td className="statistik-table-right">{formatPercent(row.percentage, 0)}</td>
+                    <td className="statistik-table-right" style={{ ...statistikActionTdStyle, ...statistikActionRightStyle }}>{formatPercent(row.percentage, 0)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="statistik-action-footer">
-            <span>
+          <div className="statistik-action-footer" style={statistikActionFooterStyle}>
+            <span style={statistikActionFooterItemStyle}>
               Menampilkan {formatNumber(pageSlice.start)}-{formatNumber(pageSlice.end)} dari {formatNumber(rows.length)} prioritas {provinceScope} ·{' '}
               <b>{formatNumber(activeMissingTotal)}</b> total belum lapor {locationPrefix} {provinceScope}
             </span>
             {anomalyText && (
-              <span className="statistik-action-alert">
+              <span className="statistik-action-alert" style={{ ...statistikActionFooterItemStyle, ...statistikActionAlertStyle }}>
                 {anomalyText} — tertahan oleh anomali data
               </span>
             )}

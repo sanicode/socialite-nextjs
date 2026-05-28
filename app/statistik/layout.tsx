@@ -13,6 +13,11 @@ const jetBrainsMono = JetBrains_Mono({
 export default function StatistikLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${plusJakartaSans.variable} ${jetBrainsMono.variable}`}>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var r=document.documentElement;if(!r.dataset.statistikPreviousTheme){r.dataset.statistikPreviousTheme=r.classList.contains('dark')?'dark':'light'}var t=localStorage.getItem('statistik-theme');if(t!=='light'&&t!=='dark'){t='dark';localStorage.setItem('statistik-theme',t)}r.dataset.statistikTheme=t;r.classList.toggle('dark',t==='dark')}catch(e){document.documentElement.classList.add('dark')}})();`,
+        }}
+      />
       {children}
     </div>
   )

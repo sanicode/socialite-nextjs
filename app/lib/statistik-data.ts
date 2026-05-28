@@ -10,11 +10,6 @@ export type StatistikFilters = {
   status?: 'pending' | 'valid' | 'invalid'
 }
 
-export type StatistikChartItem = {
-  name: string
-  value: number
-}
-
 export type StatistikProvinceChartItem = {
   name: string
   posts: number
@@ -53,7 +48,6 @@ export type StatistikDashboardPayload = {
   summary: StatistikOperatorReportSummary
   provinceData: StatistikProvinceChartItem[]
   cityData: StatistikCityChartGroup[]
-  dailyData: StatistikChartItem[]
 }
 
 export type PublicStatistikOperatorReportRow = Omit<StatistikOperatorReportRow, 'tenantUserId' | 'email' | 'phoneNumber' | 'userId'>
@@ -560,40 +554,17 @@ async function getTopCitiesByPosts(filters: StatistikFilters): Promise<Statistik
   }).sort((a, b) => a.province.localeCompare(b.province))
 }
 
-async function getPostsByDate(filters: StatistikFilters): Promise<StatistikChartItem[]> {
-  const { whereClause, params } = buildBlogPostReportFilters(filters)
-  const rows = await prisma.$queryRawUnsafe<{ date: string; value: bigint }[]>(
-    `
-    ${buildDailyReportedOperatorsCte(whereClause)}
-    SELECT
-      to_char(tanggal_pelaporan, 'YYYY-MM-DD') AS date,
-      COUNT(*) AS value
-    FROM daily_reported_operators
-    GROUP BY tanggal_pelaporan
-    ORDER BY date ASC
-    `,
-    ...params
-  )
-
-  return rows.map((row) => ({
-    name: new Date(`${row.date}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
-    value: Number(row.value),
-  }))
-}
-
 export async function getStatistikDashboardData(filters: StatistikFilters): Promise<StatistikDashboardPayload> {
   const normalizedFilters = normalizeStatistikFilters(filters)
-  const [summary, provinceData, cityData, dailyData] = await Promise.all([
+  const [summary, provinceData, cityData] = await Promise.all([
     getOperatorReportSummary(normalizedFilters),
     getProvinceChartData(normalizedFilters),
     getTopCitiesByPosts(normalizedFilters),
-    getPostsByDate(normalizedFilters),
   ])
 
   return {
     summary,
     provinceData,
     cityData,
-    dailyData,
   }
 }

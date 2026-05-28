@@ -1,11 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import StatCards from '@/app/components/dashboard/StatCards'
 import ProvinceDonutChart from '@/app/components/dashboard/ProvinceDonutChart'
 import CityBarChart from '@/app/components/dashboard/CityBarChart'
-import DailyPostsChart from '@/app/components/dashboard/DailyPostsChart'
 import type {
   PublicStatistikDashboardPayload,
   StatistikFilters,
@@ -21,6 +20,39 @@ type Props = {
 
 type ApiPayload = PublicStatistikDashboardPayload & {
   cities: { id: string; name: string }[]
+}
+
+type StatistikStyle = CSSProperties & Record<`--${string}`, string | number>
+
+const statistikWrapStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 18,
+  margin: '0 auto',
+  maxWidth: 1180,
+  width: '100%',
+}
+
+const statistikTopbarLightStyle: StatistikStyle = {
+  '--stat-topbar-glow': 'radial-gradient(650px 240px at 100% 0%, rgba(232, 116, 44, 0.13), transparent 62%), radial-gradient(520px 220px at 78% 100%, rgba(14, 138, 125, 0.1), transparent 68%)',
+  '--stat-topbar-control-bg': 'rgba(22, 32, 46, 0.045)',
+  '--stat-topbar-control-border': 'rgba(22, 32, 46, 0.1)',
+  '--stat-topbar-control-color': '#4d5b6e',
+  '--stat-topbar-control-hover': '#16202e',
+  background: 'linear-gradient(135deg, #ffffff, #f4f8fb)',
+  border: '1px solid #e0e7ef',
+  color: '#16202e',
+}
+
+const statistikTopbarDarkStyle: StatistikStyle = {
+  '--stat-topbar-glow': 'radial-gradient(600px 220px at 100% 0%, rgba(232, 116, 44, 0.28), transparent 60%)',
+  '--stat-topbar-control-bg': 'rgba(255, 255, 255, 0.07)',
+  '--stat-topbar-control-border': 'rgba(255, 255, 255, 0.1)',
+  '--stat-topbar-control-color': '#c4cdd8',
+  '--stat-topbar-control-hover': '#ffffff',
+  background: 'linear-gradient(135deg, #16202e, #1f2c3e)',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
+  color: '#ffffff',
 }
 
 function addOneMonth(dateStr: string): string {
@@ -90,7 +122,6 @@ export default function StatistikDashboardClient({
       summary: payload.summary,
       provinceData: payload.provinceData,
       cityData: payload.cityData,
-      dailyData: payload.dailyData,
     })
     if (updateCities) setCities(payload.cities)
     setLastUpdated(new Date())
@@ -108,11 +139,11 @@ export default function StatistikDashboardClient({
         root.dataset.statistikPreviousTheme = root.classList.contains('dark') ? 'dark' : 'light'
       }
       const storedTheme = localStorage.getItem('statistik-theme')
-      if (storedTheme !== 'light' && storedTheme !== 'dark') {
-        root.classList.add('dark')
-        root.dataset.statistikTheme = 'dark'
-      }
-      setTheme(root.classList.contains('dark') ? 'dark' : 'light')
+      const nextTheme = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'dark'
+      if (storedTheme !== nextTheme) localStorage.setItem('statistik-theme', nextTheme)
+      root.dataset.statistikTheme = nextTheme
+      root.classList.toggle('dark', nextTheme === 'dark')
+      setTheme(nextTheme)
       setThemeMounted(true)
     }, 0)
     return () => {
@@ -203,16 +234,29 @@ export default function StatistikDashboardClient({
   }
 
   const isDarkTheme = theme === 'dark'
+  const topbarStyle = isDarkTheme ? statistikTopbarDarkStyle : statistikTopbarLightStyle
+  const topbarMutedColor = isDarkTheme ? '#aeb9c6' : '#637184'
+  const topbarControlStyle: CSSProperties = isDarkTheme
+    ? {
+        background: 'rgba(255, 255, 255, 0.07)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        color: '#c4cdd8',
+      }
+    : {
+        background: 'rgba(22, 32, 46, 0.045)',
+        borderColor: 'rgba(22, 32, 46, 0.1)',
+        color: '#4d5b6e',
+      }
 
   return (
     <main className={`statistik-main ${isDarkTheme ? 'statistik-dark' : 'statistik-light'}`}>
-      <div className="statistik-wrap">
-        <header className="statistik-topbar statistik-anim" style={{ animationDelay: '.02s' }}>
+      <div className="statistik-wrap" style={statistikWrapStyle}>
+        <header className="statistik-topbar statistik-anim" style={{ ...topbarStyle, animationDelay: '.02s' }}>
           <div className="statistik-topbar-inner">
             <div>
               <div className="statistik-eyebrow">Dashboard Publik</div>
               <h1>Statistik Pelaporan</h1>
-              <p>Ringkasan performa pelaporan operator aktif</p>
+              <p style={{ color: topbarMutedColor }}>Ringkasan performa pelaporan operator aktif</p>
             </div>
             <div className="statistik-header-actions">
               {themeMounted && (
@@ -222,6 +266,7 @@ export default function StatistikDashboardClient({
                   aria-label={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
                   title={theme === 'dark' ? 'Tema terang' : 'Tema gelap'}
                   className="statistik-theme-button"
+                  style={topbarControlStyle}
                 >
                   {theme === 'dark' ? (
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,7 +279,7 @@ export default function StatistikDashboardClient({
                   )}
                 </button>
               )}
-              <div className="statistik-live">
+              <div className="statistik-live" style={topbarControlStyle}>
                 <span className="statistik-dot" />
                 Auto-refresh 30 detik{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('id-ID')}` : ''}
               </div>
@@ -356,7 +401,6 @@ export default function StatistikDashboardClient({
               theme={theme}
             />
             <CityBarChart data={data.cityData} variant="statistik" theme={theme} />
-            <DailyPostsChart data={data.dailyData} variant="statistik" theme={theme} />
           </>
         ) : (
           <div className="space-y-5">
@@ -367,7 +411,6 @@ export default function StatistikDashboardClient({
             </div>
             <div className="statistik-skeleton h-72 animate-pulse rounded-2xl" />
             <div className="statistik-skeleton h-80 animate-pulse rounded-2xl" />
-            <div className="statistik-skeleton h-60 animate-pulse rounded-2xl" />
           </div>
         )}
       </div>
