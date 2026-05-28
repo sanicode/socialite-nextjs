@@ -53,6 +53,7 @@ Operator tidak bisa mengakses `/posts` (redirect ke `/posts/upload`), tidak munc
 | Path | Akses | Keterangan |
 |------|-------|------------|
 | `/login` | Public | Form login dengan rate limiting |
+| `/statistik?id=bmi` | Public | Dashboard statistik pelaporan publik, tanpa login, dengan data operator disamarkan |
 | `/dashboard` | Manager, Admin | Ringkasan statistik dan rekapitulasi |
 | `/summary` | Admin | Rekap harian dengan tab Summary/Analytics, chart, export PDF dan Excel |
 | `/posts` | Manager, Admin | Semua laporan (semua operator) |
@@ -151,6 +152,12 @@ Membaca dari SQL views:
 Export ke Excel dengan hyperlink aktif via SheetJS.
 
 Dashboard admin dan manager menampilkan 3 card operator: Total Operator, Sudah Lapor, dan Belum Lapor. Card Sudah Lapor dan Belum Lapor dapat diklik untuk membuka dialog tabel operator sesuai filter tanggal, status, provinsi, kota, serta tenant. Definisi Sudah Lapor pada card menghitung operator unik dalam filter aktif. Grafik Pelapor per Provinsi, Pelapor per Kota, Pelapor per Tanggal, dan Rekapitulasi Pelaporan menghitung pelapor per tanggal dalam rentang filter: operator harus memiliki minimal satu laporan upload dan satu laporan amplifikasi pada tanggal tersebut.
+
+### Statistik Publik
+
+Halaman `/statistik?id=bmi` sengaja disediakan untuk publik dan tidak boleh mewajibkan login. Halaman ini membuat Bearer token khusus statistik saat render, lalu client memakai token tersebut untuk mengambil data dari `/api/statistik`.
+
+Endpoint `/api/statistik` tidak memakai session login, tetapi tetap menolak request tanpa token statistik yang valid. Token bersifat singkat, scope-nya hanya `statistik`, terikat ke `id=bmi` dan fingerprint request. Response API wajib melalui `stripDashboardPii`, sehingga data sensitif operator seperti email, nomor telepon, user id, dan tenant user id tidak ikut keluar ke publik.
 
 ### Summary
 

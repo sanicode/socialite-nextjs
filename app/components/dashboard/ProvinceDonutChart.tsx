@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useState, type CSSProperties } from 'react'
 import {
   BarChart,
   Bar,
@@ -13,11 +14,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import type { ProvinceChartItem } from '@/app/actions/dashboard'
+import type { CityChartGroup, ProvinceChartItem } from '@/app/actions/dashboard'
 import { renderHorizontalBarValueLabel } from '@/app/components/dashboard/ChartValueLabels'
+import { getPageSlice } from '@/app/lib/table-pagination'
 
 type Props = {
   data: ProvinceChartItem[]
+  cityGroups?: CityChartGroup[]
   summary?: ReportStatusSummary
   variant?: 'default' | 'statistik'
   theme?: 'light' | 'dark'
@@ -27,7 +30,11 @@ type ReportStatusSummary = {
   totalOperators: number
   reportedOperators: number
   missingOperators: number
+  reportedRows?: { province: string | null }[]
+  missingRows?: { province: string | null }[]
 }
+
+const ACTIONABLE_PAGE_SIZE = 7
 
 function getChartColors(variant: Props['variant'], theme: Props['theme']) {
   if (variant !== 'statistik') {
@@ -49,53 +56,164 @@ function getChartColors(variant: Props['variant'], theme: Props['theme']) {
     }
   }
 
-  if (theme === 'light') {
-    return {
-      primary: '#7aa3ad',
-      secondary: '#e8782d',
-      reported: '#7aa3ad',
-      missing: '#e8782d',
-      grid: '#d9e4e6',
-      cursor: 'rgba(122, 163, 173, 0.1)',
-      tooltipBg: '#263b43',
-      tooltipBorder: '#405962',
-      tooltipText: '#f8fafc',
-      tooltipLabel: '#b7c8cd',
-      panelStyle: {
-        background: 'linear-gradient(135deg, #ffffff 0%, #f6fafb 100%)',
-        borderColor: '#c7d8dc',
-        boxShadow: '0 16px 36px rgba(64, 89, 98, 0.1)',
-      },
-      titleStyle: { color: '#263b43' },
-      mutedStyle: { color: '#6d858c' },
-      axis: '#405962',
-    }
-  }
-
+  const isDark = theme === 'dark'
   return {
-    primary: '#8eb4bd',
-    secondary: '#f08a3d',
-    reported: '#8eb4bd',
-    missing: '#f08a3d',
-    grid: '#263b43',
-    cursor: 'rgba(142, 180, 189, 0.09)',
-    tooltipBg: '#101f25',
-    tooltipBorder: '#405962',
-    tooltipText: '#f8fafc',
-    tooltipLabel: '#b7c8cd',
+    primary: `var(--stat-good, ${isDark ? '#37d39a' : '#0e8a7d'})`,
+    secondary: `var(--stat-warn, ${isDark ? '#f08a3d' : '#e8742c'})`,
+    reported: `var(--stat-good, ${isDark ? '#37d39a' : '#0e8a7d'})`,
+    missing: `var(--stat-warn, ${isDark ? '#f08a3d' : '#e8742c'})`,
+    grid: 'var(--dashboard-chart-grid, var(--stat-line))',
+    cursor: 'var(--dashboard-chart-cursor, rgba(14, 138, 125, 0.08))',
+    tooltipBg: 'var(--dashboard-chart-tooltip-bg, #16202e)',
+    tooltipBorder: 'var(--dashboard-chart-tooltip-border, #3a4759)',
+    tooltipText: 'var(--dashboard-chart-tooltip-text, #ffffff)',
+    tooltipLabel: 'var(--dashboard-chart-tooltip-label, #c4cdd8)',
     panelStyle: {
-      background: 'linear-gradient(135deg, #152b32 0%, #102129 100%)',
-      borderColor: '#28434b',
-      boxShadow: '0 18px 38px rgba(0, 0, 0, 0.26)',
+      background: 'var(--dashboard-panel-bg, var(--stat-surface))',
+      borderColor: 'var(--dashboard-panel-border, var(--stat-line))',
+      borderRadius: 'var(--stat-radius, 18px)',
+      boxShadow: 'var(--dashboard-panel-shadow, var(--stat-shadow))',
     },
-    titleStyle: { color: '#f8fafc' },
-    mutedStyle: { color: '#b7c8cd' },
-    axis: '#b7c8cd',
+    titleStyle: { color: 'var(--stat-ink)' },
+    mutedStyle: { color: 'var(--stat-muted)' },
+    axis: 'var(--dashboard-axis, var(--stat-ink-2))',
   }
 }
 
 function formatNumber(value: number) {
   return value.toLocaleString('id-ID')
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
+}
+
+function getPercentage(value: number, total: number) {
+  return total > 0 ? (value / total) * 100 : 0
+}
+
+function formatPercent(value: number, fractionDigits = 0) {
+  return `${clampPercent(value).toLocaleString('id-ID', {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  })}%`
+}
+
+function formatProvinceShortName(value: string) {
+  const normalized = getProvinceKey(value)
+  const shortNames: Record<string, string> = {
+    'jawa timur': 'Jatim',
+    'jawa tengah': 'Jateng',
+    'jawa barat': 'Jabar',
+    'dki jakarta': 'DKI Jakarta',
+    'di yogyakarta': 'DIY',
+  }
+  return shortNames[normalized] ?? value
+}
+
+function getProvinceKey(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || 'tanpa-provinsi'
+}
+
+function getProvinceDisplayName(value: string | null | undefined) {
+  return (value?.trim() || 'Tanpa Provinsi').toUpperCase()
+}
+
+function countRowsByProvince(rows: { province: string | null }[] | undefined) {
+  const counts = new Map<string, { name: string; count: number }>()
+  for (const row of rows ?? []) {
+    const key = getProvinceKey(row.province)
+    const current = counts.get(key) ?? { name: row.province?.trim() || 'Tanpa Provinsi', count: 0 }
+    counts.set(key, { ...current, count: current.count + 1 })
+  }
+  return counts
+}
+
+function getCityLeaderboardGroups(cityGroups: CityChartGroup[]) {
+  const groupsWithReports = cityGroups.filter((group) => group.cities.some((city) => city.posts > 0))
+  return groupsWithReports.length > 0 ? groupsWithReports : cityGroups
+}
+
+function getCityLeaderboardItems(cityGroups: CityChartGroup[]) {
+  const rankableGroups = getCityLeaderboardGroups(cityGroups)
+  const items = rankableGroups.flatMap((group) => group.cities
+    .filter((city) => city.operators > 0)
+    .map((city) => ({
+      city: city.name,
+      province: group.province,
+      posts: Math.max(city.posts, 0),
+      operators: Math.max(city.operators, 0),
+      percentage: getPercentage(city.posts, city.operators),
+    })))
+  const highest = [...items]
+    .sort((a, b) => b.percentage - a.percentage || b.posts - a.posts || a.city.localeCompare(b.city))
+    .slice(0, 5)
+  const lowest = items
+    .filter((item) => item.percentage < 100)
+    .sort((a, b) => a.percentage - b.percentage || b.operators - a.operators || a.city.localeCompare(b.city))
+    .slice(0, 5)
+  const uniqueProvinceNames = Array.from(new Set(rankableGroups.map((group) => group.province).filter(Boolean)))
+
+  return {
+    highest,
+    lowest,
+    provinceLabel: uniqueProvinceNames.length === 1 ? uniqueProvinceNames[0] : '',
+  }
+}
+
+function getActionableMissingData(cityGroups: CityChartGroup[]) {
+  const rankableGroups = getCityLeaderboardGroups(cityGroups)
+  const rankableProvinceKeys = new Set(rankableGroups.map((group) => getProvinceKey(group.province)))
+  const rows = rankableGroups.flatMap((group) => group.cities
+    .filter((city) => city.operators > 0)
+    .map((city) => {
+      const operators = Math.max(city.operators, 0)
+      const posts = Math.min(Math.max(city.posts, 0), operators)
+      return {
+        city: city.name,
+        province: group.province,
+        posts,
+        operators,
+        missing: Math.max(operators - posts, 0),
+        percentage: getPercentage(posts, operators),
+      }
+    })
+    .filter((city) => city.missing > 0))
+    .sort((a, b) => (
+      b.missing - a.missing
+      || a.percentage - b.percentage
+      || b.operators - a.operators
+      || a.city.localeCompare(b.city)
+    ))
+
+  const anomalySummaries = cityGroups
+    .map((group) => {
+      const totals = group.cities.reduce((total, city) => {
+        const operators = Math.max(city.operators, 0)
+        const posts = Math.min(Math.max(city.posts, 0), operators)
+        return {
+          operators: total.operators + operators,
+          posts: total.posts + posts,
+          missing: total.missing + Math.max(operators - posts, 0),
+        }
+      }, { operators: 0, posts: 0, missing: 0 })
+      return { province: group.province, ...totals }
+    })
+    .filter((group) => (
+      group.operators > 0
+      && group.posts === 0
+      && group.missing > 0
+      && !rankableProvinceKeys.has(getProvinceKey(group.province))
+    ))
+    .sort((a, b) => b.missing - a.missing || a.province.localeCompare(b.province))
+
+  return {
+    rows,
+    activeMissingTotal: rows.reduce((total, row) => total + row.missing, 0),
+    activeProvinceNames: Array.from(new Set(rankableGroups.map((group) => group.province).filter(Boolean))),
+    anomalySummaries,
+  }
 }
 
 function getReportStatus(data: ProvinceChartItem[], summary?: ReportStatusSummary) {
@@ -136,7 +254,7 @@ function ReportStatusDonut({
     <div className="border-b border-neutral-200 pb-5 dark:border-neutral-800 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-5">
       <div className="mb-3">
         <h4 className="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400" style={colors.mutedStyle}>
-          Status Operator
+          Progres Pelaporan
         </h4>
         <p className="mt-1 text-sm font-semibold text-neutral-900 dark:text-white" style={colors.titleStyle}>
           {formatNumber(total)} operator
@@ -210,7 +328,356 @@ function ReportStatusDonut({
   )
 }
 
-export default function ProvinceDonutChart({ data, summary, variant = 'default', theme = 'light' }: Props) {
+function StatistikCityLeaderboard({ cityGroups }: { cityGroups: CityChartGroup[] }) {
+  const { highest, lowest, provinceLabel } = getCityLeaderboardItems(cityGroups)
+  const hasItems = highest.length > 0 || lowest.length > 0
+
+  return (
+    <section className="statistik-card statistik-card-pad statistik-anim" style={{ animationDelay: '.34s' }}>
+      <div className="statistik-card-header">
+        <div>
+          <h2>Peringkat Performa Kota{provinceLabel ? ` — ${provinceLabel}` : ''}</h2>
+          <div className="statistik-card-sub">Rasio pelapor terhadap kuota operator. Lebih actionable daripada angka absolut.</div>
+        </div>
+      </div>
+
+      {hasItems ? (
+        <div className={`statistik-lead-grid ${highest.length === 0 || lowest.length === 0 ? 'single' : ''}`}>
+          {highest.length > 0 && (
+            <div className="statistik-lead top">
+              <div className="statistik-lead-heading">▲ Performa Tertinggi</div>
+              {highest.map((item, index) => (
+                <div key={`${item.province}-${item.city}-top`} className="statistik-lead-row">
+                  <span className="statistik-lead-rank">{index + 1}</span>
+                  <span className="statistik-lead-name">
+                    {item.city}
+                    <small>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
+                  </span>
+                  <span className="statistik-lead-bar">
+                    <i style={{ background: 'var(--stat-good)', width: `${clampPercent(item.percentage)}%` }} />
+                  </span>
+                  <span className="statistik-lead-percent" style={{ color: 'var(--stat-good)' }}>{formatPercent(item.percentage, 0)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {lowest.length > 0 && (
+            <div className="statistik-lead bottom">
+              <div className="statistik-lead-heading">▼ Performa Terendah</div>
+              {lowest.map((item, index) => (
+                <div key={`${item.province}-${item.city}-bottom`} className="statistik-lead-row">
+                  <span className="statistik-lead-rank">{index + 1}</span>
+                  <span className="statistik-lead-name">
+                    {item.city}
+                    <small>{formatNumber(item.posts)} / {formatNumber(item.operators)} operator</small>
+                  </span>
+                  <span className="statistik-lead-bar">
+                    <i style={{ background: 'var(--stat-warn)', width: `${clampPercent(item.percentage)}%` }} />
+                  </span>
+                  <span className="statistik-lead-percent" style={{ color: 'var(--stat-warn)' }}>{formatPercent(item.percentage, 0)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="statistik-province-empty">Belum ada data kota/kabupaten</div>
+      )}
+    </section>
+  )
+}
+
+function StatistikActionableMissingTable({ cityGroups }: { cityGroups: CityChartGroup[] }) {
+  const [page, setPage] = useState(1)
+  const {
+    rows,
+    activeMissingTotal,
+    activeProvinceNames,
+    anomalySummaries,
+  } = useMemo(() => getActionableMissingData(cityGroups), [cityGroups])
+  const pageSlice = getPageSlice(page, ACTIONABLE_PAGE_SIZE, rows.length)
+  const currentPage = Math.min(Math.max(1, page), pageSlice.totalPages)
+  const visibleRows = rows.slice(
+    pageSlice.offset,
+    pageSlice.take ? pageSlice.offset + pageSlice.take : rows.length
+  )
+  const provinceScope = activeProvinceNames.length === 1
+    ? formatProvinceShortName(activeProvinceNames[0])
+    : activeProvinceNames.length > 1
+      ? `${activeProvinceNames.length} provinsi aktif`
+      : 'data aktif'
+  const locationPrefix = activeProvinceNames.length === 1 ? 'di' : 'pada'
+  const anomalyText = anomalySummaries
+    .map((item) => `${formatProvinceShortName(item.province)} ${formatNumber(item.missing)} belum lapor`)
+    .join(' · ')
+
+  return (
+    <section className="statistik-card statistik-card-pad statistik-action statistik-anim" style={{ animationDelay: '.38s' }}>
+      <div className="statistik-card-header">
+        <div>
+          <h2>Sisa Operator Belum Lapor — Prioritas Tindak Lanjut</h2>
+          <div className="statistik-card-sub">Jumlah operator yang masih harus dikejar tim lapangan (kuota - pelapor)</div>
+        </div>
+      </div>
+
+      {rows.length > 0 ? (
+        <>
+          <div className="statistik-table-wrap">
+            <table className="statistik-action-table">
+              <thead>
+                <tr>
+                  <th>Kota / Kabupaten</th>
+                  <th className="statistik-table-right">Kuota</th>
+                  <th className="statistik-table-right">Sudah Lapor</th>
+                  <th className="statistik-table-right">Belum Lapor</th>
+                  <th className="statistik-table-right">Performa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row) => (
+                  <tr key={`${row.province}-${row.city}`}>
+                    <td className="statistik-action-place">
+                      {row.city} <small>· {formatProvinceShortName(row.province)}</small>
+                    </td>
+                    <td className="statistik-table-right">{formatNumber(row.operators)}</td>
+                    <td className="statistik-table-right">{formatNumber(row.posts)}</td>
+                    <td className="statistik-table-right">
+                      <span className={`statistik-gap-pill ${row.missing >= 60 ? 'hi' : ''}`}>
+                        {formatNumber(row.missing)}
+                      </span>
+                    </td>
+                    <td className="statistik-table-right">{formatPercent(row.percentage, 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="statistik-action-footer">
+            <span>
+              Menampilkan {formatNumber(pageSlice.start)}-{formatNumber(pageSlice.end)} dari {formatNumber(rows.length)} prioritas {provinceScope} ·{' '}
+              <b>{formatNumber(activeMissingTotal)}</b> total belum lapor {locationPrefix} {provinceScope}
+            </span>
+            {anomalyText && (
+              <span className="statistik-action-alert">
+                {anomalyText} — tertahan oleh anomali data
+              </span>
+            )}
+          </div>
+
+          {pageSlice.totalPages > 1 && (
+            <div className="statistik-action-pagination" aria-label="Pagination prioritas tindak lanjut">
+              <button type="button" className="statistik-page-button" disabled={currentPage <= 1} onClick={() => setPage(1)}>
+                Pertama
+              </button>
+              <button type="button" className="statistik-page-button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                Prev
+              </button>
+              <span className="statistik-page-status">Hal. {formatNumber(currentPage)} / {formatNumber(pageSlice.totalPages)}</span>
+              <button type="button" className="statistik-page-button" disabled={currentPage >= pageSlice.totalPages} onClick={() => setPage((value) => Math.min(pageSlice.totalPages, value + 1))}>
+                Next
+              </button>
+              <button type="button" className="statistik-page-button" disabled={currentPage >= pageSlice.totalPages} onClick={() => setPage(pageSlice.totalPages)}>
+                Last
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="statistik-province-empty">Tidak ada sisa operator belum lapor</div>
+      )}
+    </section>
+  )
+}
+
+function StatistikProvinceOverview({
+  data,
+  cityGroups,
+  reportStatus,
+  summary,
+}: {
+  data: ProvinceChartItem[]
+  cityGroups: CityChartGroup[]
+  reportStatus: ReportStatusSummary
+  summary?: ReportStatusSummary
+}) {
+  const total = Math.max(reportStatus.totalOperators, 0)
+  const reported = Math.max(reportStatus.reportedOperators, 0)
+  const missing = Math.max(reportStatus.missingOperators, 0)
+  const reportedPercentage = getPercentage(reported, total)
+  const missingPercentage = getPercentage(missing, total)
+  const circumference = 2 * Math.PI * 68
+  const dashOffset = circumference * (1 - clampPercent(reportedPercentage) / 100)
+  const reportedByProvince = countRowsByProvince(summary?.reportedRows)
+  const missingByProvince = countRowsByProvince(summary?.missingRows)
+  const hasSummaryRows = reportedByProvince.size > 0 || missingByProvince.size > 0
+  const cityCountByProvince = new Map(
+    cityGroups.map((group) => [getProvinceKey(group.province), group.cities.length])
+  )
+  const provinceMap = new Map<string, {
+    name: string
+    reported: number
+    missing: number
+    operators: number
+    cityCount: number
+  }>()
+
+  for (const row of data) {
+    const key = getProvinceKey(row.name)
+    const reportedFallback = Math.min(Math.max(row.posts, 0), Math.max(row.operators, 0))
+    provinceMap.set(key, {
+      name: row.name,
+      reported: reportedFallback,
+      missing: Math.max(row.operators - reportedFallback, 0),
+      operators: Math.max(row.operators, 0),
+      cityCount: cityCountByProvince.get(key) ?? 0,
+    })
+  }
+
+  if (hasSummaryRows) {
+    for (const [key, row] of reportedByProvince) {
+      const current = provinceMap.get(key) ?? {
+        name: row.name,
+        reported: 0,
+        missing: 0,
+        operators: 0,
+        cityCount: cityCountByProvince.get(key) ?? 0,
+      }
+      current.reported = row.count
+      current.operators = Math.max(current.operators, current.reported + current.missing)
+      provinceMap.set(key, current)
+    }
+    for (const [key, row] of missingByProvince) {
+      const current = provinceMap.get(key) ?? {
+        name: row.name,
+        reported: 0,
+        missing: 0,
+        operators: 0,
+        cityCount: cityCountByProvince.get(key) ?? 0,
+      }
+      current.missing = row.count
+      current.operators = Math.max(current.operators, current.reported + current.missing)
+      provinceMap.set(key, current)
+    }
+  }
+
+  const provinces = Array.from(provinceMap.values())
+    .filter((province) => province.operators > 0)
+    .sort((a, b) => {
+      const ratioB = getPercentage(b.reported, b.operators)
+      const ratioA = getPercentage(a.reported, a.operators)
+      return ratioB - ratioA || a.name.localeCompare(b.name)
+    })
+
+  return (
+    <section className="statistik-card statistik-card-pad statistik-anim" style={{ animationDelay: '.3s' }}>
+      <div className="statistik-card-header">
+        <div>
+          <h2>Performa per Provinsi</h2>
+          <div className="statistik-card-sub">Persentase operator yang sudah lapor — dibandingkan kuota operator</div>
+        </div>
+        <div className="statistik-legend-top">
+          <span className="statistik-legend-item">
+            <span className="statistik-swatch" style={{ background: 'var(--stat-good)' }} />
+            Sudah Lapor
+          </span>
+          <span className="statistik-legend-item">
+            <span className="statistik-swatch" style={{ background: 'var(--stat-warn)' }} />
+            Belum Lapor
+          </span>
+        </div>
+      </div>
+
+      <div className="statistik-province-split">
+        <div className="statistik-donut-wrap">
+          <div className="statistik-donut">
+            <svg width="170" height="170" viewBox="0 0 170 170" aria-hidden="true">
+              <circle className="statistik-donut-track" cx="85" cy="85" r="68" fill="none" strokeWidth="20" />
+              <circle
+                className="statistik-donut-ring"
+                cx="85"
+                cy="85"
+                r="68"
+                fill="none"
+                strokeWidth="20"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                style={{ '--stat-circ': circumference } as CSSProperties}
+              />
+            </svg>
+            <div className="statistik-donut-center">
+              <div className="statistik-donut-number">{formatPercent(reportedPercentage, 0)}</div>
+              <div className="statistik-donut-label">total sudah lapor</div>
+            </div>
+          </div>
+          <div className="statistik-donut-legend">
+            <div className="statistik-donut-legend-row">
+              <span className="statistik-donut-legend-name">
+                <span className="statistik-swatch" style={{ background: 'var(--stat-good)' }} />
+                Sudah Lapor
+              </span>
+              <span className="statistik-donut-legend-value" style={{ color: 'var(--stat-good)' }}>
+                {formatNumber(reported)} · {formatPercent(reportedPercentage, 0)}
+              </span>
+            </div>
+            <div className="statistik-donut-legend-row">
+              <span className="statistik-donut-legend-name">
+                <span className="statistik-swatch" style={{ background: 'var(--stat-warn)' }} />
+                Belum Lapor
+              </span>
+              <span className="statistik-donut-legend-value" style={{ color: 'var(--stat-warn)' }}>
+                {formatNumber(missing)} · {formatPercent(missingPercentage, 0)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="statistik-province-grid">
+          {provinces.length > 0 ? provinces.map((province) => {
+            const percentage = getPercentage(province.reported, province.operators)
+            const isFlagged = province.reported === 0 && province.operators > 0
+            const trackWidth = isFlagged ? Math.max(clampPercent(percentage), 1.5) : clampPercent(percentage)
+            return (
+              <div key={province.name} className={`statistik-province-card ${isFlagged ? 'flag' : 'ok'}`}>
+                <div className="statistik-province-corner">{isFlagged ? 'Anomali data' : 'Aktif melapor'}</div>
+                <div className="statistik-province-name">{getProvinceDisplayName(province.name)}</div>
+                <div className="statistik-province-sub">
+                  {province.cityCount > 0 ? `${province.cityCount.toLocaleString('id-ID')} kota/kab · ` : ''}
+                  kuota {formatNumber(province.operators)} operator
+                </div>
+                <div className="statistik-province-big">{formatPercent(percentage, 1)}</div>
+                <div className="statistik-province-detail">
+                  <b className="statistik-mono">{formatNumber(province.reported)}</b> sudah lapor ·{' '}
+                  <b className="statistik-mono">{formatNumber(province.missing)}</b> belum lapor
+                  {isFlagged && (
+                    <>
+                      {' '}— <b className="statistik-danger-text">tidak ada satu pun pelapor</b>
+                    </>
+                  )}
+                </div>
+                <div className="statistik-province-track">
+                  <i
+                    style={{
+                      background: isFlagged
+                        ? 'var(--stat-danger)'
+                        : 'linear-gradient(90deg, var(--stat-good), #15a596)',
+                      width: `${trackWidth}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          }) : (
+            <div className="statistik-province-empty">Belum ada data provinsi</div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export default function ProvinceDonutChart({ data, cityGroups = [], summary, variant = 'default', theme = 'light' }: Props) {
   const colors = getChartColors(variant, theme)
   const compactCluster = variant === 'statistik'
   const reportStatus = getReportStatus(data, summary)
@@ -223,6 +690,21 @@ export default function ProvinceDonutChart({ data, summary, variant = 'default',
         <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-4" style={colors.titleStyle}>Pelapor per Provinsi</h3>
         <div className="h-64 flex items-center justify-center text-neutral-400 text-sm" style={colors.mutedStyle}>Belum ada data</div>
       </div>
+    )
+  }
+
+  if (variant === 'statistik') {
+    return (
+      <>
+        <StatistikProvinceOverview
+          data={data}
+          cityGroups={cityGroups}
+          reportStatus={reportStatus}
+          summary={summary}
+        />
+        <StatistikCityLeaderboard cityGroups={cityGroups} />
+        <StatistikActionableMissingTable cityGroups={cityGroups} />
+      </>
     )
   }
 

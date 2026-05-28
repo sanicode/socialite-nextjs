@@ -103,12 +103,16 @@ export default function StatistikDashboardClient({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const root = document.documentElement
+      if (!root.dataset.statistikPreviousTheme) {
+        root.dataset.statistikPreviousTheme = root.classList.contains('dark') ? 'dark' : 'light'
+      }
       const storedTheme = localStorage.getItem('statistik-theme')
       if (storedTheme !== 'light' && storedTheme !== 'dark') {
-        document.documentElement.classList.add('dark')
-        document.documentElement.dataset.statistikTheme = 'dark'
+        root.classList.add('dark')
+        root.dataset.statistikTheme = 'dark'
       }
-      setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+      setTheme(root.classList.contains('dark') ? 'dark' : 'light')
       setThemeMounted(true)
     }, 0)
     return () => {
@@ -201,300 +205,139 @@ export default function StatistikDashboardClient({
   const isDarkTheme = theme === 'dark'
 
   return (
-    <main
-      className={`statistik-main min-h-screen px-4 py-6 sm:px-6 sm:py-8 ${isDarkTheme ? 'statistik-dark' : 'statistik-light'}`}
-      style={{
-        background: isDarkTheme
-          ? 'linear-gradient(180deg, #13262d 0%, #0f1d23 100%)'
-          : 'linear-gradient(180deg, #f4f7f8 0%, #e8f0f1 100%)',
-        color: isDarkTheme ? '#f8fafc' : '#263b43',
-        padding: '32px 24px',
-        paddingTop: '40px',
-      }}
-    >
-      <div className="mx-auto max-w-7xl space-y-5">
-
-        {/* Header */}
-        <div
-          className="statistik-header overflow-hidden rounded-2xl shadow-lg"
-          style={{
-            background: isDarkTheme
-              ? 'linear-gradient(135deg, #18323a 0%, #102129 100%)'
-              : 'linear-gradient(135deg, #ffffff 0%, #e7f0f2 100%)',
-            borderColor: isDarkTheme ? '#28434b' : '#c7d8dc',
-            borderTop: `3px solid ${isDarkTheme ? '#f08a3d' : '#e8782d'}`,
-            color: isDarkTheme ? '#f8fafc' : '#263b43',
-            marginTop: '4px',
-            position: 'relative',
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              backgroundColor: isDarkTheme ? '#f08a3d' : '#e8782d',
-              display: 'block',
-              height: '3px',
-              left: 0,
-              position: 'absolute',
-              right: 0,
-              top: 0,
-              zIndex: 2,
-            }}
-          />
-          <div
-            className="statistik-header-inner"
-            style={{
-              padding: '24px 32px',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            <div
-              className="statistik-header-row"
-              style={{
-                alignItems: 'center',
-                display: 'grid',
-                gap: '24px',
-                gridTemplateColumns: 'minmax(0, 1fr) max-content',
-                justifyContent: 'stretch',
-              }}
-            >
-              <div
-                className="statistik-header-copy"
-                style={{ minWidth: 0 }}
-              >
-                <p
-                  className="statistik-header-label text-xs font-bold uppercase tracking-widest"
-                  style={{
-                    color: isDarkTheme ? '#f08a3d' : '#e8782d',
-                    lineHeight: 1,
-                    margin: 0,
-                  }}
+    <main className={`statistik-main ${isDarkTheme ? 'statistik-dark' : 'statistik-light'}`}>
+      <div className="statistik-wrap">
+        <header className="statistik-topbar statistik-anim" style={{ animationDelay: '.02s' }}>
+          <div className="statistik-topbar-inner">
+            <div>
+              <div className="statistik-eyebrow">Dashboard Publik</div>
+              <h1>Statistik Pelaporan</h1>
+              <p>Ringkasan performa pelaporan operator aktif</p>
+            </div>
+            <div className="statistik-header-actions">
+              {themeMounted && (
+                <button
+                  type="button"
+                  onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
+                  aria-label={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
+                  title={theme === 'dark' ? 'Tema terang' : 'Tema gelap'}
+                  className="statistik-theme-button"
                 >
-                  Dashboard Publik
-                </p>
-                <h1
-                  className="statistik-header-title mt-1.5 text-2xl font-bold tracking-tight"
-                  style={{
-                    color: isDarkTheme ? '#f8fafc' : '#263b43',
-                    lineHeight: 1.15,
-                  }}
-                >
-                  Statistik Pelaporan
-                </h1>
-                <p
-                  className="statistik-header-text mt-1 text-sm"
-                  style={{
-                    color: isDarkTheme ? '#b7c8cd' : '#6d858c',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Ringkasan data pelaporan operator aktif
-                </p>
-              </div>
-              <div
-                className="statistik-header-actions"
-                style={{
-                  alignItems: 'center',
-                  alignSelf: 'center',
-                  display: 'inline-grid',
-                  gap: '10px',
-                  gridAutoColumns: 'max-content',
-                  gridAutoFlow: 'column',
-                  justifyContent: 'end',
-                  justifySelf: 'end',
-                  textAlign: 'right',
-                  whiteSpace: 'nowrap',
-                  width: 'max-content',
-                }}
-              >
-                {themeMounted && (
-                  <button
-                    type="button"
-                    onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
-                    aria-label={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
-                    title={theme === 'dark' ? 'Tema terang' : 'Tema gelap'}
-                    className="statistik-theme-button transition"
-                    style={{
-                      alignItems: 'center',
-                      backgroundColor: 'transparent',
-                      border: 0,
-                      color: isDarkTheme ? '#b7c8cd' : '#6d858c',
-                      display: 'inline-flex',
-                      height: '24px',
-                      justifyContent: 'center',
-                      padding: 0,
-                      width: '24px',
-                    }}
-                  >
-                    {theme === 'dark' ? (
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ display: 'block', height: '20px', width: '20px' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3v1m0 16v1m8.66-9H21M3 12H2m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ display: 'block', height: '20px', width: '20px' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                      </svg>
-                    )}
-                  </button>
-                )}
-                <p
-                  className="statistik-header-text statistik-header-refresh text-xs"
-                  style={{
-                    color: isDarkTheme ? '#b7c8cd' : '#6d858c',
-                    lineHeight: 1.2,
-                    margin: 0,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Auto-refresh 30 detik{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('id-ID')}` : ''}
-                </p>
+                  {theme === 'dark' ? (
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3v1m0 16v1m8.66-9H21M3 12H2m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  ) : (
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <div className="statistik-live">
+                <span className="statistik-dot" />
+                Auto-refresh 30 detik{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('id-ID')}` : ''}
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Filter */}
-        <div
-          className="statistik-filter-panel rounded-2xl border px-5 py-4 shadow-sm"
-          style={{
-            background: isDarkTheme
-              ? 'linear-gradient(135deg, #18323a 0%, #102129 100%)'
-              : 'linear-gradient(135deg, #ffffff 0%, #edf4f5 100%)',
-            borderColor: isDarkTheme ? '#28434b' : '#c7d8dc',
-          }}
-        >
-          <div className="mb-3.5 flex items-center justify-between gap-3">
-            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
+        <section className="statistik-filter-panel statistik-anim" style={{ animationDelay: '.06s' }}>
+          <div className="statistik-filter-heading">
+            <span className="statistik-filter-heading-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M22 3H2l8 9.46V19l4 2v-8.54z" />
               </svg>
               Filter
-            </p>
+            </span>
             <button
               type="button"
               onClick={() => setIsFilterExpanded((expanded) => !expanded)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white sm:hidden"
+              className={`statistik-filter-toggle ${isFilterExpanded ? 'is-open' : ''}`}
               aria-expanded={isFilterExpanded}
               aria-controls="statistik-filter-form"
               aria-label={isFilterExpanded ? 'Sembunyikan filter' : 'Tampilkan filter'}
-              style={{
-                backgroundColor: isDarkTheme ? '#10242a' : '#f8fbfb',
-                border: `1px solid ${isDarkTheme ? '#36535c' : '#cfdfe3'}`,
-                color: isDarkTheme ? '#b7c8cd' : '#6d858c',
-              }}
             >
-              <svg
-                className={`h-4 w-4 transition-transform ${isFilterExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
               </svg>
             </button>
           </div>
-          <div id="statistik-filter-form" className={`${isFilterExpanded ? 'block' : 'hidden'} sm:block`}>
-          <form noValidate onSubmit={applyFilters} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => handleDateFrom(event.target.value)}
-                className="rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:border-[#e8782d] focus:outline-none focus:ring-2 focus:ring-[#f7d6bf] dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d] sm:w-44"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                Tanggal Akhir <span className="text-neutral-400 dark:text-neutral-500">(maks. 1 bulan)</span>
-              </span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => handleDateTo(event.target.value)}
-                className={`rounded-lg border bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-white sm:w-44 ${
-                  rangeError
-                    ? 'border-amber-400 focus:ring-amber-200 dark:border-amber-500 dark:focus:ring-amber-900'
-                    : 'border-neutral-200 focus:border-[#e8782d] focus:ring-[#f7d6bf] dark:border-neutral-700 dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d]'
-                }`}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:border-[#e8782d] focus:outline-none focus:ring-2 focus:ring-[#f7d6bf] dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d] sm:w-40"
-              >
-                <option value="">Semua Status</option>
-                <option value="pending">Pending</option>
-                <option value="valid">Valid</option>
-                <option value="invalid">Invalid</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Provinsi</span>
-              <select
-                value={provinceId}
-                onChange={(event) => handleProvinceChange(event.target.value)}
-                className="rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:border-[#e8782d] focus:outline-none focus:ring-2 focus:ring-[#f7d6bf] dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d] sm:w-52"
-              >
-                <option value="">Semua Provinsi</option>
-                {provinces.map((province) => (
-                  <option key={province.id} value={province.id}>{province.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota / Kabupaten</span>
-              <select
-                value={cityId}
-                onChange={(event) => setCityId(event.target.value)}
-                disabled={!provinceId}
-                className="rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 transition focus:border-[#e8782d] focus:outline-none focus:ring-2 focus:ring-[#f7d6bf] disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:border-[#f08a3d] dark:focus:ring-[#5c2f1d] sm:w-52"
-              >
-                <option value="">Semua Kota</option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              disabled={Boolean(rangeError) || isFilterLoading}
-              className="statistik-filter-button inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                backgroundColor: isDarkTheme ? '#f08a3d' : '#e8782d',
-                border: 0,
-                color: '#ffffff',
-              }}
-            >
-              {isFilterLoading ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+          <div id="statistik-filter-form" className={`statistik-filter-body ${isFilterExpanded ? 'is-open' : ''}`}>
+            <form noValidate onSubmit={applyFilters} className="statistik-filter-grid">
+              <label className="statistik-field">
+                <span>Tanggal Awal</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(event) => handleDateFrom(event.target.value)}
+                />
+              </label>
+              <label className="statistik-field">
+                <span>Tanggal Akhir (maks. 1 bulan)</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(event) => handleDateTo(event.target.value)}
+                  className={rangeError ? 'is-error' : undefined}
+                />
+              </label>
+              <label className="statistik-field">
+                <span>Status</span>
+                <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                  <option value="">Semua Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="valid">Valid</option>
+                  <option value="invalid">Invalid</option>
+                </select>
+              </label>
+              <label className="statistik-field">
+                <span>Provinsi</span>
+                <select value={provinceId} onChange={(event) => handleProvinceChange(event.target.value)}>
+                  <option value="">Semua Provinsi</option>
+                  {provinces.map((province) => (
+                    <option key={province.id} value={province.id}>{province.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="statistik-field">
+                <span>Kota / Kabupaten</span>
+                <select
+                  value={cityId}
+                  onChange={(event) => setCityId(event.target.value)}
+                  disabled={!provinceId}
+                >
+                  <option value="">Semua Kota</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>{city.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" disabled={Boolean(rangeError) || isFilterLoading} className="statistik-filter-button">
+                {isFilterLoading ? (
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
+                  </svg>
+                )}
+                {isFilterLoading ? 'Memproses...' : 'Filter'}
+              </button>
+            </form>
+            {rangeError && (
+              <p className="statistik-range-error">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
-                </svg>
-              )}
-              {isFilterLoading ? 'Memuat' : 'Filter'}
-            </button>
-          </form>
-          {rangeError && (
-            <p className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              {rangeError}
-            </p>
-          )}
+                {rangeError}
+              </p>
+            )}
           </div>
-        </div>
+        </section>
 
-        {/* Data / Skeleton */}
         {data ? (
           <>
             <StatCards
@@ -505,23 +348,28 @@ export default function StatistikDashboardClient({
               theme={theme}
               reportedStatus={filters.status ?? ''}
             />
-            <ProvinceDonutChart data={data.provinceData} summary={data.summary} variant="statistik" theme={theme} />
+            <ProvinceDonutChart
+              cityGroups={data.cityData}
+              data={data.provinceData}
+              summary={data.summary}
+              variant="statistik"
+              theme={theme}
+            />
             <CityBarChart data={data.cityData} variant="statistik" theme={theme} />
             <DailyPostsChart data={data.dailyData} variant="statistik" theme={theme} />
           </>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="statistik-skeleton h-28 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="statistik-skeleton h-28 animate-pulse rounded-2xl" />
               ))}
             </div>
-            <div className="statistik-skeleton h-72 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
-            <div className="statistik-skeleton h-80 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
-            <div className="statistik-skeleton h-60 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
+            <div className="statistik-skeleton h-72 animate-pulse rounded-2xl" />
+            <div className="statistik-skeleton h-80 animate-pulse rounded-2xl" />
+            <div className="statistik-skeleton h-60 animate-pulse rounded-2xl" />
           </div>
         )}
-
       </div>
     </main>
   )

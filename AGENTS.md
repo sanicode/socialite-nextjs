@@ -5,7 +5,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Authentication & Authorization — mandatory rules
 
-Every server action (`'use server'`) and every page (`page.tsx`) MUST enforce auth. No exceptions, including read-only actions.
+Every server action (`'use server'`) and every non-public page (`page.tsx`) MUST enforce auth, including read-only actions.
+
+Documented public exception:
+- `/statistik?id=bmi` is a public dashboard and MUST NOT redirect to `/login`.
+- `/api/statistik` is the public companion endpoint for that dashboard. It MUST remain protected by the short-lived statistik Bearer token from `app/lib/statistik-token.ts`, bound to `id=bmi` and the request fingerprint, and responses MUST be stripped of PII with `stripDashboardPii`.
+- Do not add new public pages/endpoints without documenting the exception here and applying equivalent data-minimization controls.
 
 ## Required pattern for every server action
 
@@ -49,12 +54,14 @@ These rules apply to **all code in this project** regardless of language or fram
 
 ## 1. Authentication & Authorization
 
-**Every endpoint, action, or handler that reads or writes data must verify the caller's identity and role before doing anything else.**
+**Every non-public endpoint, action, or handler that reads or writes data must verify the caller's identity and role before doing anything else.** Documented public endpoints must use explicit public-access controls such as short-lived scoped tokens, allowlisted public identifiers, and PII stripping.
 
 This is true even for:
 - Read-only endpoints (GET, query functions)
 - Internal helper functions called from other authenticated code
 - Background tasks triggered by authenticated users
+
+Documented exception: `/statistik?id=bmi` is public, and `/api/statistik` is public only when called with a valid statistik Bearer token.
 
 ### Role hierarchy (most to least privileged)
 
@@ -63,7 +70,7 @@ This is true even for:
 | `admin` | Full access: settings, logs, user management, security, all features |
 | `manager` | Business features: posts/reports, dashboard |
 | Authenticated user | Own data only |
-| Unauthenticated | Login page only — redirect everything else |
+| Unauthenticated | Login page and public statistik dashboard only — redirect everything else |
 
 ### Implementation checklist per platform
 
@@ -72,11 +79,13 @@ This is true even for:
 // In every 'use server' action — first line:
 const admin = await requireAdmin()   // or requireUser() / requireManagerOrAdmin()
 
-// In every page.tsx:
+// In every non-public page.tsx:
 const user = await getSessionUser()
 if (!user) redirect('/login')
 if (!user.roles.includes('admin')) redirect('/posts')
 ```
+
+Public exception: `/statistik?id=bmi` is intentionally unauthenticated, while `/api/statistik` requires a signed, short-lived statistik Bearer token and returns only PII-stripped public data.
 
 **Python (Django / FastAPI / Flask)**
 ```python

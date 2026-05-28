@@ -86,7 +86,7 @@ Setiap perubahan aplikasi harus dicatat di file ini, terutama perubahan yang men
 
 #### 2.2 Fitur Statistik & Validasi Pelaporan (Fondasi)
 - **Pembangunan halaman Statistik dari awal** (`app/statistik/`):
-  - `app/statistik/page.tsx` — halaman utama dengan auth guard
+  - `app/statistik/page.tsx` — halaman statistik publik tanpa login
   - `app/statistik/layout.tsx` — layout halaman statistik
   - `app/statistik/StatistikDashboardClient.tsx` — komponen client-side dashboard statistik
 - Membangun **API endpoint statistik** (`app/api/statistik/route.ts`) untuk menyajikan data agregat ke client.
@@ -101,7 +101,8 @@ Setiap perubahan aplikasi harus dicatat di file ini, terutama perubahan yang men
 ### 3 Mei 2026
 
 #### 3.1 Pengamanan & Sensor Data Sensitif pada API Statistik
-- Menambah **autentikasi wajib** di `app/api/statistik/route.ts` agar endpoint tidak bisa diakses tanpa login.
+- Menjaga `/statistik?id=bmi` tetap **publik tanpa login** sesuai kebutuhan aplikasi.
+- Mengamankan `app/api/statistik/route.ts` dengan Bearer token khusus statistik, bukan session login.
 - Memperbarui `app/lib/statistik-data.ts` agar tidak menyertakan `tenantUserId` dalam response API.
 - Menambah **masking data sensitif** di `app/components/dashboard/StatCards.tsx` untuk menyembunyikan identitas operator dari tampilan statistik publik.
 

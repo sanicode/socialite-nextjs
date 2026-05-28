@@ -40,6 +40,52 @@ type StatCardItem = {
   valueStyle?: CSSProperties
   cardStyle?: CSSProperties
   accentStyle?: CSSProperties
+  statistikMeta?: ReactNode
+  statistikMinibar?: {
+    color: string
+    percentage: number
+  }
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
+}
+
+function getPercentage(value: number, total: number) {
+  return total > 0 ? (value / total) * 100 : 0
+}
+
+function formatPercent(value: number, fractionDigits = 1) {
+  return `${clampPercent(value).toLocaleString('id-ID', {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  })}%`
+}
+
+function formatProvinceShortName(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase()
+  if (!normalized) return 'Tanpa provinsi'
+  if (normalized === 'jawa timur') return 'Jatim'
+  if (normalized === 'jawa tengah') return 'Jateng'
+  if (normalized === 'jawa barat') return 'Jabar'
+  if (normalized === 'dki jakarta') return 'DKI'
+  if (normalized === 'di yogyakarta' || normalized === 'daerah istimewa yogyakarta') return 'DIY'
+  return normalized
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function getProvinceCounts(rows: DisplayOperatorReportRow[]) {
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    const province = formatProvinceShortName(row.province)
+    counts.set(province, (counts.get(province) ?? 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
 }
 
 function PeopleIcon() {
@@ -90,9 +136,9 @@ function StatusBadge({
         }`}
         style={useStatistikPalette
           ? {
-              backgroundColor: 'var(--stat-card-missing-bg, #fff1f2)',
-              boxShadow: 'inset 0 0 0 1px var(--stat-card-missing-border, #efb9c2)',
-              color: 'var(--stat-card-missing-color, #c91d3a)',
+              backgroundColor: 'var(--stat-card-missing-bg, var(--stat-warn-tint))',
+              boxShadow: 'inset 0 0 0 1px var(--stat-card-missing-border, var(--stat-warn-soft))',
+              color: 'var(--stat-card-missing-color, var(--stat-warn))',
             }
           : undefined}
       >
@@ -110,9 +156,9 @@ function StatusBadge({
       }`}
       style={useStatistikPalette
         ? {
-            backgroundColor: 'var(--stat-card-reported-bg, #eef7f8)',
-            boxShadow: 'inset 0 0 0 1px var(--stat-card-reported-border, #b5d5dc)',
-            color: 'var(--stat-card-reported-color, #5d8994)',
+            backgroundColor: 'var(--stat-card-reported-bg, var(--stat-good-tint))',
+            boxShadow: 'inset 0 0 0 1px var(--stat-card-reported-border, var(--stat-good-soft))',
+            color: 'var(--stat-card-reported-color, var(--stat-good))',
           }
         : undefined}
     >
@@ -319,61 +365,42 @@ export default function StatCards({
       : reportedStatus === 'invalid'
         ? 'Invalid'
         : ''
-  const statistikColors = theme === 'dark'
-    ? {
-        label: '#b7c8cd',
-        total: {
-          bg: '#172938',
-          cardBg: 'linear-gradient(135deg, #1a3443 0%, #10232f 100%)',
-          color: '#9db8c9',
-          border: '#2c4a5b',
-          iconShadow: 'inset 0 0 0 1px #2c4a5b, 0 10px 22px rgba(0, 0, 0, 0.24)',
-          shadow: '0 18px 35px rgba(0, 0, 0, 0.28)',
-        },
-        reported: {
-          bg: '#12332d',
-          cardBg: 'linear-gradient(135deg, #164138 0%, #102b27 100%)',
-          color: '#7bc6ad',
-          border: '#2d5b50',
-          iconShadow: 'inset 0 0 0 1px #2d5b50, 0 10px 22px rgba(0, 0, 0, 0.24)',
-          shadow: '0 18px 35px rgba(0, 0, 0, 0.3)',
-        },
-        missing: {
-          bg: '#2d151b',
-          cardBg: 'linear-gradient(135deg, #3a1921 0%, #221116 100%)',
-          color: '#f0a2ad',
-          border: '#54313a',
-          iconShadow: 'inset 0 0 0 1px #54313a, 0 10px 22px rgba(0, 0, 0, 0.24)',
-          shadow: '0 18px 35px rgba(0, 0, 0, 0.32)',
-        },
-      }
-    : {
-        label: '#6d858c',
-        total: {
-          bg: '#edf3f8',
-          cardBg: 'linear-gradient(135deg, #ffffff 0%, #dfeaf2 100%)',
-          color: '#46617a',
-          border: '#b8cad8',
-          iconShadow: 'inset 0 0 0 1px #b8cad8, 0 10px 22px rgba(70, 97, 122, 0.16)',
-          shadow: '0 18px 35px rgba(70, 97, 122, 0.18)',
-        },
-        reported: {
-          bg: '#eaf8f4',
-          cardBg: 'linear-gradient(135deg, #ffffff 0%, #d6f0e8 100%)',
-          color: '#2d8a73',
-          border: '#addbce',
-          iconShadow: 'inset 0 0 0 1px #addbce, 0 10px 22px rgba(45, 138, 115, 0.16)',
-          shadow: '0 18px 35px rgba(45, 138, 115, 0.2)',
-        },
-        missing: {
-          bg: '#fff1f2',
-          cardBg: 'linear-gradient(135deg, #ffffff 0%, #ffe3e8 100%)',
-          color: '#c91d3a',
-          border: '#efb9c2',
-          iconShadow: 'inset 0 0 0 1px #efb9c2, 0 10px 22px rgba(201, 29, 58, 0.14)',
-          shadow: '0 18px 35px rgba(201, 29, 58, 0.16)',
-        },
-      }
+  const statistikColors = {
+    label: 'var(--stat-card-label, var(--stat-muted))',
+    total: {
+      bg: 'var(--stat-card-total-bg, #e9f0fe)',
+      cardBg: 'var(--stat-card-total-card-bg, var(--stat-surface))',
+      color: 'var(--stat-card-total-color, var(--stat-info))',
+      border: 'var(--stat-card-total-border, var(--stat-line))',
+      iconShadow: 'var(--stat-card-total-icon-shadow, none)',
+      shadow: 'var(--stat-card-total-shadow, var(--stat-shadow))',
+    },
+    reported: {
+      bg: 'var(--stat-card-reported-bg, var(--stat-good-tint))',
+      cardBg: 'var(--stat-card-reported-card-bg, var(--stat-surface))',
+      color: 'var(--stat-card-reported-color, var(--stat-good))',
+      border: 'var(--stat-card-reported-border, var(--stat-line))',
+      iconShadow: 'var(--stat-card-reported-icon-shadow, none)',
+      shadow: 'var(--stat-card-reported-shadow, var(--stat-shadow))',
+    },
+    missing: {
+      bg: 'var(--stat-card-missing-bg, var(--stat-warn-tint))',
+      cardBg: 'var(--stat-card-missing-card-bg, var(--stat-surface))',
+      color: 'var(--stat-card-missing-color, var(--stat-warn))',
+      border: 'var(--stat-card-missing-border, var(--stat-line))',
+      iconShadow: 'var(--stat-card-missing-icon-shadow, none)',
+      shadow: 'var(--stat-card-missing-shadow, var(--stat-shadow))',
+    },
+  }
+  const reportedPercentage = getPercentage(summary.reportedOperators, summary.totalOperators)
+  const missingPercentage = getPercentage(summary.missingOperators, summary.totalOperators)
+  const reportedProvinceCounts = getProvinceCounts(summary.reportedRows)
+  const missingProvinceCounts = getProvinceCounts(summary.missingRows)
+  const dominantReportedProvince = reportedProvinceCounts[0]
+  const dominantReportedProvincePercentage = dominantReportedProvince
+    ? getPercentage(dominantReportedProvince.count, summary.reportedOperators)
+    : 0
+  const missingProvinceBreakdown = missingProvinceCounts.slice(0, 2)
   const cards: StatCardItem[] = [
     {
       label: 'Total Operator',
@@ -403,7 +430,9 @@ export default function StatCards({
       accentStyle: useStatistikPalette ? { backgroundColor: statistikColors.total.color } : undefined,
     },
     {
-      label: reportedStatusLabel ? `Jumlah Pelapor ${reportedStatusLabel}` : 'Jumlah Pelapor',
+      label: useStatistikPalette
+        ? reportedStatusLabel ? `Sudah Lapor ${reportedStatusLabel}` : 'Sudah Lapor'
+        : reportedStatusLabel ? `Jumlah Pelapor ${reportedStatusLabel}` : 'Jumlah Pelapor',
       value: summary.reportedOperators,
       icon: <ReportedIcon />,
       iconClassName: useStatistikPalette
@@ -430,6 +459,28 @@ export default function StatCards({
           }
         : undefined,
       accentStyle: useStatistikPalette ? { backgroundColor: statistikColors.reported.color } : undefined,
+      statistikMeta: useStatistikPalette ? (
+        <>
+          <span className="statistik-kpi-percent" style={{ color: 'var(--stat-good)' }}>
+            {formatPercent(reportedPercentage)}
+          </span>
+          <span>dari total</span>
+          {dominantReportedProvince && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="statistik-kpi-badge up">
+                {formatPercent(dominantReportedProvincePercentage, 0)} di {dominantReportedProvince.name}
+              </span>
+            </>
+          )}
+        </>
+      ) : undefined,
+      statistikMinibar: useStatistikPalette
+        ? {
+            color: 'var(--stat-good)',
+            percentage: reportedPercentage,
+          }
+        : undefined,
       onClick: () => setDialog({ title: 'Operator Sudah Lapor', rows: summary.reportedRows }),
     },
     {
@@ -460,13 +511,33 @@ export default function StatCards({
           }
         : undefined,
       accentStyle: useStatistikPalette ? { backgroundColor: statistikColors.missing.color } : undefined,
+      statistikMeta: useStatistikPalette ? (
+        <>
+          <span className="statistik-kpi-percent" style={{ color: 'var(--stat-warn)' }}>
+            {formatPercent(missingPercentage)}
+          </span>
+          {missingProvinceBreakdown.length > 0 && <span aria-hidden="true">·</span>}
+          {missingProvinceBreakdown.map((province, index) => (
+            <span key={province.name} className="statistik-kpi-breakdown">
+              {index > 0 && <span aria-hidden="true"> + </span>}
+              {province.name} <b className="statistik-mono">{province.count.toLocaleString('id-ID')}</b>
+            </span>
+          ))}
+        </>
+      ) : undefined,
+      statistikMinibar: useStatistikPalette
+        ? {
+            color: 'var(--stat-warn)',
+            percentage: missingPercentage,
+          }
+        : undefined,
       onClick: () => setDialog({ title: 'Operator Belum Lapor', rows: summary.missingRows }),
     },
   ]
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" data-statistik-theme={useStatistikPalette ? theme : undefined}>
         {cards.map((card) => {
           const content = (
             <>
@@ -477,14 +548,29 @@ export default function StatCards({
                   style={card.accentStyle}
                 />
               )}
-              <div className={`relative p-3 ${card.iconClassName}`} style={card.iconStyle}>
+              <div className={`${useStatistikPalette ? 'statistik-kpi-icon' : ''} relative p-3 ${card.iconClassName}`} style={card.iconStyle}>
                 {card.icon}
               </div>
-              <div className="relative">
-                <p className="text-sm text-neutral-500 dark:text-neutral-400" style={card.labelStyle}>{card.label}</p>
-                <p className={`mt-0.5 text-2xl font-bold ${card.valueClassName}`} style={card.valueStyle}>
+              <div className={`${useStatistikPalette ? 'statistik-kpi-content' : ''} relative`}>
+                <p className={`${useStatistikPalette ? 'statistik-kpi-label' : ''} text-sm text-neutral-500 dark:text-neutral-400`} style={card.labelStyle}>{card.label}</p>
+                <p className={`${useStatistikPalette ? 'statistik-kpi-value' : ''} mt-0.5 text-2xl font-bold ${card.valueClassName}`} style={card.valueStyle}>
                   {card.value.toLocaleString('id-ID')}
                 </p>
+                {useStatistikPalette && card.statistikMeta && (
+                  <div className="statistik-kpi-meta">
+                    {card.statistikMeta}
+                  </div>
+                )}
+                {useStatistikPalette && card.statistikMinibar && (
+                  <div className="statistik-minibar" aria-hidden="true">
+                    <i
+                      style={{
+                        background: card.statistikMinibar.color,
+                        width: `${clampPercent(card.statistikMinibar.percentage)}%`,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )
@@ -497,7 +583,7 @@ export default function StatCards({
                 onClick={card.onClick}
                 className={`flex items-center gap-4 rounded-xl border bg-white p-5 text-left transition dark:bg-neutral-900 ${
                   useStatistikPalette ? 'relative overflow-hidden hover:-translate-y-0.5' : ''
-                } ${card.className}`}
+                } ${useStatistikPalette ? 'statistik-kpi-card' : ''} ${card.className}`}
                 style={card.cardStyle}
               >
                 {content}
@@ -510,7 +596,7 @@ export default function StatCards({
               key={card.label}
               className={`flex items-center gap-4 rounded-xl border bg-white p-5 dark:bg-neutral-900 ${
                 useStatistikPalette ? 'relative overflow-hidden' : ''
-              } ${card.className}`}
+              } ${useStatistikPalette ? 'statistik-kpi-card' : ''} ${card.className}`}
               style={card.cardStyle}
             >
               {content}

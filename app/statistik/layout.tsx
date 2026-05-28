@@ -1,12 +1,19 @@
+import { JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google'
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: '--font-statistik-sans',
+  subsets: ['latin'],
+})
+
+const jetBrainsMono = JetBrains_Mono({
+  variable: '--font-statistik-mono',
+  subsets: ['latin'],
+})
+
 export default function StatistikLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem('statistik-theme');var r=document.documentElement;r.dataset.statistikPreviousTheme=r.classList.contains('dark')?'dark':'light';if(t==='light'){r.classList.remove('dark');r.dataset.statistikTheme='light'}else{r.classList.add('dark');r.dataset.statistikTheme='dark'}}catch(e){}})()`,
-        }}
-      />
+    <div className={`${plusJakartaSans.variable} ${jetBrainsMono.variable}`}>
       {children}
-    </>
+    </div>
   )
 }

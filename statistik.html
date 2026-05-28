@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistik Pelaporan — Dashboard Publik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef1f4;
+    --bg-grad-1:#f6f8fa;
+    --surface:#ffffff;
+    --surface-2:#fafbfc;
+    --ink:#16202e;
+    --ink-2:#3a4759;
+    --muted:#7a8694;
+    --faint:#aab3bd;
+    --line:#e7ebef;
+    --line-2:#eff2f5;
+    /* semantic colors — ONE consistent meaning each */
+    --good:#0e8a7d;          /* SUDAH LAPOR / positif */
+    --good-soft:#d6efeb;
+    --good-tint:#eef8f6;
+    --warn:#e8742c;          /* BELUM LAPOR / butuh perhatian */
+    --warn-soft:#fbe3d2;
+    --warn-tint:#fdf2ea;
+    --danger:#d8392f;        /* anomali / alert */
+    --danger-soft:#fbe0de;
+    --danger-tint:#fdeeed;
+    --info:#2f6df0;
+    --radius:18px;
+    --radius-sm:12px;
+    --shadow-sm:0 1px 2px rgba(22,32,46,.04), 0 1px 3px rgba(22,32,46,.05);
+    --shadow:0 1px 3px rgba(22,32,46,.05), 0 8px 24px -12px rgba(22,32,46,.12);
+    --shadow-lg:0 1px 3px rgba(22,32,46,.06), 0 18px 50px -18px rgba(22,32,46,.22);
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 85% -8%, #e9f3f1 0%, transparent 55%),
+      radial-gradient(900px 500px at -5% 0%, #fcefe6 0%, transparent 45%),
+      linear-gradient(180deg,var(--bg-grad-1),var(--bg));
+    background-attachment:fixed;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+    padding:26px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  .mono{font-family:var(--mono);font-feature-settings:"tnum"}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* ---------- entrance animation ---------- */
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes ring{from{stroke-dashoffset:var(--circ)}}
+  .anim{opacity:0;animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards}
+
+  /* ---------- header ---------- */
+  .topbar{
+    background:linear-gradient(135deg,#16202e,#1f2c3e);
+    color:#fff;border-radius:var(--radius);position:relative;overflow:hidden;
+    box-shadow:var(--shadow-lg);
+    padding:26px 30px;
+  }
+  .topbar::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(600px 220px at 100% 0%, rgba(232,116,44,.28), transparent 60%);}
+  .topbar::after{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+    background:linear-gradient(180deg,var(--warn),var(--good));}
+  .topbar .inner{position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--warn);font-weight:700;margin-bottom:7px}
+  .topbar h1{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .topbar p{color:#aeb9c6;font-size:14px;margin-top:6px}
+  .live{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#c4cdd8;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+    padding:8px 13px;border-radius:999px}
+  .dot{width:7px;height:7px;border-radius:50%;background:#37d39a;box-shadow:0 0 0 0 rgba(55,211,154,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,211,154,.5)}70%{box-shadow:0 0 0 7px rgba(55,211,154,0)}100%{box-shadow:0 0 0 0 rgba(55,211,154,0)}}
+
+  /* ---------- card ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .card-pad{padding:22px 24px}
+  .card-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .card-h h2{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .card-h .sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+  /* ---------- filter ---------- */
+  .filter{padding:16px 20px}
+  .filter .lbl{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:14px}
+  .filter-grid{display:grid;grid-template-columns:repeat(5,1fr) auto;gap:13px;align-items:end}
+  .field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  .field input,.field select{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);
+    font-family:var(--sans);font-size:13.5px;color:var(--ink);background:var(--surface-2);
+    transition:.15s;cursor:pointer;font-weight:500}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--good);box-shadow:0 0 0 3px var(--good-tint);background:#fff}
+  .btn{
+    padding:11px 22px;border:none;border-radius:var(--radius-sm);font-family:var(--sans);
+    font-weight:700;font-size:13.5px;color:#fff;cursor:pointer;white-space:nowrap;
+    background:linear-gradient(135deg,var(--warn),#d4631d);box-shadow:0 6px 16px -6px rgba(232,116,44,.6);transition:.18s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 10px 22px -8px rgba(232,116,44,.7)}
+  .range-hint{grid-column:1/-1;font-size:11.5px;color:var(--good);font-weight:600;display:flex;align-items:center;gap:6px;margin-top:-2px}
+
+  /* ---------- ANOMALY BANNER (key new insight) ---------- */
+  .alert{
+    border-radius:var(--radius);overflow:hidden;position:relative;
+    background:linear-gradient(120deg,var(--danger-tint),#fff 70%);
+    border:1px solid var(--danger-soft);box-shadow:var(--shadow);
+    display:flex;gap:18px;padding:20px 24px;align-items:flex-start}
+  .alert::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--danger)}
+  .alert .ico{flex:none;width:42px;height:42px;border-radius:12px;background:var(--danger);color:#fff;
+    display:grid;place-items:center;box-shadow:0 8px 18px -8px rgba(216,57,47,.7)}
+  .alert h3{font-size:15px;font-weight:800;color:var(--danger);display:flex;align-items:center;gap:9px}
+  .alert .tag{font-size:10px;letter-spacing:.1em;background:var(--danger);color:#fff;padding:3px 8px;border-radius:6px;font-weight:700;text-transform:uppercase}
+  .alert p{font-size:13.5px;color:var(--ink-2);margin-top:6px;max-width:780px}
+  .alert b{color:var(--danger)}
+  .alert .acts{display:flex;gap:10px;margin-top:13px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;border:1px solid var(--danger-soft);background:#fff;color:var(--danger);cursor:pointer;transition:.15s}
+  .chip:hover{background:var(--danger);color:#fff}
+  .chip.ghost{border-color:var(--line);color:var(--ink-2)}
+  .chip.ghost:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* ---------- KPI ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden;box-shadow:var(--shadow);transition:.2s}
+  .kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+  .kpi .bar{position:absolute;left:0;top:0;bottom:0;width:4px}
+  .kpi.k1 .bar{background:var(--info)} .kpi.k2 .bar{background:var(--good)}
+  .kpi.k3 .bar{background:var(--warn)} .kpi.k4 .bar{background:linear-gradient(var(--good),var(--warn))}
+  .kpi .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .kpi .name{font-size:12.5px;color:var(--muted);font-weight:600}
+  .kpi .ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+  .kpi.k1 .ico{background:#e9f0fe;color:var(--info)} .kpi.k2 .ico{background:var(--good-tint);color:var(--good)}
+  .kpi.k3 .ico{background:var(--warn-tint);color:var(--warn)} .kpi.k4 .ico{background:#f0f4f8;color:var(--ink-2)}
+  .kpi .big{font-size:34px;font-weight:700;letter-spacing:-.03em;font-family:var(--mono);line-height:1}
+  .kpi.k2 .big{color:var(--good)} .kpi.k3 .big{color:var(--warn)}
+  .kpi .meta{font-size:12px;color:var(--muted);margin-top:9px;display:flex;align-items:center;gap:7px}
+  .pct{font-weight:700;font-family:var(--mono)}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .badge.up{background:var(--good-tint);color:var(--good)} .badge.down{background:var(--warn-tint);color:var(--warn)}
+  .minibar{height:6px;border-radius:99px;background:var(--line-2);margin-top:12px;overflow:hidden;display:flex}
+  .minibar i{display:block;height:100%;transform-origin:left;animation:grow 1.1s .3s cubic-bezier(.2,.7,.2,1) backwards}
+
+  /* ---------- province compliance (replaces misleading donut framing) ---------- */
+  .prov-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+  .prov{border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 20px;background:var(--surface-2);position:relative;overflow:hidden}
+  .prov.flag{border-color:var(--danger-soft);background:var(--danger-tint)}
+  .prov .pname{font-size:13px;font-weight:800;letter-spacing:.02em}
+  .prov .psub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .prov .pbig{font-size:32px;font-weight:700;font-family:var(--mono);margin:12px 0 2px;letter-spacing:-.02em}
+  .prov.ok .pbig{color:var(--good)} .prov.flag .pbig{color:var(--danger)}
+  .prov .pdetail{font-size:12px;color:var(--ink-2)}
+  .track{height:10px;border-radius:99px;background:#e9edf1;margin-top:14px;overflow:hidden}
+  .track i{display:block;height:100%;border-radius:99px;transform-origin:left;animation:grow 1.2s .4s cubic-bezier(.2,.7,.2,1) backwards}
+  .prov .corner{position:absolute;top:14px;right:16px;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:7px;letter-spacing:.04em}
+  .prov.ok .corner{background:var(--good);color:#fff}
+  .prov.flag .corner{background:var(--danger);color:#fff}
+
+  /* donut, smaller & supporting role */
+  .split{display:grid;grid-template-columns:230px 1fr;gap:26px;margin-top:20px;align-items:center}
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .donut{position:relative;width:170px;height:170px}
+  .donut svg{transform:rotate(-90deg)}
+  .donut .ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .donut .ctr .n{font-size:30px;font-weight:700;font-family:var(--mono);color:var(--good);letter-spacing:-.02em}
+  .donut .ctr .l{font-size:11px;color:var(--muted);font-weight:600}
+  .legend{display:flex;flex-direction:column;gap:10px;width:100%}
+  .legend .li{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+  .legend .name{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-weight:600}
+  .sw{width:11px;height:11px;border-radius:3px}
+  .legend .v{font-family:var(--mono);font-weight:700}
+
+  /* ---------- bar lists (per city) ---------- */
+  .legend-top{display:flex;gap:18px;align-items:center;font-size:12px;color:var(--muted);font-weight:600}
+  .legend-top .li{display:flex;align-items:center;gap:7px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:880px){.cols{grid-template-columns:1fr}}
+  .citycard{padding:20px}
+  .citycard .ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .citycard .ch .nm{font-size:13.5px;font-weight:800;letter-spacing:.03em}
+  .citycard .ch .ct{font-size:11.5px;color:var(--muted);font-weight:600}
+  .prov-rate{font-size:11.5px;font-weight:700;font-family:var(--mono);padding:3px 9px;border-radius:7px}
+  .prov-rate.good{background:var(--good-tint);color:var(--good)}
+  .prov-rate.bad{background:var(--danger-tint);color:var(--danger)}
+  .rows{margin-top:14px;display:flex;flex-direction:column;gap:11px}
+  .brow{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}
+  .brow .blbl{font-size:11.5px;color:var(--ink-2);text-align:right;font-weight:600;line-height:1.25}
+  .stack{position:relative;height:22px;background:#eef1f4;border-radius:7px;overflow:hidden;display:flex;cursor:default}
+  .stack .fill{height:100%;background:linear-gradient(90deg,var(--good),#13a294);transform-origin:left;animation:grow 1s cubic-bezier(.2,.7,.2,1) backwards;display:flex;align-items:center}
+  .stack .rest{height:100%;flex:1}
+  .stack .num{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:11px;font-family:var(--mono);font-weight:700;color:var(--ink-2)}
+  .stack .infill{font-size:10.5px;font-family:var(--mono);font-weight:700;color:#fff;padding-left:8px;white-space:nowrap}
+  .stack:hover .fill{filter:brightness(1.06)}
+  .city-foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-2);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .city-foot b{color:var(--ink);font-family:var(--mono)}
+
+  /* empty / flagged province panel */
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:36px 24px;gap:12px}
+  .empty .e-ico{width:54px;height:54px;border-radius:14px;background:var(--danger-tint);color:var(--danger);display:grid;place-items:center}
+  .empty h4{font-size:15px;font-weight:800;color:var(--danger)}
+  .empty p{font-size:12.5px;color:var(--muted);max-width:300px}
+  .empty .cnt{font-family:var(--mono);font-weight:700;font-size:22px;color:var(--danger)}
+  .ghost-rows{width:100%;margin-top:8px;display:flex;flex-direction:column;gap:9px;opacity:.55}
+  .ghost-rows .gr{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center}
+  .ghost-rows .gl{font-size:10.5px;color:var(--faint);text-align:right}
+  .ghost-rows .gbar{height:16px;background:#eef1f4;border-radius:6px;overflow:hidden;position:relative}
+  .ghost-rows .gbar i{display:block;height:100%;background:repeating-linear-gradient(45deg,#f1d9cb,#f1d9cb 6px,#f7e7dd 6px,#f7e7dd 12px)}
+
+  /* ---------- leaderboard ---------- */
+  .lead-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+  @media(max-width:880px){.lead-grid{grid-template-columns:1fr}}
+  .lead{border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px;background:var(--surface-2)}
+  .lead .lh{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em}
+  .lead.top .lh{color:var(--good)} .lead.bot .lh{color:var(--warn)}
+  .lrow{display:flex;align-items:center;gap:12px;padding:8px 0}
+  .lrank{font-family:var(--mono);font-size:12px;font-weight:700;width:20px;color:var(--faint)}
+  .lname{flex:1;font-size:13px;font-weight:600}
+  .lname small{display:block;color:var(--muted);font-weight:500;font-size:11px}
+  .lbar{width:90px;height:7px;background:#e9edf1;border-radius:99px;overflow:hidden}
+  .lbar i{display:block;height:100%;border-radius:99px;transform-origin:left;animation:grow 1.1s .3s cubic-bezier(.2,.7,.2,1) backwards}
+  .lpct{font-family:var(--mono);font-weight:700;font-size:13px;width:48px;text-align:right}
+
+  /* ---------- actionable: sisa belum lapor ---------- */
+  .action .tablewrap{margin-top:16px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:var(--surface-2);text-align:left;padding:11px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
+  thead th.r{text-align:right}
+  tbody td{padding:11px 16px;border-bottom:1px solid var(--line-2)}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  td.r{text-align:right;font-family:var(--mono);font-weight:600}
+  .gap-pill{font-family:var(--mono);font-weight:700;padding:3px 10px;border-radius:7px;background:var(--warn-tint);color:var(--warn);font-size:12.5px}
+  .gap-pill.hi{background:var(--danger-tint);color:var(--danger)}
+  .place{font-weight:600}.place small{color:var(--muted);font-weight:500}
+
+  /* ---------- trend ---------- */
+  .trend{position:relative}
+  .chart{position:relative;height:230px;margin-top:22px;padding-left:8px}
+  .gridlines{position:absolute;inset:0 0 26px 36px;display:flex;flex-direction:column;justify-content:space-between}
+  .gridlines .gl{border-top:1px dashed var(--line);position:relative}
+  .gridlines .gl span{position:absolute;left:-36px;top:-8px;font-size:10.5px;color:var(--faint);font-family:var(--mono);width:30px;text-align:right}
+  .bars{position:absolute;inset:0 0 26px 44px;display:flex;align-items:flex-end;gap:14px;padding:0 6px}
+  .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+  .col .b{width:100%;max-width:54px;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,#19a596,var(--good));position:relative;transform-origin:bottom;animation:growY 1s cubic-bezier(.2,.7,.2,1) backwards;box-shadow:0 -2px 10px -4px rgba(14,138,125,.5)}
+  @keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .col .b .v{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-family:var(--mono);font-weight:700;color:var(--good)}
+  .col .b.proj{background:repeating-linear-gradient(180deg,#bfe6e1,#bfe6e1 6px,#d8f0ec 6px,#d8f0ec 12px);box-shadow:none}
+  .col .b.proj .v{color:var(--muted)}
+  .col .x{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+  .xaxis{position:absolute;left:44px;right:0;bottom:0;height:1px;background:var(--line)}
+  .trend-note{font-size:11.5px;color:var(--muted);margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .trend-note .li{display:flex;align-items:center;gap:6px}
+
+  .foot{text-align:center;font-size:11.5px;color:var(--faint);padding-top:8px}
+  .foot b{color:var(--muted)}
+
+  @media(max-width:880px){
+    .kpis{grid-template-columns:1fr 1fr}
+    .filter-grid{grid-template-columns:1fr 1fr}
+    .split{grid-template-columns:1fr}
+    .prov-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="topbar anim" style="animation-delay:.02s">
+    <div class="inner">
+      <div>
+        <div class="eyebrow">Dashboard Publik</div>
+        <h1>Statistik Pelaporan</h1>
+        <p>Ringkasan performa pelaporan operator aktif · 22–28 Mei 2026</p>
+      </div>
+      <div class="live"><span class="dot"></span>Auto-refresh 30 detik · 14.57.28</div>
+    </div>
+  </header>
+
+  <!-- FILTER -->
+  <section class="card filter anim" style="animation-delay:.06s">
+    <div class="lbl">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg>
+      Filter
+    </div>
+    <div class="filter-grid">
+      <div class="field"><label>Tanggal Awal</label><input type="date" value="2026-05-22"></div>
+      <div class="field"><label>Tanggal Akhir (maks. 1 bulan)</label><input type="date" value="2026-05-28"></div>
+      <div class="field"><label>Status</label><select><option>Semua Status</option><option>Sudah Lapor</option><option>Belum Lapor</option></select></div>
+      <div class="field"><label>Provinsi</label><select><option>Semua Provinsi</option><option>Jawa Tengah</option><option>Jawa Timur</option></select></div>
+      <div class="field"><label>Kota / Kabupaten</label><select><option>Semua Kota</option></select></div>
+      <button class="btn">Terapkan</button>
+      <div class="range-hint">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+        Default kini menampilkan 7 hari terakhir agar grafik tren bermakna — bukan satu hari.
+      </div>
+    </div>
+  </section>
+
+  <!-- ANOMALY / KEY INSIGHT BANNER -->
+  <!-- <section class="alert anim" style="animation-delay:.1s">
+    <div class="ico">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+    </div>
+    <div>
+      <h3>Jawa Tengah: 0 pelapor dari 1.263 operator <span class="tag">Perlu Verifikasi</span></h3>
+      <p>Seluruh 852 pelapor berasal dari Jawa Timur; <b>Jawa Tengah tercatat 0% di ke-23 kota/kabupaten</b>. Pola "nol total" lebih sering menandakan masalah aliran data (data belum masuk / sinkronisasi gagal) daripada performa benar-benar nol. Angka headline <b>"32% sudah lapor"</b> sebenarnya rata-rata dua kondisi yang sangat berbeda — Jawa Timur ±61% dan Jawa Tengah 0% — sehingga bisa menyesatkan.</p>
+      <div class="acts">
+        <button class="chip">Verifikasi pipeline data Jateng</button>
+        <button class="chip ghost">Lihat log sinkronisasi terakhir</button>
+        <button class="chip ghost">Sembunyikan Jateng dari rata-rata</button>
+      </div>
+    </div>
+  </section> -->
+
+  <!-- KPI -->
+  <section class="kpis">
+    <div class="kpi k1 anim" style="animation-delay:.14s">
+      <span class="bar"></span>
+      <div class="row"><span class="name">Total Operator</span>
+        <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      </div>
+      <div class="big tnum">2.667</div>
+      <div class="meta">Jateng <b class="mono">1.263</b> · Jatim <b class="mono">1.404</b></div>
+    </div>
+
+    <div class="kpi k2 anim" style="animation-delay:.18s">
+      <span class="bar"></span>
+      <div class="row"><span class="name">Sudah Lapor</span>
+        <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg></span>
+      </div>
+      <div class="big tnum">852</div>
+      <div class="meta"><span class="pct" style="color:var(--good)">32,0%</span> dari total · <span class="badge up">100% di Jatim</span></div>
+      <div class="minibar"><i style="width:32%;background:var(--good)"></i></div>
+    </div>
+
+    <div class="kpi k3 anim" style="animation-delay:.22s">
+      <span class="bar"></span>
+      <div class="row"><span class="name">Belum Lapor</span>
+        <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+      </div>
+      <div class="big tnum">1.815</div>
+      <div class="meta"><span class="pct" style="color:var(--warn)">68,0%</span> · Jateng <b class="mono">1.263</b> + Jatim <b class="mono">552</b></div>
+      <div class="minibar"><i style="width:68%;background:var(--warn)"></i></div>
+    </div>
+
+    <div class="kpi k4 anim" style="animation-delay:.26s">
+      <span class="bar"></span>
+      <div class="row"><span class="name">Tingkat performa</span>
+        <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
+      </div>
+      <div class="big tnum">61<span style="font-size:18px;color:var(--muted)">% Jatim</span></div>
+      <div class="meta">vs <b style="color:var(--danger)">0% Jateng</b> — disparitas <b class="mono">61 poin</b></div>
+      <div class="minibar"><i style="width:61%;background:var(--good)"></i><i style="width:39%;background:var(--line)"></i></div>
+    </div>
+  </section>
+
+  <!-- PROVINCE OVERVIEW -->
+  <section class="card card-pad anim" style="animation-delay:.3s">
+    <div class="card-h">
+      <div>
+        <h2>performa per Provinsi</h2>
+        <div class="sub">Persentase operator yang sudah lapor — dibandingkan kuota operator</div>
+      </div>
+      <div class="legend-top">
+        <span class="li"><span class="sw" style="background:var(--good)"></span>Sudah Lapor</span>
+        <span class="li"><span class="sw" style="background:var(--warn)"></span>Belum Lapor</span>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="donut-wrap">
+        <div class="donut">
+          <svg width="170" height="170" viewBox="0 0 170 170">
+            <circle cx="85" cy="85" r="68" fill="none" stroke="#eef1f4" stroke-width="20"/>
+            <circle cx="85" cy="85" r="68" fill="none" stroke="var(--good)" stroke-width="20" stroke-linecap="round"
+              stroke-dasharray="427.3" stroke-dashoffset="290.6" style="--circ:427.3;animation:ring 1.3s .4s cubic-bezier(.2,.7,.2,1) backwards"/>
+          </svg>
+          <div class="ctr"><div class="n">32%</div><div class="l">total sudah lapor</div></div>
+        </div>
+        <div class="legend">
+          <div class="li"><span class="name"><span class="sw" style="background:var(--good)"></span>Sudah Lapor</span><span class="v" style="color:var(--good)">852 · 32%</span></div>
+          <div class="li"><span class="name"><span class="sw" style="background:var(--warn)"></span>Belum Lapor</span><span class="v" style="color:var(--warn)">1.815 · 68%</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="prov-grid" style="grid-template-columns:1fr;margin-top:0">
+          <div class="prov ok">
+            <div class="corner">Aktif melapor</div>
+            <div class="pname">JAWA TIMUR</div>
+            <div class="psub">14 kota/kab · kuota 1.404 operator</div>
+            <div class="pbig tnum">60,7%</div>
+            <div class="pdetail"><b class="mono">852</b> sudah lapor · <b class="mono">552</b> belum lapor</div>
+            <div class="track"><i style="width:60.7%;background:linear-gradient(90deg,var(--good),#15a596)"></i></div>
+          </div>
+          <div class="prov flag">
+            <div class="corner">Anomali data</div>
+            <div class="pname">JAWA TENGAH</div>
+            <div class="psub">23 kota/kab · kuota 1.263 operator</div>
+            <div class="pbig tnum">0,0%</div>
+            <div class="pdetail"><b class="mono">0</b> sudah lapor · <b class="mono">1.263</b> belum lapor — <b style="color:var(--danger)">tidak ada satu pun pelapor</b></div>
+            <div class="track"><i style="width:1.5%;background:var(--danger)"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEADERBOARD (new insight) -->
+  <section class="card card-pad anim" style="animation-delay:.34s">
+    <div class="card-h">
+      <div>
+        <h2>Peringkat Performa Kota — Jawa Timur</h2>
+        <div class="sub">Rasio pelapor terhadap kuota operator. Lebih actionable daripada angka absolut.</div>
+      </div>
+    </div>
+    <div class="lead-grid">
+      <div class="lead top">
+        <div class="lh">▲ Performa Tertinggi</div>
+        <div class="lrow"><span class="lrank">1</span><span class="lname">Kab. Nganjuk<small>49 / 57 operator</small></span><span class="lbar"><i style="width:86%;background:var(--good)"></i></span><span class="lpct" style="color:var(--good)">86%</span></div>
+        <div class="lrow"><span class="lrank">2</span><span class="lname">Kab. Bojonegoro<small>191 / 267 operator</small></span><span class="lbar"><i style="width:71.5%;background:var(--good)"></i></span><span class="lpct" style="color:var(--good)">72%</span></div>
+        <div class="lrow"><span class="lrank">3</span><span class="lname">Kab. Ponorogo<small>98 / 138 operator</small></span><span class="lbar"><i style="width:71%;background:var(--good)"></i></span><span class="lpct" style="color:var(--good)">71%</span></div>
+        <div class="lrow"><span class="lrank">4</span><span class="lname">Kab. Madiun<small>66 / 93 operator</small></span><span class="lbar"><i style="width:71%;background:var(--good)"></i></span><span class="lpct" style="color:var(--good)">71%</span></div>
+        <div class="lrow"><span class="lrank">5</span><span class="lname">Kota Madiun<small>41 / 58 operator</small></span><span class="lbar"><i style="width:70.7%;background:var(--good)"></i></span><span class="lpct" style="color:var(--good)">71%</span></div>
+      </div>
+      <div class="lead bot">
+        <div class="lh">▼ Performa Terendah</div>
+        <div class="lrow"><span class="lrank">1</span><span class="lname">Kab. Pacitan<small>26 / 75 operator</small></span><span class="lbar"><i style="width:34.7%;background:var(--warn)"></i></span><span class="lpct" style="color:var(--warn)">35%</span></div>
+        <div class="lrow"><span class="lrank">2</span><span class="lname">Kab. Trenggalek<small>34 / 80 operator</small></span><span class="lbar"><i style="width:42.5%;background:var(--warn)"></i></span><span class="lpct" style="color:var(--warn)">43%</span></div>
+        <div class="lrow"><span class="lrank">3</span><span class="lname">Kab. Magetan<small>26 / 60 operator</small></span><span class="lbar"><i style="width:43.3%;background:var(--warn)"></i></span><span class="lpct" style="color:var(--warn)">43%</span></div>
+        <div class="lrow"><span class="lrank">4</span><span class="lname">Kab. Blitar<small>31 / 70 operator</small></span><span class="lbar"><i style="width:44.3%;background:var(--warn)"></i></span><span class="lpct" style="color:var(--warn)">44%</span></div>
+        <div class="lrow"><span class="lrank">5</span><span class="lname">Kota Kediri<small>34 / 75 operator</small></span><span class="lbar"><i style="width:45.3%;background:var(--warn)"></i></span><span class="lpct" style="color:var(--warn)">45%</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTIONABLE: sisa belum lapor -->
+  <section class="card card-pad action anim" style="animation-delay:.38s">
+    <div class="card-h">
+      <div>
+        <h2>Sisa Operator Belum Lapor — Prioritas Tindak Lanjut</h2>
+        <div class="sub">Jumlah operator yang masih harus dikejar tim lapangan (kuota − pelapor)</div>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Kota / Kabupaten</th><th class="r">Kuota</th><th class="r">Sudah Lapor</th><th class="r">Belum Lapor</th><th class="r">performa</th></tr></thead>
+        <tbody>
+          <tr><td class="place">Kab. Bojonegoro <small>· Jatim</small></td><td class="r">267</td><td class="r">191</td><td class="r"><span class="gap-pill hi">76</span></td><td class="r">72%</td></tr>
+          <tr><td class="place">Kab. Kediri <small>· Jatim</small></td><td class="r">154</td><td class="r">89</td><td class="r"><span class="gap-pill hi">65</span></td><td class="r">58%</td></tr>
+          <tr><td class="place">Kab. Ngawi <small>· Jatim</small></td><td class="r">127</td><td class="r">77</td><td class="r"><span class="gap-pill">50</span></td><td class="r">61%</td></tr>
+          <tr><td class="place">Kab. Pacitan <small>· Jatim</small></td><td class="r">75</td><td class="r">26</td><td class="r"><span class="gap-pill">49</span></td><td class="r">35%</td></tr>
+          <tr><td class="place">Kab. Trenggalek <small>· Jatim</small></td><td class="r">80</td><td class="r">34</td><td class="r"><span class="gap-pill">46</span></td><td class="r">43%</td></tr>
+          <tr><td class="place">Kota Kediri <small>· Jatim</small></td><td class="r">75</td><td class="r">34</td><td class="r"><span class="gap-pill">41</span></td><td class="r">45%</td></tr>
+          <tr><td class="place">Kab. Ponorogo <small>· Jatim</small></td><td class="r">138</td><td class="r">98</td><td class="r"><span class="gap-pill">40</span></td><td class="r">71%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="city-foot" style="border-top:none;padding-top:14px">
+      <span>Menampilkan 7 prioritas teratas Jatim · <b>552</b> total belum lapor di Jatim</span>
+      <span style="color:var(--danger)">Jateng <b style="color:var(--danger)">1.263</b> belum lapor — tertahan oleh anomali data</span>
+    </div>
+  </section>
+
+  <!-- PER CITY (consistent stacked bars) -->
+  <section style="display:flex;flex-direction:column;gap:6px" class="anim" style="animation-delay:.42s">
+    <div class="card-h" style="padding:0 2px">
+      <div><h2 style="font-size:16px;font-weight:700">Pelapor per Kota</h2>
+        <div class="sub">2 provinsi · panjang bar = kuota operator, isian = sudah lapor</div></div>
+      <div class="legend-top">
+        <span class="li"><span class="sw" style="background:var(--good)"></span>Sudah Lapor</span>
+        <span class="li"><span class="sw" style="background:#eef1f4;border:1px solid var(--line)"></span>Belum Lapor</span>
+      </div>
+    </div>
+    <div class="cols" style="margin-top:10px">
+
+      <!-- JATIM -->
+      <div class="card citycard">
+        <div class="ch">
+          <div><span class="nm">JAWA TIMUR</span> <span class="ct">14 kota/kab</span></div>
+          <span class="prov-rate good">60,7% lapor</span>
+        </div>
+        <div class="rows" id="jatim"></div>
+        <div class="city-foot"><span>Total kuota <b>1.404</b></span><span>Sudah lapor <b style="color:var(--good)">852</b></span></div>
+      </div>
+
+      <!-- JATENG flagged -->
+      <div class="card citycard">
+        <div class="ch">
+          <div><span class="nm">JAWA TENGAH</span> <span class="ct">23 kota/kab</span></div>
+          <span class="prov-rate bad">0% lapor</span>
+        </div>
+        <div class="empty">
+          <div class="e-ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+          <h4>Tidak ada data pelapor</h4>
+          <div class="cnt">0 / 1.263</div>
+          <p>Ke-23 kota/kabupaten memiliki kuota operator namun nol pelapor. Kemungkinan besar data belum tersinkronisasi — bukan grafik kosong biasa.</p>
+          <div class="ghost-rows">
+            <div class="gr"><span class="gl">KAB. JEPARA</span><div class="gbar"><i style="width:71%"></i></div></div>
+            <div class="gr"><span class="gl">KOTA SURAKARTA</span><div class="gbar"><i style="width:68%"></i></div></div>
+            <div class="gr"><span class="gl">KOTA SEMARANG</span><div class="gbar"><i style="width:61%"></i></div></div>
+            <div class="gr"><span class="gl">KAB. SRAGEN</span><div class="gbar"><i style="width:60%"></i></div></div>
+          </div>
+          <button class="chip" style="margin-top:6px">Verifikasi sumber data Jateng</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TREND -->
+  <section class="card card-pad trend anim" style="animation-delay:.46s">
+    <div class="card-h">
+      <div>
+        <h2>Tren Pelapor Kumulatif</h2>
+        <div class="sub">7 hari terakhir · garis putus-putus = proyeksi laju saat ini</div>
+      </div>
+      <div class="legend-top">
+        <span class="li"><span class="sw" style="background:var(--good)"></span>Aktual</span>
+        <span class="li"><span class="sw" style="background:#cfeae5"></span>Proyeksi</span>
+      </div>
+    </div>
+    <div class="chart">
+      <div class="gridlines">
+        <div class="gl"><span>1000</span></div><div class="gl"><span>750</span></div>
+        <div class="gl"><span>500</span></div><div class="gl"><span>250</span></div>
+        <div class="gl"><span>0</span></div>
+      </div>
+      <div class="bars">
+        <div class="col"><div class="b" style="height:9.8%;animation-delay:.5s"><span class="v">98</span></div><span class="x">22 Mei</span></div>
+        <div class="col"><div class="b" style="height:21%;animation-delay:.56s"><span class="v">210</span></div><span class="x">23 Mei</span></div>
+        <div class="col"><div class="b" style="height:34%;animation-delay:.62s"><span class="v">338</span></div><span class="x">24 Mei</span></div>
+        <div class="col"><div class="b" style="height:47%;animation-delay:.68s"><span class="v">471</span></div><span class="x">25 Mei</span></div>
+        <div class="col"><div class="b" style="height:61%;animation-delay:.74s"><span class="v">609</span></div><span class="x">26 Mei</span></div>
+        <div class="col"><div class="b" style="height:74%;animation-delay:.8s"><span class="v">738</span></div><span class="x">27 Mei</span></div>
+        <div class="col"><div class="b" style="height:85.2%;animation-delay:.86s"><span class="v">852</span></div><span class="x">28 Mei</span></div>
+        <div class="col"><div class="b proj" style="height:96%;animation-delay:.92s"><span class="v">~960</span></div><span class="x">29 Mei</span></div>
+      </div>
+      <div class="xaxis"></div>
+    </div>
+    <div class="trend-note">
+      <span class="li"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4"><path d="m23 6-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg> Rata-rata <b class="mono" style="color:var(--good)">+126/hari</b> selama 7 hari</span>
+      <span class="li" style="color:var(--muted)">Catatan: tren ini hanya mencerminkan Jawa Timur — Jateng belum berkontribusi.</span>
+    </div>
+  </section>
+
+  <div class="foot">Mockup perbaikan · <b>Dashboard Statistik Pelaporan</b> · data per 28 Mei 2026, 14.57</div>
+</div>
+
+<script>
+// JATIM stacked bars: full bar = kuota, fill = pelapor — sorted by compliance desc
+const jatim = [
+  ["Kab. Nganjuk",49,57],["Kab. Bojonegoro",191,267],["Kab. Ponorogo",98,138],
+  ["Kab. Madiun",66,93],["Kota Madiun",41,58],["Kab. Tulungagung",58,94],
+  ["Kab. Ngawi",77,127],["Kab. Kediri",89,154],["Kota Blitar",32,56],
+  ["Kota Kediri",34,75],["Kab. Blitar",31,70],["Kab. Magetan",26,60],
+  ["Kab. Trenggalek",34,80],["Kab. Pacitan",26,75]
+];
+const maxK = Math.max(...jatim.map(d=>d[2])); // 267
+const host = document.getElementById('jatim');
+jatim.forEach((d,i)=>{
+  const [name,lap,kuota]=d;
+  const totalW = (kuota/maxK)*100;          // bar length relative to largest kuota
+  const fillW  = (lap/kuota)*100;           // fill within the bar = compliance
+  const rate = Math.round((lap/kuota)*100);
+  const showInside = fillW>26;
+  const row=document.createElement('div');
+  row.className='brow';
+  row.innerHTML=`
+    <div class="blbl">${name}</div>
+    <div class="stack" style="width:${Math.max(totalW,8)}%" title="${name}: ${lap}/${kuota} (${rate}%)">
+      <div class="fill" style="width:${fillW}%;animation-delay:${.45+i*.04}s">
+        ${showInside?`<span class="infill">${lap}</span>`:''}
+      </div>
+      <div class="rest"></div>
+      <span class="num">${showInside?kuota:lap+' / '+kuota}</span>
+    </div>`;
+  host.appendChild(row);
+});
+</script>
+</body>
+</html>

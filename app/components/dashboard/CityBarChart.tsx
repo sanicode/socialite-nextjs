@@ -37,44 +37,25 @@ function getChartColors(variant: Props['variant'], theme: Props['theme']) {
     }
   }
 
-  if (theme === 'light') {
-    return {
-      primary: '#7aa3ad',
-      secondary: '#e8782d',
-      grid: '#d9e4e6',
-      cursor: 'rgba(122, 163, 173, 0.1)',
-      tooltipBg: '#263b43',
-      tooltipBorder: '#405962',
-      tooltipText: '#f8fafc',
-      tooltipLabel: '#b7c8cd',
-      panelStyle: {
-        background: 'linear-gradient(135deg, #ffffff 0%, #f6fafb 100%)',
-        borderColor: '#c7d8dc',
-        boxShadow: '0 16px 36px rgba(64, 89, 98, 0.1)',
-      },
-      titleStyle: { color: '#263b43' },
-      mutedStyle: { color: '#6d858c' },
-      axis: '#405962',
-    }
-  }
-
+  const isDark = theme === 'dark'
   return {
-    primary: '#8eb4bd',
-    secondary: '#f08a3d',
-    grid: '#263b43',
-    cursor: 'rgba(142, 180, 189, 0.09)',
-    tooltipBg: '#101f25',
-    tooltipBorder: '#405962',
-    tooltipText: '#f8fafc',
-    tooltipLabel: '#b7c8cd',
+    primary: `var(--stat-good, ${isDark ? '#37d39a' : '#0e8a7d'})`,
+    secondary: `var(--stat-warn, ${isDark ? '#f08a3d' : '#e8742c'})`,
+    grid: 'var(--dashboard-chart-grid, var(--stat-line))',
+    cursor: 'var(--dashboard-chart-cursor, rgba(14, 138, 125, 0.08))',
+    tooltipBg: 'var(--dashboard-chart-tooltip-bg, #16202e)',
+    tooltipBorder: 'var(--dashboard-chart-tooltip-border, #3a4759)',
+    tooltipText: 'var(--dashboard-chart-tooltip-text, #ffffff)',
+    tooltipLabel: 'var(--dashboard-chart-tooltip-label, #c4cdd8)',
     panelStyle: {
-      background: 'linear-gradient(135deg, #152b32 0%, #102129 100%)',
-      borderColor: '#28434b',
-      boxShadow: '0 18px 38px rgba(0, 0, 0, 0.26)',
+      background: 'var(--dashboard-panel-bg, var(--stat-surface))',
+      borderColor: 'var(--dashboard-panel-border, var(--stat-line))',
+      borderRadius: 'var(--stat-radius, 18px)',
+      boxShadow: 'var(--dashboard-panel-shadow, var(--stat-shadow))',
     },
-    titleStyle: { color: '#f8fafc' },
-    mutedStyle: { color: '#b7c8cd' },
-    axis: '#b7c8cd',
+    titleStyle: { color: 'var(--stat-ink)' },
+    mutedStyle: { color: 'var(--stat-muted)' },
+    axis: 'var(--dashboard-axis, var(--stat-ink-2))',
   }
 }
 
