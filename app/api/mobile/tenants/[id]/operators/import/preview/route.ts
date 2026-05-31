@@ -27,13 +27,6 @@ function normalizePhone(value: string) {
   return phone
 }
 
-function parseLine(rawLine: string, line: number): { phone: string; email: string } | null {
-  const text = rawLine.trim()
-  if (!text) return null
-  const phone = normalizePhone(text)
-  if (!/^0\d{9,14}$/.test(phone)) return null
-  return { phone, email: `${phone}@${DOMAIN}` }
-}
 
 export async function buildTenantOperatorImportPreview(tenantId: string, rawText: string) {
   const tenantBigId = BigInt(tenantId)
