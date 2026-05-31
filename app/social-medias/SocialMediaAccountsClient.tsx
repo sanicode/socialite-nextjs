@@ -77,7 +77,7 @@ export default function SocialMediaAccountsClient({ accounts, providers }: Props
             {provider.configured ? (
               <a
                 href={`/api/social-oauth/${provider.platform}/start`}
-                className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex ui-button mt-4 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
                 Hubungkan
               </a>

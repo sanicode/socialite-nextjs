@@ -111,15 +111,15 @@ export async function PUT(request: Request, { params }: Ctx) {
     }
 
     // Validasi URL per kategori
-    let categoryName: string | null = null
+    let categoryForRules: { name: string; url_rules: unknown | null } | null = null
     if (requireTitle && rawTitle && category_id) {
       const cat = await prisma.blog_post_categories.findUnique({
         where: { id: BigInt(category_id) },
-        select: { name: true },
+        select: { name: true, url_rules: true },
       })
       if (cat) {
-        categoryName = cat.name
-        const urlError = validateSocialUrlForCategory(rawTitle, cat.name)
+        categoryForRules = cat
+        const urlError = validateSocialUrlForCategory(rawTitle, cat)
         if (urlError) return Response.json({ errors: { title: urlError } }, { status: 422 })
       }
     }
@@ -136,8 +136,8 @@ export async function PUT(request: Request, { params }: Ctx) {
       select: { is_published: true },
     })
     const storedTitle = sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : (rawTitle || '-')
-    const metadata = sourceUrl === 'upload' && rawTitle && categoryName
-      ? await getSocialLinkMetadata(rawTitle, categoryName)
+    const metadata = sourceUrl === 'upload' && rawTitle && categoryForRules
+      ? await getSocialLinkMetadata(rawTitle, categoryForRules)
       : null
     const inputDescription = typeof description === 'string' && description.trim() ? description.trim() : null
     const storedDescription = sourceUrl === 'upload'

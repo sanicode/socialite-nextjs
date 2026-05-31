@@ -400,7 +400,95 @@ Pagination is URL-based (query param `page`). The page never loads all rows — 
 
 ---
 
-## 3. Loading skeletons must mirror the real layout
+## 4. Toolbar search, buttons, and icon standards
+
+### Toolbar layout
+
+Every table page toolbar uses a two-tier structure:
+
+**Tier 1 — always visible bar:**
+```
+[Page size select]  |  [Search form: input + Cari]  [Filter toggle]
+```
+
+**Tier 2 — collapsible filter panel** (shown when Filter is toggled):
+```
+[Field filters grid]  [Apply]  [Reset]
+```
+
+### Search form pattern
+
+The search form is a `flex` container wrapping the input and the Cari submit button:
+
+```tsx
+<form onSubmit={applySearch} className="flex w-full items-center gap-2 sm:w-auto">
+  <div className="relative flex-1 sm:w-64">
+    {/* magnifying glass icon — absolute left-3.5 */}
+    <input
+      type="search"
+      className="h-10 w-full rounded-xl border border-neutral-300 bg-white py-2 pl-11 pr-4 text-sm ..."
+    />
+  </div>
+  <button
+    type="submit"
+    disabled={processing}
+    className="inline-flex flex-none items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+  >
+    {processing ? <SpinnerIcon /> : <SearchIcon className="h-4 w-4" />}
+    {processing ? 'Memproses...' : 'Cari'}
+  </button>
+</form>
+```
+
+### Button sizes (all toolbar and filter buttons)
+
+| Button | Tailwind size classes | Icon size |
+|--------|-----------------------|-----------|
+| Cari (search submit) | `px-3 py-1.5 text-xs gap-1.5 rounded-xl` | `h-4 w-4` |
+| Filter toggle | `px-3 py-1.5 text-xs gap-1.5 rounded-xl` | `h-4 w-4` |
+| Apply (filter panel submit) | `px-3 py-1.5 text-xs gap-1.5 rounded-lg` | `h-3.5 w-3.5` |
+| Reset (filter panel) | `px-3 py-1.5 text-xs rounded-lg` | — |
+| Create/Tambah (primary action) | `px-3 py-1.5 text-xs gap-1.5 rounded-lg` | `h-3.5 w-3.5` |
+
+### Button icons
+
+| Button | Icon path (stroke, `fill="none"`) |
+|--------|-----------------------------------|
+| Cari | `M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z` |
+| Filter toggle | `M4 7h7m4 0h5M4 17h5m4 0h7M11 7a2 2 0 104 0 2 2 0 00-4 0zM9 17a2 2 0 104 0 2 2 0 00-4 0z` |
+| Apply (idle) | `M5 13l4 4L19 7` (checkmark) |
+| Create/Tambah | `M12 4v16m8-8H4` (plus) |
+
+### Processing state (SpinnerIcon)
+
+Every submit button must swap its idle icon for a spinner and change its label to `Memproses...` while the transition is pending:
+
+```tsx
+{processing ? <SpinnerIcon /> : <YourIcon className="h-3.5 w-3.5" />}
+{processing ? 'Memproses...' : 'Apply'}
+```
+
+```tsx
+function SpinnerIcon() {
+  return (
+    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+    </svg>
+  )
+}
+```
+
+### Reference implementations
+
+- `app/components/settings/UsersClientSection.tsx` — toolbar search + Cari + Filter toggle
+- `app/components/settings/TenantsClientSection.tsx` — toolbar + Cari + Filter toggle + Create button
+- `app/components/posts/PostsTable.tsx` — toolbar + Cari + Filter toggle
+- `app/components/settings/SocialMediaCategoriesClientSection.tsx` — standalone search form + Cari + Reset
+
+---
+
+## 5. Loading skeletons must mirror the real layout
 
 Every page with a table must have a `loading.tsx` sibling that renders a skeleton matching the real page structure:
 

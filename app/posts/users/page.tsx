@@ -3,10 +3,22 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/app/lib/prisma'
 import Link from 'next/link'
 import PostsByUsersTable from '@/app/components/posts/users/PostsByUsersTable'
+import PostsUsersFilterControls from '@/app/components/posts/users/PostsUsersFilterControls'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
+import { getCities, getProvinces } from '@/app/actions/dashboard'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
-type SearchParams = Promise<{ sortBy?: string; sortDir?: string; page?: string; pageSize?: string }>
+type SearchParams = Promise<{
+  sortBy?: string
+  sortDir?: string
+  page?: string
+  pageSize?: string
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+  provinceId?: string
+  cityId?: string
+}>
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -38,6 +50,33 @@ function getJakartaDateString(date = new Date()) {
   }).format(date)
 }
 
+function normalizeDateParam(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const parsed = new Date(`${value}T00:00:00+07:00`)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return getJakartaDateString(parsed) === value ? value : undefined
+}
+
+function normalizeNumericParam(value: string | undefined) {
+  return value && /^\d+$/.test(value) ? value : undefined
+}
+
+function formatDateLabel(value: string) {
+  return new Date(`${value}T00:00:00+07:00`).toLocaleDateString('id-ID')
+}
+
+function getDateRangeLabel(dateFrom: string, dateTo: string) {
+  if (dateFrom && dateTo && dateFrom === dateTo) {
+    return `Tanggal ${formatDateLabel(dateFrom)}`
+  }
+  if (dateFrom && dateTo) {
+    return `Tanggal ${formatDateLabel(dateFrom)} s.d. ${formatDateLabel(dateTo)}`
+  }
+  if (dateFrom) return `Mulai ${formatDateLabel(dateFrom)}`
+  if (dateTo) return `Sampai ${formatDateLabel(dateTo)}`
+  return 'Semua tanggal'
+}
+
 export default async function PostsByUsersPage({
   searchParams,
 }: {
@@ -49,8 +88,21 @@ export default async function PostsByUsersPage({
     redirect('/posts/upload')
   }
 
-  const { sortBy: rawSortBy, sortDir: rawSortDir, page: pageParam, pageSize: pageSizeParam } = await searchParams
+  const {
+    sortBy: rawSortBy,
+    sortDir: rawSortDir,
+    page: pageParam,
+    pageSize: pageSizeParam,
+    dateFrom: rawDateFrom,
+    dateTo: rawDateTo,
+    search: rawSearch,
+    provinceId: rawProvinceId,
+    cityId: rawCityId,
+  } = await searchParams
   const isAdmin = user.roles.includes('admin')
+  const search = rawSearch?.trim()
+  const provinceId = isAdmin ? normalizeNumericParam(rawProvinceId) : undefined
+  const cityId = isAdmin && provinceId ? normalizeNumericParam(rawCityId) : undefined
 
   const page    = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
   const pageSize = parseTablePageSize(pageSizeParam, DEFAULT_PAGE_SIZE)
@@ -58,6 +110,16 @@ export default async function PostsByUsersPage({
   const sortDir = rawSortDir === 'desc' ? 'DESC' : 'ASC'
   const orderCol = ALLOWED_SORT_COLS[sortBy]
   const today = getJakartaDateString()
+  const requestedDateFrom = normalizeDateParam(rawDateFrom)
+  const requestedDateTo = normalizeDateParam(rawDateTo)
+  const hasAdminDateFilter = isAdmin && !!(requestedDateFrom || requestedDateTo)
+  const dateFrom = isAdmin
+    ? (hasAdminDateFilter ? requestedDateFrom ?? '' : today)
+    : today
+  const dateTo = isAdmin
+    ? (hasAdminDateFilter ? requestedDateTo ?? '' : today)
+    : today
+  const dateRangeLabel = getDateRangeLabel(dateFrom, dateTo)
 
   const tenantUser = await prisma.tenant_user.findFirst({
     where: { user_id: BigInt(user.id) },
@@ -67,10 +129,34 @@ export default async function PostsByUsersPage({
   const conditions: string[] = []
   const params: unknown[] = []
   let idx = 1
+  const jakartaCreatedDateSql = `date((post.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
 
-  conditions.push(`date((post.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') = $${idx}::date`)
-  params.push(today)
-  idx++
+  if (dateFrom) {
+    conditions.push(`${jakartaCreatedDateSql} >= $${idx}::date`)
+    params.push(dateFrom)
+    idx++
+  }
+  if (dateTo) {
+    conditions.push(`${jakartaCreatedDateSql} <= $${idx}::date`)
+    params.push(dateTo)
+    idx++
+  }
+
+  if (search) {
+    conditions.push(`(u.name ILIKE $${idx} OR u.email ILIKE $${idx} OR p.name ILIKE $${idx} OR c.name ILIKE $${idx})`)
+    params.push(`%${search}%`)
+    idx++
+  }
+  if (provinceId) {
+    conditions.push(`p.id = $${idx}::int`)
+    params.push(provinceId)
+    idx++
+  }
+  if (cityId) {
+    conditions.push(`c.id = $${idx}::bigint`)
+    params.push(cityId)
+    idx++
+  }
 
   if (!isAdmin) {
     const tId = tenantUser?.tenant_id
@@ -141,7 +227,18 @@ export default async function PostsByUsersPage({
     sortBy:     rawSortBy,
     sortDir:    rawSortDir,
     pageSize:   pageSizeParam,
+    dateFrom:   isAdmin ? requestedDateFrom : undefined,
+    dateTo:     isAdmin ? requestedDateTo : undefined,
+    search,
+    provinceId,
+    cityId,
   }
+  const [provinces, cities] = isAdmin
+    ? await Promise.all([
+        getProvinces(),
+        provinceId ? getCities(provinceId) : Promise.resolve([]),
+      ])
+    : [[], []]
 
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
@@ -154,17 +251,38 @@ export default async function PostsByUsersPage({
             {total > 0
               ? `${start}–${end} dari ${total.toLocaleString('id-ID')} operator`
               : '0 operator'}
-            <span className="ml-2 text-neutral-400 dark:text-neutral-500">Tanggal {new Date(`${today}T00:00:00+07:00`).toLocaleDateString('id-ID')}</span>
+            <span className="ml-2 text-neutral-400 dark:text-neutral-500">{dateRangeLabel}</span>
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {isAdmin ? (
+          <PostsUsersFilterControls
+            key={`${search ?? ''}-${provinceId ?? ''}-${cityId ?? ''}-${requestedDateFrom ?? 'default'}-${requestedDateTo ?? 'default'}-${pageSize}`}
+            pageSize={pageSize}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            search={search ?? ''}
+            provinceId={provinceId ?? ''}
+            cityId={cityId ?? ''}
+            provinces={provinces}
+            initialCities={cities}
+          />
+        ) : (
           <TablePageSizeSelect value={pageSize} />
-        </div>
+        )}
 
         {/* Table */}
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-          <PostsByUsersTable rows={rows} sortBy={sortBy} sortDir={sortDir.toLowerCase()} />
+          <PostsByUsersTable
+            rows={rows}
+            sortBy={sortBy}
+            sortDir={sortDir.toLowerCase()}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            search={search}
+            provinceId={provinceId}
+            cityId={cityId}
+          />
         </div>
 
         {/* Pagination */}
@@ -178,7 +296,7 @@ export default async function PostsByUsersPage({
             <div className="flex items-center gap-2">
               <Link
                 href={buildPostsUsersHref({ ...flatParams, page: '1' })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -188,7 +306,7 @@ export default async function PostsByUsersPage({
               </Link>
               <Link
                 href={buildPostsUsersHref({ ...flatParams, page: String(Math.max(1, page - 1)) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -201,7 +319,7 @@ export default async function PostsByUsersPage({
               </span>
               <Link
                 href={buildPostsUsersHref({ ...flatParams, page: String(Math.min(totalPages, page + 1)) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -211,7 +329,7 @@ export default async function PostsByUsersPage({
               </Link>
               <Link
                 href={buildPostsUsersHref({ ...flatParams, page: String(totalPages) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'

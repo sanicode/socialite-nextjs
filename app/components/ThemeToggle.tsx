@@ -26,12 +26,12 @@ export default function ThemeToggle() {
     }
   }
 
-  if (!mounted) return <div className="h-9 w-9" />
+  if (!mounted) return <div className="h-10 w-10" />
 
   return (
     <button
       onClick={toggle}
-      className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+      className="ui-button-icon flex items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
       aria-label={dark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
       title={dark ? 'Mode terang' : 'Mode gelap'}
     >

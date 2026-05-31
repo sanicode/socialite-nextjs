@@ -20,12 +20,17 @@ import { getSocialLinkMetadata } from '@/app/lib/link-metadata'
 import { parseLinkPreviewDescription, stringifyLinkPreviewDescription } from '@/app/lib/link-preview-description'
 import { queryPostById, queryPosts } from '@/app/lib/posts-query'
 import { getReportLocationByTenantId, type ReportObjectLocation } from '@/app/lib/report-location'
-import { normalizeSocialUrl, validateSocialUrlForCategory } from '@/app/lib/social-platform'
+import { normalizeSocialUrl, normalizeSocialUrlRules, validateSocialUrlForCategory, type SocialUrlRules } from '@/app/lib/social-platform'
 import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
 import {
   getNonAdminReportingWindowDecision,
   getOperatorReportingWindowDecision,
 } from '@/app/lib/operator-reporting-window'
+import {
+  getOperatorReportValidationDisabledMessage,
+  getRequiredSocialMediaCategoryCount,
+  isOperatorReportValidationReady,
+} from '@/app/lib/operator-report-validation'
 
 async function redirectToLoginIfUnauthorized(error: unknown): Promise<never> {
   if (error instanceof Error && error.message === 'Unauthorized') {
@@ -105,7 +110,7 @@ export async function updateOperatorPostStatus(
       throw new Error('Rentang tanggal tidak valid')
     }
 
-    const [uploadCount, amplifikasiCount] = await Promise.all([
+    const [uploadCount, amplifikasiCount, requiredCategoryCount] = await Promise.all([
       prisma.blog_posts.count({
         where: {
           user_id: post.user_id,
@@ -126,10 +131,11 @@ export async function updateOperatorPostStatus(
           },
         },
       }),
+      getRequiredSocialMediaCategoryCount(),
     ])
 
-    if (uploadCount < 3 || amplifikasiCount < 3) {
-      throw new Error('Validasi aktif setelah minimal 3 upload dan 3 amplifikasi terpenuhi.')
+    if (!isOperatorReportValidationReady(uploadCount, amplifikasiCount, requiredCategoryCount)) {
+      throw new Error(getOperatorReportValidationDisabledMessage(requiredCategoryCount))
     }
   }
 
@@ -194,7 +200,7 @@ export async function bulkUpdateOperatorPostStatus(
 
   if (!sessionUser.roles.includes('admin')) {
     const userId = posts[0].user_id
-    const [uploadCount, amplifikasiCount] = await Promise.all([
+    const [uploadCount, amplifikasiCount, requiredCategoryCount] = await Promise.all([
       prisma.blog_posts.count({
         where: {
           user_id: userId,
@@ -215,10 +221,11 @@ export async function bulkUpdateOperatorPostStatus(
           },
         },
       }),
+      getRequiredSocialMediaCategoryCount(),
     ])
 
-    if (uploadCount < 3 || amplifikasiCount < 3) {
-      throw new Error('Validasi aktif setelah minimal 3 upload dan 3 amplifikasi terpenuhi.')
+    if (!isOperatorReportValidationReady(uploadCount, amplifikasiCount, requiredCategoryCount)) {
+      throw new Error(getOperatorReportValidationDisabledMessage(requiredCategoryCount))
     }
   }
 
@@ -285,10 +292,13 @@ export type SerializedPost = {
 export type SerializedCategory = {
   id: string
   name: string
+  is_required: boolean
+  url_rules: SocialUrlRules | null
 }
 
 const getCategoriesCached = cache(async () => {
   return prisma.blog_post_categories.findMany({
+    where: { is_active: true, deleted_at: null },
     orderBy: { name: 'asc' },
   })
 })
@@ -571,7 +581,12 @@ export async function getPosts(params: {
 export async function getCategories(): Promise<SerializedCategory[]> {
   await requireUser()
   const cats = await getCategoriesCached()
-  return cats.map((c) => ({ id: c.id.toString(), name: c.name }))
+  return cats.map((c) => ({
+    id: c.id.toString(),
+    name: c.name,
+    is_required: c.is_required,
+    url_rules: normalizeSocialUrlRules(c.url_rules),
+  }))
 }
 
 export async function getPostById(id: string): Promise<SerializedPost | null> {
@@ -685,15 +700,15 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
   if (Object.keys(errors).length > 0) return { errors }
 
-  let categoryName: string | null = null
+  let categoryForRules: { name: string; url_rules: unknown | null } | null = null
   if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
-      select: { name: true },
+      select: { name: true, url_rules: true },
     })
     if (category) {
-      categoryName = category.name
-      const urlError = validateSocialUrlForCategory(rawTitle, category.name)
+      categoryForRules = category
+      const urlError = validateSocialUrlForCategory(rawTitle, category)
       if (urlError) return { errors: { title: [urlError] } }
     }
   }
@@ -744,8 +759,8 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
   }
 
   const storedTitle = opts.sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : title
-  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryName
-    ? await getSocialLinkMetadata(rawTitle, categoryName)
+  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryForRules
+    ? await getSocialLinkMetadata(rawTitle, categoryForRules)
     : null
   const storedDescription = opts.sourceUrl === 'upload'
     ? (
@@ -840,15 +855,15 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
     return { message: 'Anda tidak memiliki akses untuk mengedit laporan ini.' }
   }
 
-  let categoryName: string | null = null
+  let categoryForRules: { name: string; url_rules: unknown | null } | null = null
   if (opts.validateUrl && categoryId && rawTitle) {
     const category = await prisma.blog_post_categories.findUnique({
       where: { id: BigInt(categoryId) },
-      select: { name: true },
+      select: { name: true, url_rules: true },
     })
     if (category) {
-      categoryName = category.name
-      const urlError = validateSocialUrlForCategory(rawTitle, category.name)
+      categoryForRules = category
+      const urlError = validateSocialUrlForCategory(rawTitle, category)
       if (urlError) return { errors: { title: [urlError] } }
     }
   }
@@ -859,8 +874,8 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
   }
 
   const storedTitle = opts.sourceUrl === 'upload' && rawTitle ? normalizeSocialUrl(rawTitle) : title
-  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryName
-    ? await getSocialLinkMetadata(rawTitle, categoryName)
+  const metadata = opts.sourceUrl === 'upload' && rawTitle && categoryForRules
+    ? await getSocialLinkMetadata(rawTitle, categoryForRules)
     : null
   const storedDescription = opts.sourceUrl === 'upload'
     ? (
@@ -942,14 +957,14 @@ export async function previewUploadLinkMetadata(categoryId: string, title: strin
 
   const category = await prisma.blog_post_categories.findUnique({
     where: { id: BigInt(categoryId) },
-    select: { name: true },
+    select: { name: true, url_rules: true },
   })
   if (!category) return { description: null, error: 'Kategori tidak ditemukan.' }
 
-  const urlError = validateSocialUrlForCategory(rawTitle, category.name)
+  const urlError = validateSocialUrlForCategory(rawTitle, category)
   if (urlError) return { description: null, error: urlError }
 
-  const metadata = await getSocialLinkMetadata(rawTitle, category.name)
+  const metadata = await getSocialLinkMetadata(rawTitle, category)
   const description = stringifyLinkPreviewDescription({
     text: metadata?.description,
     thumbnailUrl: metadata?.thumbnailUrl,

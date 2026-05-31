@@ -70,7 +70,7 @@ export default function ReportTable({ data }: Props) {
           target="_blank"
           rel="noopener noreferrer"
           title={value}
-          className="inline-flex max-w-40 items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+          className="inline-flex ui-button-sm max-w-40 items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
         >
           <span className="truncate">{getUrlLabel(column)}</span>
         </a>

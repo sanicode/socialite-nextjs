@@ -8,6 +8,7 @@ import ImageUpload from './ImageUpload'
 import LinkPreviewDescription from './LinkPreviewDescription'
 import { useToast } from '@/app/components/ToastContext'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
+import { getSocialLinkPlatformHint, validateSocialUrlForCategory } from '@/app/lib/social-platform'
 
 type Props = {
   action: (state: PostFormState, formData: FormData) => Promise<PostFormState>
@@ -18,29 +19,6 @@ type Props = {
   variant?: 'default' | 'upload' | 'amplifikasi'
   basePath?: string
   returnTo?: string
-}
-
-const PLATFORM_HINTS: Record<string, { pattern: RegExp; placeholder: string; label: string }> = {
-  tiktok: {
-    pattern: /tiktok\.com/i,
-    placeholder: 'https://www.tiktok.com/@username/video/...',
-    label: 'TikTok',
-  },
-  instagram: {
-    pattern: /instagram\.com/i,
-    placeholder: 'https://www.instagram.com/p/...',
-    label: 'Instagram',
-  },
-  facebook: {
-    pattern: /(facebook\.com|fb\.com|fb\.watch)/i,
-    placeholder: 'https://www.facebook.com/...',
-    label: 'Facebook',
-  },
-  youtube: {
-    pattern: /(youtube\.com|youtu\.be)/i,
-    placeholder: 'https://www.youtube.com/watch?v=...',
-    label: 'YouTube',
-  },
 }
 
 const ALERT_ICON = {
@@ -118,16 +96,10 @@ export default function PostForm({ action, post, categories, maxUploadFileSizeBy
 
   const selectedCategory = categories.find((c) => c.id === categoryId)
 
-  const platformHint = showUrl && selectedCategory
-    ? Object.entries(PLATFORM_HINTS).find(([key]) =>
-        selectedCategory.name.toLowerCase().includes(key)
-      )?.[1]
-    : null
+  const platformHint = showUrl && selectedCategory ? getSocialLinkPlatformHint(selectedCategory) : null
 
   const urlClientError =
-    showUrl && title && platformHint && !platformHint.pattern.test(title)
-      ? `Link harus berupa URL ${platformHint.label} yang valid.`
-      : null
+    showUrl && title && selectedCategory ? validateSocialUrlForCategory(title, selectedCategory) : null
 
   useEffect(() => {
     if (!showMetadataPreview) return

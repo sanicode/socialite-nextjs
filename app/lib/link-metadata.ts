@@ -1,10 +1,12 @@
 import {
-  detectSocialPlatformFromCategory,
   extractFirstHttpUrl,
-  getSocialPlatformLabel,
   isAllowedSocialHostname,
+  resolveSocialLinkRulesForCategory,
+  type SocialLinkCategoryInput,
+  type SocialLinkRuleResolution,
+  type SocialLinkPlatform,
+  type SocialUrlRules,
 } from '@/app/lib/social-platform'
-import type { SocialPlatform } from '@/app/lib/social-oauth'
 import { getOptionalEnv } from '@/app/lib/env'
 
 const MAX_REDIRECTS = 3
@@ -193,7 +195,7 @@ function getTitle(html: string) {
   return cleanMetadataValue(match?.[1] ?? null)
 }
 
-function extractHtmlMetadata(html: string, baseUrl: URL, platform: SocialPlatform): SocialLinkMetadata {
+function extractHtmlMetadata(html: string, baseUrl: URL, context: SocialLinkRuleResolution): SocialLinkMetadata {
   let title = getMetaContent(html, ['og:title', 'twitter:title']) ?? getTitle(html)
   const description = getMetaContent(html, ['og:description', 'twitter:description', 'description'])
   const imageUrl = resolveMetadataUrl(getMetaContent(html, ['og:image', 'twitter:image', 'twitter:image:src']), baseUrl)
@@ -204,10 +206,10 @@ function extractHtmlMetadata(html: string, baseUrl: URL, platform: SocialPlatfor
     getHandleFromUrl(getMetaContent(html, ['article:author'])) ??
     getHandleFromUrl(canonicalUrl) ??
     getHandleFromUrl(baseUrl.toString())
-  const platformName = getMetaContent(html, ['og:site_name', 'application-name']) ?? getSocialPlatformLabel(platform)
+  const platformName = getMetaContent(html, ['og:site_name', 'application-name']) ?? context.label
   const contentType = getMetaContent(html, ['og:type'])
 
-  if (platform === 'instagram') {
+  if (context.platform === 'instagram') {
     const instagramParts = extractInstagramTextParts({
       title,
       description,
@@ -218,7 +220,7 @@ function extractHtmlMetadata(html: string, baseUrl: URL, platform: SocialPlatfor
     title = instagramParts.caption ?? title
   }
 
-  if (platform === 'facebook') {
+  if (context.platform === 'facebook') {
     if (authorHandle?.toLowerCase() === '@facebookapp') {
       authorHandle = null
     }
@@ -265,10 +267,10 @@ async function readHtml(response: Response) {
   return new TextDecoder().decode(htmlBytes)
 }
 
-function isAllowedUrl(url: URL, platform: SocialPlatform) {
+function isAllowedUrl(url: URL, rules: SocialUrlRules) {
   return (
     (url.protocol === 'http:' || url.protocol === 'https:') &&
-    isAllowedSocialHostname(platform, url.hostname)
+    isAllowedSocialHostname(rules, url.hostname)
   )
 }
 
@@ -355,7 +357,7 @@ function getFacebookGraphVersion() {
   return /^v\d+\.\d+$/.test(version) ? version : 'v19.0'
 }
 
-async function fetchMetaOEmbedDescription(platform: Extract<SocialPlatform, 'facebook' | 'instagram'>, url: URL) {
+async function fetchMetaOEmbedDescription(platform: Extract<SocialLinkPlatform, 'facebook' | 'instagram'>, url: URL) {
   const accessToken = getMetaOEmbedAccessToken()
   if (!accessToken) return null
 
@@ -376,7 +378,7 @@ async function fetchMetaOEmbedDescription(platform: Extract<SocialPlatform, 'fac
   return null
 }
 
-async function fetchProviderMetadata(platform: SocialPlatform, url: URL) {
+async function fetchProviderMetadata(platform: SocialLinkPlatform, url: URL) {
   switch (platform) {
     case 'tiktok':
       return fetchTikTokOEmbedDescription(url)
@@ -390,11 +392,11 @@ async function fetchProviderMetadata(platform: SocialPlatform, url: URL) {
   }
 }
 
-async function fetchHtmlWithCheckedRedirects(startUrl: URL, platform: SocialPlatform) {
+async function fetchHtmlWithCheckedRedirects(startUrl: URL, rules: SocialUrlRules) {
   let currentUrl = startUrl
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
-    if (!isAllowedUrl(currentUrl, platform)) return null
+    if (!isAllowedUrl(currentUrl, rules)) return null
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
@@ -429,28 +431,28 @@ async function fetchHtmlWithCheckedRedirects(startUrl: URL, platform: SocialPlat
   return null
 }
 
-export async function getSocialLinkMetadata(value: string, categoryName: string): Promise<SocialLinkMetadata | null> {
+export async function getSocialLinkMetadata(value: string, category: SocialLinkCategoryInput): Promise<SocialLinkMetadata | null> {
   const urlValue = extractFirstHttpUrl(value)
   if (!urlValue) return null
 
-  const platform = detectSocialPlatformFromCategory(categoryName)
-  if (!platform) return null
+  const context = resolveSocialLinkRulesForCategory(category)
+  if (!context.rules || context.rules.hosts.length === 0) return null
 
   try {
     const url = new URL(urlValue)
-    if (!isAllowedUrl(url, platform)) return null
+    if (!isAllowedUrl(url, context.rules)) return null
 
-    const providerMetadata = await fetchProviderMetadata(platform, url)
+    const providerMetadata = context.platform ? await fetchProviderMetadata(context.platform, url) : null
     if (providerMetadata) return providerMetadata
 
-    const htmlResult = await fetchHtmlWithCheckedRedirects(url, platform)
-    return htmlResult ? extractHtmlMetadata(htmlResult.html, htmlResult.url, platform) : null
+    const htmlResult = await fetchHtmlWithCheckedRedirects(url, context.rules)
+    return htmlResult ? extractHtmlMetadata(htmlResult.html, htmlResult.url, context) : null
   } catch {
     return null
   }
 }
 
-export async function getSocialLinkMetadataDescription(value: string, categoryName: string) {
-  const metadata = await getSocialLinkMetadata(value, categoryName)
+export async function getSocialLinkMetadataDescription(value: string, category: SocialLinkCategoryInput) {
+  const metadata = await getSocialLinkMetadata(value, category)
   return metadata?.description ?? null
 }

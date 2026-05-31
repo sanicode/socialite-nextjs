@@ -11,13 +11,13 @@ export default function UploadLoading() {
             <SkeletonBlock className="h-8 w-40" />
             <SkeletonBlock className="h-4 w-32" />
           </div>
-          <SkeletonBlock className="h-11 w-36" />
+          <SkeletonBlock className="h-8 w-36" />
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <SkeletonBlock className="h-11 flex-1 min-w-[180px]" />
-          <SkeletonBlock className="h-11 sm:w-48" />
-          <SkeletonBlock className="h-11 sm:w-40" />
-          <SkeletonBlock className="h-11 sm:w-40" />
+          <SkeletonBlock className="h-10 flex-1 min-w-[180px]" />
+          <SkeletonBlock className="h-10 sm:w-48" />
+          <SkeletonBlock className="h-10 sm:w-40" />
+          <SkeletonBlock className="h-10 sm:w-40" />
         </div>
         <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
           <div className="space-y-3 p-4">

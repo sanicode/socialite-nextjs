@@ -15,22 +15,13 @@ export default function UsersLoading() {
           <Skeleton className="h-4 w-80" />
         </div>
 
-        {/* Filter */}
-        <div className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 dark:border-neutral-800 dark:bg-neutral-900">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="space-y-1">
-              <Skeleton className="h-3 w-20 rounded" />
-              <Skeleton className="h-10 rounded-lg" />
-            </div>
-          ))}
-          <div className="flex gap-3 sm:col-span-2 xl:col-span-1">
-            <Skeleton className="h-10 w-20 rounded-lg" />
-            <Skeleton className="h-10 w-20 rounded-lg" />
+        {/* Filter toolbar */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+          <Skeleton className="h-10 w-44 rounded-lg" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Skeleton className="h-10 w-full rounded-xl sm:w-80" />
+            <Skeleton className="h-10 w-28 rounded-xl" />
           </div>
-        </div>
-
-        <div className="flex justify-end">
-          <Skeleton className="h-10 w-full rounded-lg sm:max-w-xs" />
         </div>
 
         {/* Table */}
@@ -54,8 +45,8 @@ export default function UsersLoading() {
               <Skeleton className="h-5 w-14 rounded-full" />
               <Skeleton className="h-3.5 w-20" />
               <div className="flex gap-2">
-                <Skeleton className="h-7 w-16 rounded-lg" />
-                <Skeleton className="h-7 w-16 rounded-lg" />
+                <Skeleton className="h-8 w-16 rounded-lg" />
+                <Skeleton className="h-8 w-16 rounded-lg" />
               </div>
             </div>
           ))}

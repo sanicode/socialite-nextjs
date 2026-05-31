@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useToast } from '@/app/components/ToastContext'
 import {
   createTenant,
@@ -34,6 +34,10 @@ type Props = {
   sortDir: 'asc' | 'desc'
   searchParams: Record<string, string | undefined>
   isLoading?: boolean
+}
+
+export type TenantsTableHandle = {
+  openCreate: () => void
 }
 
 // ── Sort helpers ──────────────────────────────────────────────────────────────
@@ -670,7 +674,7 @@ function ManageUsersPanel({
               type="button"
               onClick={openImportOperators}
               disabled={pending || importPending}
-              className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="inline-flex ui-button-sm gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0-12l4 4m-4-4L8 7M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
@@ -805,7 +809,7 @@ function ManageUsersPanel({
           <button
             type="button"
             onClick={() => importDialogRef.current?.close()}
-            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="ui-button-icon rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -909,7 +913,7 @@ function ManageUsersPanel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams, isLoading = false }: Props) {
+const TenantsTable = forwardRef<TenantsTableHandle, Props>(function TenantsTable({ tenants, provinces, sortBy, sortDir, searchParams, isLoading = false }, ref) {
   const { showToast } = useToast()
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -930,6 +934,8 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
     setCreateFormKey((key) => key + 1)
     createDialogRef.current?.showModal()
   }
+
+  useImperativeHandle(ref, () => ({ openCreate }))
 
   function handleCreate(form: EditFormState) {
     startTransition(async () => {
@@ -1036,20 +1042,6 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
 
   return (
     <>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Tenant
-        </button>
-      </div>
-
       {/* Table */}
       <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <table className="w-full text-sm">
@@ -1068,7 +1060,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
                     type="button"
                     onClick={() => handleSort(col)}
                     disabled={sorting}
-                    className="inline-flex items-center gap-0.5 hover:text-neutral-900 dark:hover:text-white transition-colors disabled:opacity-60"
+                    className="ui-button-unstyled inline-flex items-center gap-0.5 hover:text-neutral-900 transition-colors disabled:opacity-60 dark:hover:text-white"
                   >
                     {label}
                     <SortIcon active={sortBy === col} dir={sortDir} />
@@ -1099,7 +1091,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
                   <div className="h-5 w-10 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700" />
                 </td>
                 <td className="px-4 py-3">
-                  <div className="h-7 w-24 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
+                  <div className="h-8 w-24 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
                 </td>
               </tr>
             ))}
@@ -1122,7 +1114,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
                     <button
                       type="button"
                       onClick={() => openUsers(t, 'manager')}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer ${
+                      className={`ui-button-unstyled inline-flex cursor-pointer items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                         t.manager_count > 0
                           ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:hover:bg-blue-900/70'
                           : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700'
@@ -1135,7 +1127,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
                     <button
                       type="button"
                       onClick={() => openUsers(t, 'operator')}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer ${
+                      className={`ui-button-unstyled inline-flex cursor-pointer items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
                         t.operator_count > 0
                           ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:hover:bg-emerald-900/70'
                           : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700'
@@ -1196,7 +1188,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
           <button
             type="button"
             onClick={() => createDialogRef.current?.close()}
-            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="ui-button-icon rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1230,7 +1222,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
           <button
             type="button"
             onClick={() => editDialogRef.current?.close()}
-            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="ui-button-icon rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1272,7 +1264,7 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
           <button
             type="button"
             onClick={() => usersDialogRef.current?.close()}
-            className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="ui-button-icon rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1344,4 +1336,6 @@ export default function TenantsTable({ tenants, provinces, sortBy, sortDir, sear
       </dialog>
     </>
   )
-}
+})
+
+export default TenantsTable

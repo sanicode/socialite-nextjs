@@ -341,9 +341,12 @@ export default async function SummaryPage({ searchParams }: Props) {
             </label>
             <button
               type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
             >
-              Tampilkan
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Apply
             </button>
             <SummaryPdfButton filename={`summary-${month}`} />
             {activeTab === 'summary' && (

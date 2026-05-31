@@ -33,7 +33,7 @@ export default function OperatorsLoading() {
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
             <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-7 w-36 rounded-lg" />
+            <Skeleton className="h-8 w-36 rounded-lg" />
           </div>
           <div className="grid grid-cols-4 gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-800/50">
             {['w-16', 'w-16', 'w-20', 'w-10'].map((w, i) => (
@@ -48,7 +48,7 @@ export default function OperatorsLoading() {
               <Skeleton className="h-3.5 w-28" />
               <Skeleton className="h-3.5 w-36" />
               <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="ml-auto h-7 w-14 rounded-lg" />
+              <Skeleton className="ml-auto h-8 w-14 rounded-lg" />
             </div>
           ))}
         </div>

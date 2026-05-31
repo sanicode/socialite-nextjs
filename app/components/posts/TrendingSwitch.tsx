@@ -16,7 +16,7 @@ export default function TrendingSwitch({ checked, disabled = false, title, onCli
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`relative inline-flex h-5 w-[3.25rem] shrink-0 items-center overflow-hidden rounded-full p-0.5 transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`ui-button-unstyled relative inline-flex h-5 w-[3.25rem] shrink-0 items-center overflow-hidden rounded-full p-0.5 transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
         checked
           ? 'bg-gradient-to-r from-emerald-500 to-green-600 shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.18)]'
           : 'bg-gradient-to-r from-neutral-200 to-neutral-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.14)] dark:from-neutral-700 dark:to-neutral-800'

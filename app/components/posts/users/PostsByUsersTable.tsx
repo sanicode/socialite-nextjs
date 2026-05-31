@@ -18,6 +18,11 @@ type Props = {
   rows: Row[]
   sortBy: string
   sortDir: string
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+  provinceId?: string
+  cityId?: string
 }
 
 const COLUMNS: { key: string; label: string; align: 'left' | 'right' }[] = [
@@ -30,7 +35,7 @@ const COLUMNS: { key: string; label: string; align: 'left' | 'right' }[] = [
   { key: 'invalid_posts',  label: 'Invalid',  align: 'right' },
 ]
 
-export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
+export default function PostsByUsersTable({ rows, sortBy, sortDir, dateFrom, dateTo, search, provinceId, cityId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -64,8 +69,23 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
     )
   }
 
+  function buildDateScopedHref(path: string) {
+    const params = new URLSearchParams()
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    if (search) params.set('search', search)
+    if (provinceId) params.set('provinceId', provinceId)
+    if (cityId) params.set('cityId', cityId)
+    const qs = params.toString()
+    return qs ? `${path}?${qs}` : path
+  }
+
   function buildViewHref(userId: number) {
-    return `/posts/users/${userId}`
+    return buildDateScopedHref(`/posts/users/${userId}`)
+  }
+
+  function buildStatusHref(userId: number, status: string) {
+    return buildDateScopedHref(`/posts/users/${userId}/${status}`)
   }
 
   return (
@@ -81,7 +101,7 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
                 >
                   <button
                     onClick={() => handleSort(key)}
-                    className={`inline-flex items-center gap-1 hover:text-neutral-900 dark:hover:text-white transition ${align === 'right' ? 'flex-row-reverse w-full justify-start' : ''}`}
+                    className={`ui-button-unstyled inline-flex items-center gap-1 transition hover:text-neutral-900 dark:hover:text-white ${align === 'right' ? 'w-full flex-row-reverse justify-start' : ''}`}
                   >
                     {label}
                     <SortIcon col={key} />
@@ -109,24 +129,24 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
                   <td className="px-4 py-3 text-neutral-500 dark:text-neutral-400">{row.email}</td>
                   <td className="px-4 py-3 text-right">
                     <a
-                      href={`/posts/users/${row.user_id}/pending`}
-                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition"
+                      href={buildStatusHref(row.user_id, 'pending')}
+                      className="inline-flex ui-button min-w-10 rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
                     >
                       {row.pending_posts}
                     </a>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <a
-                      href={`/posts/users/${row.user_id}/valid`}
-                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition"
+                      href={buildStatusHref(row.user_id, 'valid')}
+                      className="inline-flex ui-button min-w-10 rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
                     >
                       {row.valid_posts}
                     </a>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <a
-                      href={`/posts/users/${row.user_id}/invalid`}
-                      className="inline-flex items-center justify-center min-w-[2.5rem] px-3 py-1.5 rounded-lg font-semibold text-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
+                      href={buildStatusHref(row.user_id, 'invalid')}
+                      className="inline-flex ui-button min-w-10 rounded-lg bg-red-100 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                     >
                       {row.invalid_posts}
                     </a>
@@ -134,7 +154,7 @@ export default function PostsByUsersTable({ rows, sortBy, sortDir }: Props) {
                   <td className="px-4 py-3 text-right">
                     <a
                       href={buildViewHref(row.user_id)}
-                      className="inline-flex items-center justify-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      className="inline-flex ui-button-sm rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     >
                       View
                     </a>

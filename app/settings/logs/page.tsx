@@ -93,7 +93,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
             <div className="flex items-center gap-2">
               <Link
                 href={buildLogsHref({ ...params, page: '1' })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -103,7 +103,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
               </Link>
               <Link
                 href={buildLogsHref({ ...params, page: String(Math.max(1, page - 1)) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -116,7 +116,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
               </span>
               <Link
                 href={buildLogsHref({ ...params, page: String(Math.min(totalPages, page + 1)) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
@@ -126,7 +126,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
               </Link>
               <Link
                 href={buildLogsHref({ ...params, page: String(totalPages) })}
-                className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
+                className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
                     : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'

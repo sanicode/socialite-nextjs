@@ -30,6 +30,15 @@ const settingsItems = [
     ),
   },
   {
+    label: 'Jenis Medsos',
+    href: '/settings/jenis-medsos',
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 7h10M7 12h7M7 17h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Users',
     href: '/settings/users',
     icon: (
@@ -117,7 +126,7 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, a
           <span className={`text-base font-bold text-neutral-900 dark:text-white tracking-tight ${collapsed ? 'md:hidden' : ''}`}>{appName}</span>
           <button
             onClick={onToggleCollapsed}
-            className="hidden rounded-lg p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 md:inline-flex dark:hover:bg-neutral-800 dark:hover:text-white"
+            className="ui-button-icon hidden rounded-lg p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 md:inline-flex dark:hover:bg-neutral-800 dark:hover:text-white"
             aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
             title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
           >
@@ -125,7 +134,7 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapsed, a
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 6l-6 6 6 6" />
             </svg>
           </button>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition md:hidden">
+          <button onClick={onClose} className="ui-button-icon rounded-lg p-1.5 text-neutral-500 transition hover:bg-neutral-100 dark:hover:bg-neutral-800 md:hidden">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

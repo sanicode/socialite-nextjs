@@ -267,7 +267,7 @@ export default function UserPostsTableClient({
                           href={post.title}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="inline-flex ui-button-sm items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Buka
                         </a>
@@ -318,14 +318,14 @@ export default function UserPostsTableClient({
                         <span
                           aria-disabled="true"
                           title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
-                          className="inline-flex cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                          className="inline-flex ui-button-sm cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
                         >
                           Edit
                         </span>
                       ) : (
                         <Link
                           href={buildEditHref(post)}
-                          className="inline-flex rounded-lg border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="inline-flex ui-button-sm rounded-lg border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Edit
                         </Link>
@@ -347,7 +347,7 @@ export default function UserPostsTableClient({
         >
           <div className="relative p-4" onClick={e => e.stopPropagation()}>
             <button
-              className="absolute -top-10 right-0 text-white hover:text-neutral-300 transition"
+              className="ui-button-icon absolute -top-10 right-0 text-white transition hover:text-neutral-300"
               onClick={() => setModalUrl(null)}
             >
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

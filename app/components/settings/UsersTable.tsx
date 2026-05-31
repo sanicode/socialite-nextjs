@@ -291,7 +291,7 @@ export default function UsersTable({ users, totalBlocked, totalUnderAttack, tota
                   <div className="h-4 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
                 </td>
                 <td className="px-4 py-3">
-                  <div className="h-7 w-36 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
+                  <div className="h-8 w-36 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-700" />
                 </td>
               </tr>
             ))}

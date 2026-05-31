@@ -8,8 +8,21 @@ import { canActorAccessTenant } from '@/app/lib/tenant-access'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import AppAlert from '@/app/components/AppAlert'
 import UserPostsTableClient from './[status]/UserPostsTableClient'
+import {
+  getOperatorReportValidationDisabledMessage,
+  getOperatorReportValidationPendingMessage,
+  getRequiredSocialMediaCategoryCount,
+  isOperatorReportValidationReady,
+} from '@/app/lib/operator-report-validation'
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
+type SearchParams = Promise<{
+  dateFrom?: string
+  dateTo?: string
+  search?: string
+  provinceId?: string
+  cityId?: string
+}>
 
 function getJakartaDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -24,10 +37,28 @@ function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
   return new Date(`${dateString}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+07:00`)
 }
 
+function normalizeDateParam(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const parsed = new Date(`${value}T00:00:00+07:00`)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return getJakartaDateString(parsed) === value ? value : undefined
+}
+
+function buildPostsUsersHref(params: Record<string, string | undefined>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value)
+  }
+  const qs = query.toString()
+  return qs ? `/posts/users?${qs}` : '/posts/users'
+}
+
 export default async function UserPostsReviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ userId: string }>
+  searchParams: SearchParams
 }) {
   const actor = await getSessionUser()
   if (!actor) redirect('/login')
@@ -52,28 +83,35 @@ export default async function UserPostsReviewPage({
     if (!canAccessTarget) redirect('/posts/users')
   }
 
+  const { dateFrom: rawDateFrom, dateTo: rawDateTo, search, provinceId, cityId } = await searchParams
   const today = getJakartaDateString()
-  const dateFrom = today
-  const dateTo = today
+  const requestedDateFrom = normalizeDateParam(rawDateFrom)
+  const requestedDateTo = normalizeDateParam(rawDateTo)
+  const hasDateFilter = !!(requestedDateFrom || requestedDateTo)
+  const dateFrom = hasDateFilter ? requestedDateFrom ?? '' : today
+  const dateTo = hasDateFilter ? requestedDateTo ?? '' : today
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(actor.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
 
-  const posts = await prisma.blog_posts.findMany({
-    where: {
-      user_id: targetUser.id,
-      source_url: { in: ['upload', 'amplifikasi'] },
-      created_at: {
-        gte: getJakartaDateBounds(dateFrom, false),
-        lte: getJakartaDateBounds(dateTo, true),
+  const [posts, requiredCategoryCount] = await Promise.all([
+    prisma.blog_posts.findMany({
+      where: {
+        user_id: targetUser.id,
+        source_url: { in: ['upload', 'amplifikasi'] },
+        created_at: {
+          ...(dateFrom ? { gte: getJakartaDateBounds(dateFrom, false) } : {}),
+          ...(dateTo ? { lte: getJakartaDateBounds(dateTo, true) } : {}),
+        },
       },
-    },
-    orderBy: { created_at: 'desc' },
-    include: { blog_post_categories: true },
-  })
+      orderBy: { created_at: 'desc' },
+      include: { blog_post_categories: true },
+    }),
+    getRequiredSocialMediaCategoryCount(),
+  ])
 
   const uploadCount = posts.filter((post) => post.source_url === 'upload').length
   const amplifikasiCount = posts.filter((post) => post.source_url === 'amplifikasi').length
-  const validationReady = uploadCount >= 3 && amplifikasiCount >= 3
+  const validationReady = isOperatorReportValidationReady(uploadCount, amplifikasiCount, requiredCategoryCount)
 
   const postIds = posts.map((post) => post.id)
   const media = postIds.length > 0
@@ -119,7 +157,7 @@ export default async function UserPostsReviewPage({
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/posts/users" className="text-sm text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white">
+          <Link href={buildPostsUsersHref({ dateFrom, dateTo, search, provinceId, cityId })} className="text-sm text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white">
             ← Kembali
           </Link>
           <span className="text-neutral-300 dark:text-neutral-700">/</span>
@@ -140,7 +178,7 @@ export default async function UserPostsReviewPage({
           <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">Syarat Validasi</p>
             <p className={`mt-1 text-sm font-semibold ${validationReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {validationReady ? 'Terpenuhi' : 'Minimal 3 upload dan 3 amplifikasi'}
+              {validationReady ? 'Terpenuhi' : `Minimal ${requiredCategoryCount} upload dan ${requiredCategoryCount} amplifikasi`}
             </p>
           </div>
         </div>
@@ -157,7 +195,7 @@ export default async function UserPostsReviewPage({
           <AppAlert
             type="warning"
             title="Validasi Belum Aktif"
-            message="Status laporan akan tetap pending sampai operator memiliki minimal 3 laporan upload dan 3 laporan amplifikasi pada rentang tanggal ini."
+            message={getOperatorReportValidationPendingMessage(requiredCategoryCount)}
           />
         )}
 
@@ -169,7 +207,7 @@ export default async function UserPostsReviewPage({
             userData={{ name: targetUser.name }}
             status=""
             validationEnabled={validationReady}
-            validationDisabledMessage="Validasi aktif setelah minimal 3 upload dan 3 amplifikasi terpenuhi."
+            validationDisabledMessage={getOperatorReportValidationDisabledMessage(requiredCategoryCount)}
             validationDateFrom={dateFrom}
             validationDateTo={dateTo}
             removeOnStatusChange={false}

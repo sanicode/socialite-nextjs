@@ -30,7 +30,7 @@ export default function DatabaseUnavailableScreen({ error }: Props) {
         <div className="mt-6">
           <a
             href=""
-            className="inline-flex rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+            className="inline-flex ui-button rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
           >
             Muat ulang
           </a>

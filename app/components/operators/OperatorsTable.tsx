@@ -72,7 +72,7 @@ function AttachDialog({ onClose }: { onClose: () => void }) {
         <h2 className="text-base font-semibold text-neutral-900 dark:text-white">Tambah Operator</h2>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          className="ui-button-icon rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -221,7 +221,7 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
           <button
             type="button"
             onClick={() => setShowAttach(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+            className="inline-flex ui-button-sm gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -246,7 +246,7 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
                   <tr key={`operator-skeleton-${rowIndex}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
                     {[0, 1, 2, 3].map((colIndex) => (
                       <td key={`operator-skeleton-${rowIndex}-${colIndex}`} className="px-4 py-3">
-                        <div className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${colIndex === 3 ? 'ml-auto h-7 w-16' : 'h-4 w-28'}`} />
+                        <div className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${colIndex === 3 ? 'ml-auto h-8 w-16' : 'h-4 w-28'}`} />
                       </td>
                     ))}
                   </tr>

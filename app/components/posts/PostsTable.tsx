@@ -58,6 +58,31 @@ function isUrlSearch(value: string) {
   return /^https?:\/\//i.test(value.trim())
 }
 
+function SearchIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  )
+}
+
+function SlidersIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h7m4 0h5M4 17h5m4 0h7M11 7a2 2 0 104 0 2 2 0 00-4 0zM9 17a2 2 0 104 0 2 2 0 00-4 0z" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+    </svg>
+  )
+}
+
 export default function PostsTable({
   posts,
   total,
@@ -119,20 +144,44 @@ export default function PostsTable({
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
   const [filterCategory, setFilterCategory] = useState(searchParams.get('category') ?? '')
   const [filterTrending, setFilterTrending] = useState(searchParams.get('trending') ?? '')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isFilterProcessing, setIsFilterProcessing] = useState(false)
   const [cities, setCities] = useState<{ id: string; name: string }[]>([])
+  const [isLoadingCities, setIsLoadingCities] = useState(false)
   const showRegionFilter = isAdmin && !!provinces
+  const hasActiveFilter =
+    !!defaultDateFrom ||
+    !!defaultDateTo ||
+    searchParams.has('dateFrom') ||
+    searchParams.has('dateTo') ||
+    searchParams.has('status') ||
+    searchParams.has('category') ||
+    searchParams.has('jenis') ||
+    searchParams.has('trending') ||
+    searchParams.has('provinceId') ||
+    searchParams.has('cityId')
 
   useEffect(() => {
     if (!showRegionFilter) return
     let cancelled = false
     async function load() {
       if (!filterProvinceId) {
-        if (!cancelled) setCities([])
+        if (!cancelled) {
+          setCities([])
+          setIsLoadingCities(false)
+        }
         return
       }
-      const next = await getCities(filterProvinceId)
-      if (!cancelled) setCities(next)
+      setCities([])
+      setIsLoadingCities(true)
+      try {
+        const next = await getCities(filterProvinceId)
+        if (!cancelled) setCities(next)
+      } catch {
+        if (!cancelled) setCities([])
+      } finally {
+        if (!cancelled) setIsLoadingCities(false)
+      }
     }
     void load()
     return () => { cancelled = true }
@@ -303,7 +352,6 @@ export default function PostsTable({
       ['dateTo', dateToValue],
       ['status', filterStatus],
       ['category', filterCategory],
-      ['search', searchValue],
     ]
 
     if (variant === 'default') entries.push(['jenis', filterJenis])
@@ -322,159 +370,229 @@ export default function PostsTable({
     const query = params.toString()
     const nextHref = query ? `${basePath}?${query}` : basePath
     const currentHref = searchParams.toString() ? `${basePath}?${searchParams.toString()}` : basePath
-    if (nextHref === currentHref) return
+    if (nextHref === currentHref) {
+      setIsFilterOpen(false)
+      return
+    }
 
+    setIsFilterOpen(false)
     setIsFilterProcessing(true)
     startTransition(() => {
-      router.push(nextHref)
+      router.push(nextHref, { scroll: false })
     })
   }
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const nextSearch = searchValue.trim()
     const currentSearch = searchParams.get('search') ?? ''
-    if (searchValue === currentSearch) return
+    if (nextSearch === currentSearch) return
 
-    updateParam('search', searchValue)
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextSearch) params.set('search', nextSearch)
+    else params.delete('search')
+    params.delete('page')
+
+    const query = params.toString()
+    setIsFilterProcessing(true)
+    startTransition(() => {
+      router.push(query ? `${basePath}?${query}` : basePath, { scroll: false })
+    })
   }
 
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <form onSubmit={applyFilters} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
-          <input
-            type="date"
-            value={filterDateFrom}
-            disabled={isPending}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
-          <input
-            type="date"
-            value={filterDateTo}
-            disabled={isPending}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          />
-        </label>
-        {showRegionFilter && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">Propinsi</span>
-            <select
-              value={filterProvinceId}
-              disabled={isPending}
-              onChange={(e) => {
-                setFilterProvinceId(e.target.value)
-                setFilterCityId('')
-              }}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+          <TablePageSizeSelect value={pageSize} />
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <form onSubmit={applySearch} className="flex w-full items-center gap-2 sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500 dark:text-neutral-400" />
+                <input
+                  type="search"
+                  placeholder="Search..."
+                  value={searchValue}
+                  disabled={isPending}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  className="ui-search-with-icon h-10 w-full rounded-xl border border-neutral-300 bg-white py-2 pl-11 pr-4 text-sm text-neutral-900 transition placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:placeholder:text-neutral-500 dark:focus:ring-white"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex flex-none items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              >
+                {isPending ? <SpinnerIcon /> : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                )}
+                {isPending ? 'Memproses...' : 'Cari'}
+              </button>
+            </form>
+            <button
+              type="button"
+              aria-expanded={isFilterOpen}
+              aria-controls="posts-table-filter"
+              onClick={() => setIsFilterOpen((open) => !open)}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                isFilterOpen || hasActiveFilter
+                  ? 'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700 dark:border-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100'
+                  : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800'
+              }`}
             >
-              <option value="">Semua Propinsi</option>
-              {provinces!.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {showRegionFilter && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota</span>
-            <select
-              value={filterCityId}
-              disabled={!filterProvinceId || isPending}
-              onChange={(e) => setFilterCityId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition disabled:opacity-50"
-            >
-              <option value="">Semua Kota</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {variant === 'default' && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">Jenis</span>
-            <select
-              value={filterJenis}
-              disabled={isPending}
-              onChange={(e) => setFilterJenis(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-            >
-              <option value="">Semua jenis</option>
-              <option value="upload">Upload</option>
-              <option value="amplifikasi">Amplifikasi</option>
-            </select>
-          </label>
-        )}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
-          <select
-            value={filterStatus}
-            disabled={isPending}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
+              <SlidersIcon className="h-4 w-4" />
+              Filter
+            </button>
+          </div>
+        </div>
+
+        {isFilterOpen && (
+          <form
+            id="posts-table-filter"
+            onSubmit={applyFilters}
+            className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <option value="">Semua status</option>
-            <option value="pending">Pending</option>
-            <option value="valid">Valid</option>
-            <option value="invalid">Invalid</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">Media Sosial</span>
-          <select
-            value={filterCategory}
-            disabled={isPending}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-          >
-            <option value="">Semua Media Sosial</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {showTrendingColumn && (
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">Trending</span>
-            <select
-              value={filterTrending}
-              disabled={isPending}
-              onChange={(e) => setFilterTrending(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white transition"
-            >
-              <option value="">Semua</option>
-              <option value="true">Ya</option>
-              <option value="false">Tidak</option>
-            </select>
-          </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Awal</span>
+              <input
+                type="date"
+                value={filterDateFrom}
+                disabled={isPending}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Tanggal Akhir</span>
+              <input
+                type="date"
+                value={filterDateTo}
+                disabled={isPending}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </label>
+            {showRegionFilter && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Provinsi</span>
+                <select
+                  value={filterProvinceId}
+                  disabled={isPending}
+                  onChange={(e) => {
+                    setFilterProvinceId(e.target.value)
+                    setFilterCityId('')
+                  }}
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+                >
+                  <option value="">Semua Provinsi</option>
+                  {provinces!.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {showRegionFilter && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Kota</span>
+                <select
+                  value={filterCityId}
+                  disabled={!filterProvinceId || isPending || isLoadingCities}
+                  onChange={(e) => setFilterCityId(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+                >
+                  <option value="">{isLoadingCities ? 'Memuat kota...' : 'Semua Kota'}</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {variant === 'default' && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Jenis</span>
+                <select
+                  value={filterJenis}
+                  disabled={isPending}
+                  onChange={(e) => setFilterJenis(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+                >
+                  <option value="">Semua jenis</option>
+                  <option value="upload">Upload</option>
+                  <option value="amplifikasi">Amplifikasi</option>
+                </select>
+              </label>
+            )}
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Status</span>
+              <select
+                value={filterStatus}
+                disabled={isPending}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              >
+                <option value="">Semua status</option>
+                <option value="pending">Pending</option>
+                <option value="valid">Valid</option>
+                <option value="invalid">Invalid</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Media Sosial</span>
+              <select
+                value={filterCategory}
+                disabled={isPending}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              >
+                <option value="">Semua Media Sosial</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {showTrendingColumn && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Trending</span>
+                <select
+                  value={filterTrending}
+                  disabled={isPending}
+                  onChange={(e) => setFilterTrending(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+                >
+                  <option value="">Semua</option>
+                  <option value="true">Ya</option>
+                  <option value="false">Tidak</option>
+                </select>
+              </label>
+            )}
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <button
+                type="submit"
+                disabled={isFilterProcessing}
+                className="inline-flex ui-button-sm gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              >
+                {isFilterProcessing ? <SpinnerIcon /> : (
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {isFilterProcessing ? 'Memproses...' : 'Apply'}
+              </button>
+              <Link
+                href={basePath}
+                className="inline-flex ui-button rounded-lg border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                Reset
+              </Link>
+            </div>
+          </form>
         )}
-        <button
-          type="submit"
-          disabled={isFilterProcessing}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-        >
-          {isFilterProcessing ? (
-            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
-              <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
-            </svg>
-          ) : (
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6 12h12m-8 7.5h4" />
-            </svg>
-          )}
-          {isFilterProcessing ? 'Memproses...' : 'Filter'}
-        </button>
-      </form>
+      </div>
 
       {/* Bulk Action Bar */}
       {isAdmin && selectedIds.size > 0 && (
@@ -498,27 +616,6 @@ export default function PostsTable({
       </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TablePageSizeSelect value={pageSize} />
-        <form onSubmit={applySearch} className="flex w-full justify-end gap-2 sm:w-auto">
-          <input
-            type="search"
-            placeholder="Cari..."
-            value={searchValue}
-            disabled={isPending}
-            onChange={(e) => setSearchValue(e.target.value)}
-            className="min-w-0 w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 sm:w-72 sm:max-w-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:focus:ring-white"
-          />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="inline-flex w-auto flex-none items-center justify-center whitespace-nowrap rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-          >
-            Cari
-          </button>
-        </form>
-      </div>
-
       {/* Table */}
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
         <div className="overflow-x-auto">
@@ -538,7 +635,7 @@ export default function PostsTable({
                 <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32">
                   <button
                     onClick={() => updateParam('sort', currentSort === 'asc' ? 'desc' : 'asc')}
-                    className="flex items-center gap-1 hover:text-neutral-900 dark:hover:text-white transition"
+                    className="ui-button-unstyled flex items-center gap-1 transition hover:text-neutral-900 dark:hover:text-white"
                   >
                     Tanggal
                     {currentSort === 'asc' ? (
@@ -621,7 +718,7 @@ export default function PostsTable({
                       <td key={`filter-skeleton-${rowIndex}-${colIndex}`} className="px-4 py-3">
                         <div
                           className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${
-                            colIndex === 0 ? 'h-4 w-16' : colIndex === columnCount - 1 ? 'h-7 w-16' : 'h-4 w-24'
+                            colIndex === 0 ? 'h-4 w-16' : colIndex === columnCount - 1 ? 'h-8 w-16' : 'h-4 w-24'
                           }`}
                         />
                       </td>
@@ -747,7 +844,7 @@ export default function PostsTable({
                           href={post.title}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="inline-flex ui-button-sm items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Buka
                         </a>
@@ -755,7 +852,7 @@ export default function PostsTable({
                         <button
                           type="button"
                           onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
-                          className="font-medium text-neutral-900 dark:text-white line-clamp-1 font-mono text-left hover:underline cursor-pointer"
+                          className="ui-button-unstyled line-clamp-1 cursor-pointer text-left font-mono font-medium text-neutral-900 hover:underline dark:text-white"
                         >
                           {post.title}
                         </button>
@@ -862,14 +959,14 @@ export default function PostsTable({
                             <span
                               aria-disabled="true"
                               title={actionsDisabledMessage ?? 'Aksi sedang dinonaktifkan.'}
-                              className="cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
+                              className="inline-flex ui-button-sm cursor-not-allowed rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs text-neutral-400 dark:border-neutral-800 dark:text-neutral-600"
                             >
                               Edit
                             </span>
                           ) : (
                             <Link
                               href={buildEditHref(post.id)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition"
+                              className="inline-flex ui-button-sm rounded-lg border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                             >
                               Edit
                             </Link>
@@ -963,7 +1060,7 @@ export default function PostsTable({
               </h3>
               <button
                 onClick={closeModal}
-                className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition flex-shrink-0"
+                className="ui-button-icon flex-shrink-0 text-neutral-400 transition hover:text-neutral-900 dark:hover:text-white"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -993,7 +1090,7 @@ export default function PostsTable({
                       href={modal.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
+                      className="inline-flex ui-button items-center gap-2 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                     >
                       Buka Link
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

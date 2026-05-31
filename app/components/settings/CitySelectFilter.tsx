@@ -9,9 +9,10 @@ type Props = {
   defaultCityId?: string
   defaultCityName?: string
   label?: string
+  disabled?: boolean
 }
 
-export default function CitySelectFilter({ defaultCityId, defaultCityName, label = 'Kota' }: Props) {
+export default function CitySelectFilter({ defaultCityId, defaultCityName, label = 'Kota', disabled = false }: Props) {
   const [selected, setSelected] = useState<City | null>(
     defaultCityId && defaultCityName
       ? { id: defaultCityId, name: defaultCityName }
@@ -81,12 +82,13 @@ export default function CitySelectFilter({ defaultCityId, defaultCityName, label
 
       {selected ? (
         /* Show selected city with clear button */
-        <div className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-950">
+        <div className={`flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-950 ${disabled ? 'opacity-50' : ''}`}>
           <span className="flex-1 truncate text-neutral-900 dark:text-white">{selected.name}</span>
           <button
             type="button"
             onClick={clear}
-            className="shrink-0 text-neutral-400 transition hover:text-neutral-700 dark:hover:text-neutral-200"
+            disabled={disabled}
+            className="ui-button-unstyled shrink-0 text-neutral-400 transition hover:text-neutral-700 disabled:cursor-not-allowed dark:hover:text-neutral-200"
             aria-label="Hapus pilihan kota"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,7 +107,8 @@ export default function CitySelectFilter({ defaultCityId, defaultCityName, label
             onFocus={() => { if (results.length > 0) setOpen(true) }}
             placeholder="Cari kota..."
             autoComplete="off"
-            className={`${baseCls} pr-8`}
+            disabled={disabled}
+            className={`${baseCls} pr-8 disabled:opacity-50`}
           />
           {loading ? (
             <div className="absolute right-2.5 top-1/2 -translate-y-1/2">

@@ -11,14 +11,15 @@ export default function PostsLoading() {
             <SkeletonBlock className="h-8 w-40" />
             <SkeletonBlock className="h-4 w-32" />
           </div>
-          <SkeletonBlock className="h-11 w-36" />
+          <SkeletonBlock className="h-10 w-36" />
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <SkeletonBlock className="h-11 flex-1 min-w-[180px]" />
-          <SkeletonBlock className="h-11 sm:w-48" />
-          <SkeletonBlock className="h-11 sm:w-40" />
-          <SkeletonBlock className="h-11 sm:w-40" />
+        <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+          <SkeletonBlock className="h-10 w-44 rounded-lg" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <SkeletonBlock className="h-10 w-full rounded-xl sm:w-80" />
+            <SkeletonBlock className="h-10 w-28 rounded-xl" />
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">

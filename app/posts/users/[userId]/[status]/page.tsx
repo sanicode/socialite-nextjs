@@ -16,10 +16,42 @@ type SearchParams = Promise<{
   category?: string
   dateFrom?: string
   dateTo?: string
+  search?: string
+  provinceId?: string
+  cityId?: string
   trending?: string
 }>
 
 type PostStatus = 'pending' | 'valid' | 'invalid'
+
+function getJakartaDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
+  return new Date(`${dateString}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}+07:00`)
+}
+
+function normalizeDateParam(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const parsed = new Date(`${value}T00:00:00+07:00`)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return getJakartaDateString(parsed) === value ? value : undefined
+}
+
+function buildPostsUsersHref(params: Record<string, string | undefined>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value)
+  }
+  const qs = query.toString()
+  return qs ? `/posts/users?${qs}` : '/posts/users'
+}
 
 export default async function UserPostsByStatusPage({
   params,
@@ -33,7 +65,9 @@ export default async function UserPostsByStatusPage({
   if (!user.roles.some(role => ['admin', 'manager'].includes(role))) redirect('/posts/upload')
 
   const { userId, status } = await params
-  const { jenis, category, dateFrom, dateTo, trending } = await searchParams
+  const { jenis, category, dateFrom: rawDateFrom, dateTo: rawDateTo, search, provinceId, cityId, trending } = await searchParams
+  const dateFrom = normalizeDateParam(rawDateFrom)
+  const dateTo = normalizeDateParam(rawDateTo)
   const reportingWindowDecision = await getNonAdminReportingWindowDecision(user.roles)
   const reportingWindowClosed = !reportingWindowDecision.allowed
 
@@ -55,7 +89,10 @@ export default async function UserPostsByStatusPage({
     if (!canAccessTarget) redirect('/posts/users')
   }
 
-  const categories = await prisma.blog_post_categories.findMany({ orderBy: { name: 'asc' } })
+  const categories = await prisma.blog_post_categories.findMany({
+    where: { is_active: true, deleted_at: null },
+    orderBy: { name: 'asc' },
+  })
 
   const where: Prisma.blog_postsWhereInput = {
     user_id: userData.id,
@@ -65,8 +102,8 @@ export default async function UserPostsByStatusPage({
     ...(trending === 'true' ? { is_trending: true } : trending === 'false' ? { is_trending: false } : {}),
     ...(dateFrom || dateTo ? {
       created_at: {
-        ...(dateFrom ? { gte: new Date(dateFrom + 'T00:00:00') } : {}),
-        ...(dateTo   ? { lte: new Date(dateTo   + 'T23:59:59') } : {}),
+        ...(dateFrom ? { gte: getJakartaDateBounds(dateFrom, false) } : {}),
+        ...(dateTo ? { lte: getJakartaDateBounds(dateTo, true) } : {}),
       },
     } : {}),
   }
@@ -132,7 +169,7 @@ export default async function UserPostsByStatusPage({
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
-            href="/posts/users"
+            href={buildPostsUsersHref({ dateFrom, dateTo, search, provinceId, cityId })}
             className="text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition"
           >
             ← Kembali

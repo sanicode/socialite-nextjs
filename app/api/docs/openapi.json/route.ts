@@ -183,6 +183,8 @@ const spec: OpenApiSpec = {
         properties: {
           id: { type: 'string', example: '3' },
           name: { type: 'string', example: 'Instagram' },
+          is_required: { type: 'boolean', example: true },
+          url_rules: { type: 'object', nullable: true, additionalProperties: true },
         },
       },
       Province: {
@@ -944,6 +946,8 @@ const spec: OpenApiSpec = {
                 required: ['status'],
                 properties: {
                   status: { type: 'string', enum: ['pending', 'valid', 'invalid'] },
+                  date_from: { type: 'string', format: 'date', description: 'Awal rentang validasi manager. Default tanggal Jakarta hari ini.' },
+                  date_to: { type: 'string', format: 'date', description: 'Akhir rentang validasi manager. Default tanggal Jakarta hari ini.' },
                 },
               },
             },

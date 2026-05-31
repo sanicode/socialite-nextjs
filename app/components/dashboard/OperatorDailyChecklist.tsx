@@ -122,14 +122,14 @@ export default function OperatorDailyChecklist({
                 <span
                   aria-disabled="true"
                   title={reportingWindowMessage ?? 'Pelaporan operator sedang ditutup.'}
-                  className="cursor-not-allowed rounded-lg bg-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
+                  className="inline-flex ui-button-sm cursor-not-allowed rounded-lg bg-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
                 >
                   Tambah Upload
                 </span>
                 <span
                   aria-disabled="true"
                   title={reportingWindowMessage ?? 'Pelaporan operator sedang ditutup.'}
-                  className="cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600"
+                  className="inline-flex ui-button-sm cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600"
                 >
                   Tambah Amplifikasi
                 </span>
@@ -138,13 +138,13 @@ export default function OperatorDailyChecklist({
               <>
                 <Link
                   href="/posts/upload/new"
-                  className="rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                  className="inline-flex ui-button-sm rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                 >
                   Tambah Upload
                 </Link>
                 <Link
                   href="/posts/amplifikasi/new"
-                  className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="inline-flex ui-button-sm rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
                 >
                   Tambah Amplifikasi
                 </Link>

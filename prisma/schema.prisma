@@ -42,13 +42,16 @@ model announcements {
 }
 
 model blog_post_categories {
-  id         BigInt       @id @default(autoincrement())
-  name       String       @db.VarChar(255)
-  slug       String       @unique(map: "blog_post_categories_slug_unique") @db.VarChar(255)
-  created_at DateTime?    @db.Timestamp(0)
-  updated_at DateTime?    @db.Timestamp(0)
-  deleted_at DateTime?    @db.Timestamp(0)
-  blog_posts blog_posts[]
+  id          BigInt       @id @default(autoincrement())
+  name        String       @db.VarChar(255)
+  slug        String       @unique(map: "blog_post_categories_slug_unique") @db.VarChar(255)
+  is_active   Boolean      @default(true)
+  is_required Boolean      @default(false)
+  url_rules   Json?        @db.JsonB
+  created_at  DateTime?    @db.Timestamp(0)
+  updated_at  DateTime?    @db.Timestamp(0)
+  deleted_at  DateTime?    @db.Timestamp(0)
+  blog_posts  blog_posts[]
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.

@@ -605,10 +605,12 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%instagram%') AS instagram_link,
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%facebook%') AS facebook_link,
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%youtube%') AS youtube_link,
+      MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%threads%') AS threads_link,
       MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 1) AS amplifikasi_1,
       MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 2) AS amplifikasi_2,
       MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 3) AS amplifikasi_3,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4,
+      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 5) AS amplifikasi_5
     FROM numbered
     GROUP BY tanggal_pelaporan, email, nama_operator, no_hp, propinsi, kabupaten_kota
     HAVING COUNT(*) FILTER (WHERE source_url = 'upload') > 0

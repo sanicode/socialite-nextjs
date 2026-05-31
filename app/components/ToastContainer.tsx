@@ -56,7 +56,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           <p className={`text-xs mt-0.5 leading-snug ${SUB_STYLES[toast.type]}`}>{toast.message}</p>
         )}
       </div>
-      <button onClick={onDismiss} className={`shrink-0 mt-0.5 transition ${CLOSE_STYLES[toast.type]}`}>
+      <button onClick={onDismiss} className={`ui-button-icon-sm mt-0.5 shrink-0 transition ${CLOSE_STYLES[toast.type]}`}>
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>

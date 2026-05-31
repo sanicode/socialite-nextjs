@@ -132,6 +132,7 @@ export async function getTenants(params: {
   page?: number
   pageSize?: TablePageSize
   search?: string
+  provinceId?: string
   cityId?: string
   sortBy?: string
   sortDir?: string
@@ -147,12 +148,36 @@ export async function getTenants(params: {
   const qParams: unknown[]   = []
   let idx = 1
 
-  if (params.search) {
-    conditions.push(`(t.name ILIKE $${idx} OR t.domain ILIKE $${idx})`)
-    qParams.push(`%${params.search}%`)
+  const search = params.search?.trim()
+  if (search) {
+    conditions.push(`(
+      t.name ILIKE $${idx}
+      OR t.domain ILIKE $${idx}
+      OR EXISTS (
+        SELECT 1
+        FROM addresses a
+        LEFT JOIN reg_cities rc ON rc.id = a.city_id
+        WHERE a.tenant_id = t.id
+          AND (a.city ILIKE $${idx} OR rc.name ILIKE $${idx})
+        LIMIT 1
+      )
+    )`)
+    qParams.push(`%${search}%`)
     idx++
   }
-  if (params.cityId) {
+  if (params.provinceId && /^\d+$/.test(params.provinceId)) {
+    conditions.push(`EXISTS (
+      SELECT 1
+      FROM addresses a
+      LEFT JOIN reg_cities rc ON rc.id = a.city_id
+      WHERE a.tenant_id = t.id
+        AND (a.province_id = $${idx} OR rc.province_id = $${idx})
+      LIMIT 1
+    )`)
+    qParams.push(parseInt(params.provinceId, 10))
+    idx++
+  }
+  if (params.cityId && /^\d+$/.test(params.cityId)) {
     conditions.push(
       `EXISTS (SELECT 1 FROM addresses WHERE tenant_id = t.id AND city_id = $${idx} LIMIT 1)`
     )

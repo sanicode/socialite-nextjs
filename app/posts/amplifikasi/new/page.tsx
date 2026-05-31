@@ -31,7 +31,7 @@ export default async function NewAmplifikasiPage() {
             ← Kembali
           </Link>
           <span className="text-neutral-300 dark:text-neutral-700">/</span>
-          <h1 className="text-xl font-bold text-neutral-900 dark:text-white">Buat Laporan Amplifikasi</h1>
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-white">Tambah Laporan Amplifikasi</h1>
         </div>
 
         <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-6">

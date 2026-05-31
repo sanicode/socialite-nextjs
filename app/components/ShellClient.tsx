@@ -57,7 +57,7 @@ export default function ShellClient({ user, appName, showSummary, showDashboard,
           {/* Hamburger menu — mobile only */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-1 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition md:hidden"
+            className="ui-button-icon -ml-1 rounded-lg p-2 text-neutral-500 transition hover:bg-neutral-100 dark:hover:bg-neutral-800 md:hidden"
             aria-label="Buka menu"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

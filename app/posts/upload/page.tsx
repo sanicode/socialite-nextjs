@@ -84,16 +84,16 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
               <span
                 aria-disabled="true"
                 title={reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.'}
-                className="cursor-not-allowed rounded-lg bg-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
+                className="inline-flex ui-button-sm cursor-not-allowed rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
               >
-                + Buat Laporan Upload
+                + Tambah Laporan Upload
               </span>
             ) : (
               <Link
                 href="/posts/upload/new"
-                className="px-4 py-2.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-100 transition"
+                className="inline-flex ui-button-sm rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
-                + Buat Laporan Upload
+                + Tambah Laporan Upload
               </Link>
             )
           )}

@@ -52,7 +52,7 @@ export default function UserMenu({ name, email, role, tenantName }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-label="Buka menu pengguna"
         aria-expanded={open}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-900 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+        className="ui-button-icon flex items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-900 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
       >
         <span className="w-8 h-8 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center text-xs font-bold flex-shrink-0 select-none">
           {getInitials(name)}

@@ -1,10 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
-import { getUsers } from '@/app/actions/users'
-import UsersClientSection from '@/app/components/settings/UsersClientSection'
-import AddUserButton from '@/app/components/settings/AddUserButton'
-import ImportUsersButton from '@/app/components/settings/ImportUsersButton'
+import { getSocialMediaCategories } from '@/app/actions/social-media-categories'
+import SocialMediaCategoriesClientSection from '@/app/components/settings/SocialMediaCategoriesClientSection'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
@@ -12,43 +10,53 @@ type SearchParams = Promise<{
   pageSize?: string
   search?: string
   status?: string
-  loginSecurity?: string
-  dateFrom?: string
-  dateTo?: string
+  createdFrom?: string
+  createdTo?: string
+  updatedFrom?: string
+  updatedTo?: string
   sortBy?: string
   sortDir?: string
 }>
 
 const DEFAULT_PAGE_SIZE = 20
 
-function buildUsersHref(params: Record<string, string | undefined>) {
+function buildSocialMediaCategoriesHref(params: Record<string, string | undefined>) {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value) query.set(key, value)
   }
   const qs = query.toString()
-  return qs ? `/settings/users?${qs}` : '/settings/users'
+  return qs ? `/settings/jenis-medsos?${qs}` : '/settings/jenis-medsos'
 }
 
-export default async function UsersPage({ searchParams }: { searchParams: SearchParams }) {
+function normalizeSortBy(value: string | undefined) {
+  return ['name', 'slug', 'is_required', 'is_active', 'created_at', 'updated_at'].includes(value ?? '')
+    ? value as string
+    : 'name'
+}
+
+export default async function SocialMediaCategoriesPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await getSessionUser()
   if (!user) redirect('/login')
   if (!user.roles.includes('admin')) redirect('/posts')
 
   const params = await searchParams
-  const page   = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
   const pageSize = parseTablePageSize(params.pageSize, DEFAULT_PAGE_SIZE)
+  const sortBy = normalizeSortBy(params.sortBy)
+  const sortDir = params.sortDir === 'desc' ? 'desc' : 'asc'
 
-  const { users, total, totalBlocked, totalUnderAttack, totalRateLimited } = await getUsers({
+  const { categories, total, totalActive, totalInactive, totalRequired } = await getSocialMediaCategories({
     page,
     pageSize,
-    search:   params.search,
-    status:   params.status,
-    loginSecurity: params.loginSecurity,
-    dateFrom: params.dateFrom,
-    dateTo:   params.dateTo,
-    sortBy:   params.sortBy,
-    sortDir:  params.sortDir,
+    search: params.search,
+    status: params.status,
+    createdFrom: params.createdFrom,
+    createdTo: params.createdTo,
+    updatedFrom: params.updatedFrom,
+    updatedTo: params.updatedTo,
+    sortBy,
+    sortDir,
   })
 
   const { totalPages, start, end } = getPageSlice(page, pageSize, total)
@@ -56,42 +64,36 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
-            <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Users</h1>
-            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              Kelola akun pengguna, status blokir, dan reset rate limit login.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <ImportUsersButton />
-            <AddUserButton />
-          </div>
+        <div>
+          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
+          <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Jenis Medsos</h1>
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+            Kelola jenis media sosial yang digunakan pada laporan dan posting medsos.
+          </p>
         </div>
 
-        <UsersClientSection
-          key={`${params.search ?? ''}-${params.status ?? ''}-${params.loginSecurity ?? ''}-${params.dateFrom ?? ''}-${params.dateTo ?? ''}-${params.pageSize ?? ''}-${params.sortBy ?? ''}-${params.sortDir ?? ''}`}
-          users={users}
-          totalBlocked={totalBlocked}
-          totalUnderAttack={totalUnderAttack}
-          totalRateLimited={totalRateLimited}
+        <SocialMediaCategoriesClientSection
+          key={`${params.search ?? ''}-${params.status ?? ''}-${params.createdFrom ?? ''}-${params.createdTo ?? ''}-${params.updatedFrom ?? ''}-${params.updatedTo ?? ''}-${params.pageSize ?? ''}-${sortBy}-${sortDir}`}
+          categories={categories}
+          totalActive={totalActive}
+          totalInactive={totalInactive}
+          totalRequired={totalRequired}
           params={params}
           pageSize={pageSize}
+          sortBy={sortBy}
+          sortDir={sortDir}
         />
 
-        {/* Pagination */}
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {total > 0
-              ? `${start}–${end} dari ${total.toLocaleString('id-ID')} user`
-              : '0 user'}
+              ? `${start}-${end} dari ${total.toLocaleString('id-ID')} entri`
+              : '0 entri'}
           </p>
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
               <Link
-                href={buildUsersHref({ ...params, page: '1' })}
+                href={buildSocialMediaCategoriesHref({ ...params, page: '1' })}
                 className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
@@ -101,7 +103,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
                 First
               </Link>
               <Link
-                href={buildUsersHref({ ...params, page: String(Math.max(1, page - 1)) })}
+                href={buildSocialMediaCategoriesHref({ ...params, page: String(Math.max(1, page - 1)) })}
                 className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === 1
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
@@ -114,7 +116,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
                 Hal. {page} / {totalPages}
               </span>
               <Link
-                href={buildUsersHref({ ...params, page: String(Math.min(totalPages, page + 1)) })}
+                href={buildSocialMediaCategoriesHref({ ...params, page: String(Math.min(totalPages, page + 1)) })}
                 className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
@@ -124,7 +126,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
                 Next
               </Link>
               <Link
-                href={buildUsersHref({ ...params, page: String(totalPages) })}
+                href={buildSocialMediaCategoriesHref({ ...params, page: String(totalPages) })}
                 className={`ui-button-sm inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition ${
                   page === totalPages
                     ? 'pointer-events-none border-neutral-200 text-neutral-400 dark:border-neutral-700'
@@ -136,7 +138,6 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
             </div>
           )}
         </div>
-
       </div>
     </div>
   )
