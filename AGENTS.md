@@ -432,7 +432,7 @@ The search form is a `flex` container wrapping the input and the Cari submit but
   <button
     type="submit"
     disabled={processing}
-    className="inline-flex flex-none items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+    className="inline-flex flex-none items-center justify-center gap-2 rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
   >
     {processing ? <SpinnerIcon /> : <SearchIcon className="h-4 w-4" />}
     {processing ? 'Memproses...' : 'Cari'}

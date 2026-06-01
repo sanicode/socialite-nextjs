@@ -3,8 +3,6 @@ import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/app/lib/session'
 import { getUsers } from '@/app/actions/users'
 import UsersClientSection from '@/app/components/settings/UsersClientSection'
-import AddUserButton from '@/app/components/settings/AddUserButton'
-import ImportUsersButton from '@/app/components/settings/ImportUsersButton'
 import { getPageSlice, parseTablePageSize } from '@/app/lib/table-pagination'
 
 type SearchParams = Promise<{
@@ -65,10 +63,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
               Kelola akun pengguna, status blokir, dan reset rate limit login.
             </p>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
+          {/* <div className="flex flex-wrap justify-end gap-2">
             <ImportUsersButton />
             <AddUserButton />
-          </div>
+          </div> */}
         </div>
 
         <UsersClientSection

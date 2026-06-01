@@ -8,6 +8,8 @@ import UsersTable from '@/app/components/settings/UsersTable'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import type { UserRow } from '@/app/actions/users'
 import type { TablePageSize } from '@/app/lib/table-pagination'
+import AddUserButton from '@/app/components/settings/AddUserButton'
+import ImportUsersButton from '@/app/components/settings/ImportUsersButton'
 
 type UsersParams = {
   pageSize?: string
@@ -74,7 +76,7 @@ export default function UsersClientSection({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
-  const [isOpen, setIsOpen] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
   const [search, setSearch] = useState(params.search ?? '')
   const [status, setStatus] = useState(params.status ?? '')
@@ -124,7 +126,7 @@ export default function UsersClientSection({
     })
     const currentHref = searchParamsString ? `/settings/users?${searchParamsString}` : '/settings/users'
     if (nextHref === currentHref) {
-      setIsOpen(false)
+      setisFilterOpen(false)
       return
     }
 
@@ -136,6 +138,10 @@ export default function UsersClientSection({
 
   return (
     <>
+      <div className="flex flex-wrap justify-end gap-2">
+        <ImportUsersButton />
+        <AddUserButton />
+      </div>
       <div className="space-y-3">
         <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
           <TablePageSizeSelect value={pageSize} />
@@ -155,7 +161,7 @@ export default function UsersClientSection({
               <button
                 type="submit"
                 disabled={processing}
-                className="inline-flex flex-none items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex flex-none items-center justify-center gap-2 rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
               >
                 {processing ? <SpinnerIcon /> : (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -167,11 +173,11 @@ export default function UsersClientSection({
             </form>
             <button
               type="button"
-              aria-expanded={isOpen}
+              aria-expanded={isFilterOpen}
               aria-controls="users-filter"
-              onClick={() => setIsOpen((open) => !open)}
+              onClick={() => setIsFilterOpen((open) => !open)}
               className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
-                isOpen || hasActiveFilter
+                isFilterOpen || hasActiveFilter
                   ? 'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700 dark:border-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100'
                   : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800'
               }`}
@@ -182,7 +188,7 @@ export default function UsersClientSection({
           </div>
         </div>
 
-        {isOpen && (
+        {isFilterOpen && (
           <form
             id="users-filter"
             onSubmit={applyFilters}
@@ -239,7 +245,7 @@ export default function UsersClientSection({
               <button
                 type="submit"
                 disabled={processing}
-                className="inline-flex ui-button-sm gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex ui-button-sm gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
                 {processing ? <SpinnerIcon /> : (
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -250,7 +256,7 @@ export default function UsersClientSection({
               </button>
               <Link
                 href="/settings/users"
-                className="inline-flex ui-button rounded-lg border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="inline-flex ui-button-sm gap-2 rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 Reset
               </Link>

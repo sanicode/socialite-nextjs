@@ -150,8 +150,6 @@ export default function PostsTable({
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const showRegionFilter = isAdmin && !!provinces
   const hasActiveFilter =
-    !!defaultDateFrom ||
-    !!defaultDateTo ||
     searchParams.has('dateFrom') ||
     searchParams.has('dateTo') ||
     searchParams.has('status') ||
@@ -160,6 +158,7 @@ export default function PostsTable({
     searchParams.has('trending') ||
     searchParams.has('provinceId') ||
     searchParams.has('cityId')
+  const processing = isPending  
 
   useEffect(() => {
     if (!showRegionFilter) return
@@ -414,36 +413,36 @@ export default function PostsTable({
                   type="search"
                   placeholder="Search..."
                   value={searchValue}
-                  disabled={isPending}
+                  disabled={processing}
                   onChange={(e) => setSearchValue(e.target.value)}
                   className="ui-search-with-icon h-10 w-full rounded-xl border border-neutral-300 bg-white py-2 pl-11 pr-4 text-sm text-neutral-900 transition placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:placeholder:text-neutral-500 dark:focus:ring-white"
                 />
               </div>
               <button
                 type="submit"
-                disabled={isPending}
-                className="inline-flex flex-none items-center justify-center gap-1.5 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                disabled={processing}      
+                className="inline-flex flex-none items-center justify-center gap-2 rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
               >
-                {isPending ? <SpinnerIcon /> : (
+                {processing ? <SpinnerIcon /> : (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 )}
-                {isPending ? 'Memproses...' : 'Cari'}
+                {processing ? 'Memproses...' : 'Cari'}
               </button>
             </form>
             <button
               type="button"
               aria-expanded={isFilterOpen}
-              aria-controls="posts-table-filter"
+              aria-controls="posts-users-date-filter"
               onClick={() => setIsFilterOpen((open) => !open)}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
                 isFilterOpen || hasActiveFilter
                   ? 'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700 dark:border-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100'
                   : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800'
               }`}
             >
-              <SlidersIcon className="h-4 w-4" />
+              <SlidersIcon />
               Filter
             </button>
           </div>
@@ -574,7 +573,7 @@ export default function PostsTable({
               <button
                 type="submit"
                 disabled={isFilterProcessing}
-                className="inline-flex ui-button-sm gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex ui-button-sm gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
                 {isFilterProcessing ? <SpinnerIcon /> : (
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -585,7 +584,7 @@ export default function PostsTable({
               </button>
               <Link
                 href={basePath}
-                className="inline-flex ui-button rounded-lg border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="inline-flex ui-button rounded-xl border border-neutral-300 gap-2 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 Reset
               </Link>
