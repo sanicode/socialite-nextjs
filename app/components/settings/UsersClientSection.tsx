@@ -126,7 +126,7 @@ export default function UsersClientSection({
     })
     const currentHref = searchParamsString ? `/settings/users?${searchParamsString}` : '/settings/users'
     if (nextHref === currentHref) {
-      setisFilterOpen(false)
+      setIsFilterOpen(false)
       return
     }
 
