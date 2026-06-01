@@ -84,14 +84,14 @@ export default async function AmplifikasiPage({ searchParams }: { searchParams: 
               <span
                 aria-disabled="true"
                 title={reportingWindowDecision.message ?? 'Pelaporan operator sedang ditutup.'}
-                className="inline-flex ui-button-sm cursor-not-allowed rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
+                className="inline-flex ui-button cursor-not-allowed rounded-xl bg-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500"
               >
                 + Tambah Laporan Amplifikasi
               </span>
             ) : (
               <Link
                 href="/posts/amplifikasi/new"
-                className="inline-flex ui-button-sm rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex ui-button rounded-xl bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
                 + Tambah Laporan Amplifikasi
               </Link>

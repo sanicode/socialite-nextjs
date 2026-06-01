@@ -573,7 +573,7 @@ export default function PostsTable({
               <button
                 type="submit"
                 disabled={isFilterProcessing}
-                className="inline-flex ui-button-sm gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                className="inline-flex ui-button gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
               >
                 {isFilterProcessing ? <SpinnerIcon /> : (
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -584,7 +584,7 @@ export default function PostsTable({
               </button>
               <Link
                 href={basePath}
-                className="inline-flex ui-button rounded-xl border border-neutral-300 gap-2 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="inline-flex ui-button gap-2 rounded-xl border border-neutral-300 gap-2 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 Reset
               </Link>
