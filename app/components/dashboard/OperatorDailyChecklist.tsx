@@ -79,7 +79,7 @@ export default function OperatorDailyChecklist({
       <div>
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">Dashboard Operator</h1>
         <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          Checklist tugas hari ini untuk laporan upload, amplifikasi, dan YouTube.
+          Checklist tugas hari ini untuk laporan upload dan amplifikasi setiap platform.
         </p>
       </div>
 
@@ -154,7 +154,7 @@ export default function OperatorDailyChecklist({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
+          <table className="w-full min-w-[1320px] border-collapse text-sm">
             <thead>
               <tr className="bg-neutral-50 dark:bg-neutral-800/50">
                 <th

@@ -747,7 +747,7 @@ const spec: OpenApiSpec = {
           '- **upload**: wajib `title` (URL), `media_id` opsional\n' +
           '- **amplifikasi**: `title` opsional, `media_id` wajib\n' +
           '- **default** (tanpa `post_type`): wajib `title` dan `media_id`\n\n' +
-          'Double entry per kategori per hari hanya berlaku untuk `upload` dan default. `amplifikasi` boleh dibuat lebih dari satu kali pada tanggal dan kategori media sosial yang sama.',
+          'Double entry per kategori per hari hanya berlaku untuk `upload` dan default. `amplifikasi` boleh memakai kategori media sosial yang sama lebih dari satu kali. Total `upload` dan `amplifikasi` masing-masing dibatasi sejumlah jenis medsos aktif.',
         requestBody: {
           required: true,
           content: {

@@ -42,7 +42,7 @@ type OperatorDailyPostRow = {
   category_name: string | null
 }
 
-const OPERATOR_CHECKLIST_PLATFORMS = ['Facebook', 'TikTok', 'Instagram', 'YouTube']
+const OPERATOR_CHECKLIST_PLATFORMS = ['Facebook', 'TikTok', 'Instagram', 'YouTube', 'Threads']
 
 function getJakartaDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {

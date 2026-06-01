@@ -11,7 +11,6 @@ import { canUserEditPost } from '@/app/lib/post-edit-access'
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { appendSuccessParam, getPathname, normalizeReturnTo } from '@/app/lib/return-to'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
-import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { deleteSession } from '@/app/lib/session'
 import type { TablePageSize } from '@/app/lib/table-pagination'
 import { canActorReadPost, canActorValidatePost, getUserTenantIds } from '@/app/lib/tenant-access'
@@ -22,6 +21,10 @@ import { queryPostById, queryPosts } from '@/app/lib/posts-query'
 import { getReportLocationByTenantId, type ReportObjectLocation } from '@/app/lib/report-location'
 import { normalizeSocialUrl, normalizeSocialUrlRules, validateSocialUrlForCategory, type SocialUrlRules } from '@/app/lib/social-platform'
 import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
+import {
+  OperatorReportDailyLimitError,
+  withOperatorReportDailyLimit,
+} from '@/app/lib/operator-report-daily-limit'
 import {
   getNonAdminReportingWindowDecision,
   getOperatorReportingWindowDecision,
@@ -683,7 +686,11 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
   const errors: PostErrors = {}
 
-  if (!categoryId) errors.category_id = ['Kategori wajib dipilih.']
+  if (!categoryId) {
+    errors.category_id = ['Kategori wajib dipilih.']
+  } else if (!/^\d+$/.test(categoryId)) {
+    errors.category_id = ['Kategori tidak valid.']
+  }
   if (opts.requireTitle && !rawTitle) errors.title = ['Link upload tidak boleh kosong.']
   if (opts.requireScreenshot) {
     if (!screenshot || screenshot.size === 0) {
@@ -700,17 +707,23 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
   if (Object.keys(errors).length > 0) return { errors }
 
+  const selectedCategory = await prisma.blog_post_categories.findFirst({
+    where: {
+      id: BigInt(categoryId!),
+      is_active: true,
+      deleted_at: null,
+    },
+    select: { name: true, url_rules: true },
+  })
+  if (!selectedCategory) {
+    return { errors: { category_id: ['Kategori medsos tidak aktif atau tidak ditemukan.'] } }
+  }
+
   let categoryForRules: { name: string; url_rules: unknown | null } | null = null
-  if (opts.validateUrl && categoryId && rawTitle) {
-    const category = await prisma.blog_post_categories.findUnique({
-      where: { id: BigInt(categoryId) },
-      select: { name: true, url_rules: true },
-    })
-    if (category) {
-      categoryForRules = category
-      const urlError = validateSocialUrlForCategory(rawTitle, category)
-      if (urlError) return { errors: { title: [urlError] } }
-    }
+  if (opts.validateUrl && rawTitle) {
+    categoryForRules = selectedCategory
+    const urlError = validateSocialUrlForCategory(rawTitle, selectedCategory)
+    if (urlError) return { errors: { title: [urlError] } }
   }
 
   if (opts.sourceUrl === 'upload' && rawTitle) {
@@ -738,22 +751,9 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
       select: { id: true },
     })
     if (existing) {
-      const category = await prisma.blog_post_categories.findUnique({
-        where: { id: BigInt(categoryId) },
-        select: { name: true },
-      })
       return {
-        message: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${category?.name ?? 'ini'}" hari ini. Setiap operator hanya diizinkan satu laporan per kategori per hari.`,
+        message: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${selectedCategory.name}" hari ini. Setiap operator hanya diizinkan satu laporan per kategori per hari.`,
         duplicate: true,
-      }
-    }
-  }
-
-  if (opts.sourceUrl === 'amplifikasi') {
-    const amplifikasiCount = await countUserAmplifikasiToday(sessionUser.id)
-    if (amplifikasiCount >= AMPLIFIKASI_DAILY_LIMIT) {
-      return {
-        message: `Batas amplifikasi hari ini sudah tercapai. Maksimal ${AMPLIFIKASI_DAILY_LIMIT} laporan per hari.`,
       }
     }
   }
@@ -771,22 +771,31 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
       )
     : inputDescription
 
-  const post = await prisma.blog_posts.create({
-    data: {
-      title: storedTitle,
-      slug: generateSlug(storedTitle),
-      body: body || '-',
-      description: storedDescription,
-      status: 'pending',
-      is_published: isPublished,
-      published_at: isPublished ? new Date() : null,
-      user_id: userId,
-      tenant_id: tenantUser?.tenant_id ?? null,
-      blog_post_category_id: categoryId ? BigInt(categoryId) : null,
-      source_url: opts.sourceUrl,
-      created_at: new Date(),
-    },
-  })
+  const postData = {
+    title: storedTitle,
+    slug: generateSlug(storedTitle),
+    body: body || '-',
+    description: storedDescription,
+    status: 'pending',
+    is_published: isPublished,
+    published_at: isPublished ? new Date() : null,
+    user_id: userId,
+    tenant_id: tenantUser?.tenant_id ?? null,
+    blog_post_category_id: BigInt(categoryId!),
+    source_url: opts.sourceUrl,
+    created_at: new Date(),
+  }
+  let post
+  try {
+    post = opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi'
+      ? await withOperatorReportDailyLimit(userId, opts.sourceUrl, (tx) => tx.blog_posts.create({ data: postData }))
+      : await prisma.blog_posts.create({ data: postData })
+  } catch (error) {
+    if (error instanceof OperatorReportDailyLimitError) {
+      return { message: error.message }
+    }
+    throw error
+  }
 
   if (opts.requireScreenshot && screenshot && screenshot.size > 0) {
     const location = await getReportLocationByTenantId(post.tenant_id)

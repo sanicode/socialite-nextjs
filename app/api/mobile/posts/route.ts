@@ -2,7 +2,6 @@ import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api
 import { prisma } from '@/app/lib/prisma'
 import { logEvent } from '@/app/lib/logger'
 import type { JwtPayload } from '@/app/lib/jwt'
-import { AMPLIFIKASI_DAILY_LIMIT, countUserAmplifikasiToday } from '@/app/lib/amplifikasi-limit'
 import { getSocialLinkMetadata } from '@/app/lib/link-metadata'
 import { parseLinkPreviewDescription, stringifyLinkPreviewDescription } from '@/app/lib/link-preview-description'
 import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
@@ -10,6 +9,10 @@ import { getUserTenantIds } from '@/app/lib/tenant-access'
 import { queryPosts } from '@/app/lib/posts-query'
 import { normalizeSocialUrl, validateSocialUrlForCategory } from '@/app/lib/social-platform'
 import { DUPLICATE_UPLOAD_LINK_MESSAGE, findDuplicateUploadLink } from '@/app/lib/upload-link-duplicates'
+import {
+  OperatorReportDailyLimitError,
+  withOperatorReportDailyLimit,
+} from '@/app/lib/operator-report-daily-limit'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,7 +102,15 @@ export async function POST(request: Request) {
     // ── validasi ──
     const errors: Record<string, string> = {}
 
-    if (!category_id) errors.category_id = 'Kategori wajib dipilih.'
+    const categoryId = typeof category_id === 'string' || typeof category_id === 'number'
+      ? String(category_id)
+      : ''
+
+    if (!categoryId) {
+      errors.category_id = 'Kategori wajib dipilih.'
+    } else if (!/^\d+$/.test(categoryId)) {
+      errors.category_id = 'Kategori tidak valid.'
+    }
 
     const requireTitle  = post_type !== 'amplifikasi'
     const requireMedia  = post_type === 'amplifikasi' || post_type === undefined
@@ -114,17 +125,23 @@ export async function POST(request: Request) {
     }
 
     // ── validasi URL per kategori ──
+    const selectedCategory = await prisma.blog_post_categories.findFirst({
+      where: {
+        id: BigInt(categoryId),
+        is_active: true,
+        deleted_at: null,
+      },
+      select: { name: true, url_rules: true },
+    })
+    if (!selectedCategory) {
+      return Response.json({ errors: { category_id: 'Kategori medsos tidak aktif atau tidak ditemukan.' } }, { status: 422 })
+    }
+
     let categoryForRules: { name: string; url_rules: unknown | null } | null = null
-    if (requireTitle && rawTitle && category_id) {
-      const cat = await prisma.blog_post_categories.findUnique({
-        where: { id: BigInt(category_id) },
-        select: { name: true, url_rules: true },
-      })
-      if (cat) {
-        categoryForRules = cat
-        const urlError = validateSocialUrlForCategory(rawTitle, cat)
-        if (urlError) return Response.json({ errors: { title: urlError } }, { status: 422 })
-      }
+    if (requireTitle && rawTitle) {
+      categoryForRules = selectedCategory
+      const urlError = validateSocialUrlForCategory(rawTitle, selectedCategory)
+      if (urlError) return Response.json({ errors: { title: urlError } }, { status: 422 })
     }
 
     if (sourceUrl === 'upload' && rawTitle) {
@@ -134,17 +151,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── amplifikasi punya batas harian terpisah; upload/default tetap dicek per kategori ──
-    if (sourceUrl === 'amplifikasi') {
-      const amplifikasiCount = await countUserAmplifikasiToday(payload.sub)
-      if (amplifikasiCount >= AMPLIFIKASI_DAILY_LIMIT) {
-        return Response.json({
-          error: `Batas amplifikasi hari ini sudah tercapai. Maksimal ${AMPLIFIKASI_DAILY_LIMIT} laporan per hari.`,
-        }, { status: 422 })
-      }
-    }
-
-    if (category_id && sourceUrl !== 'amplifikasi') {
+    if (sourceUrl !== 'amplifikasi') {
       const userId = BigInt(payload.sub)
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
@@ -152,19 +159,15 @@ export async function POST(request: Request) {
       const existing = await prisma.blog_posts.findFirst({
         where: {
           user_id: userId,
-          blog_post_category_id: BigInt(category_id),
+          blog_post_category_id: BigInt(categoryId),
           source_url: sourceUrl,
           created_at: { gte: startOfDay, lte: endOfDay },
         },
         select: { id: true },
       })
       if (existing) {
-        const cat = await prisma.blog_post_categories.findUnique({
-          where: { id: BigInt(category_id) },
-          select: { name: true },
-        })
         return Response.json({
-          error: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${cat?.name ?? 'ini'}" hari ini.`,
+          error: `Double entry terdeteksi! Anda sudah mengirim laporan kategori "${selectedCategory.name}" hari ini.`,
           duplicate: true,
         }, { status: 409 })
       }
@@ -190,22 +193,31 @@ export async function POST(request: Request) {
         )
       : inputDescription
 
-    const post = await prisma.blog_posts.create({
-      data: {
-        title: storedTitle,
-        slug: generateSlug(storedTitle || 'laporan'),
-        body: postBody || '-',
-        description: storedDescription,
-        status: 'pending',
-        is_published: Boolean(is_published),
-        published_at: is_published ? new Date() : null,
-        user_id: userId,
-        tenant_id: tenantUser?.tenant_id ?? null,
-        blog_post_category_id: category_id ? BigInt(category_id) : null,
-        source_url: sourceUrl,
-        created_at: new Date(),
-      },
-    })
+    const postData = {
+      title: storedTitle,
+      slug: generateSlug(storedTitle || 'laporan'),
+      body: postBody || '-',
+      description: storedDescription,
+      status: 'pending',
+      is_published: Boolean(is_published),
+      published_at: is_published ? new Date() : null,
+      user_id: userId,
+      tenant_id: tenantUser?.tenant_id ?? null,
+      blog_post_category_id: BigInt(categoryId),
+      source_url: sourceUrl,
+      created_at: new Date(),
+    }
+    let post
+    try {
+      post = sourceUrl === 'upload' || sourceUrl === 'amplifikasi'
+        ? await withOperatorReportDailyLimit(userId, sourceUrl, (tx) => tx.blog_posts.create({ data: postData }))
+        : await prisma.blog_posts.create({ data: postData })
+    } catch (error) {
+      if (error instanceof OperatorReportDailyLimitError) {
+        return Response.json({ error: error.message }, { status: 422 })
+      }
+      throw error
+    }
 
     // ── link media ──
     if (media_id) {
