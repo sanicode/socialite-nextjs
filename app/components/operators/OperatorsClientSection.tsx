@@ -2,10 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import type { FormEvent } from 'react'
-import OperatorsTable from '@/app/components/operators/OperatorsTable'
-import TableSearchForm from '@/app/components/TableSearchForm'
+import OperatorsTable, { type OperatorsTableHandle } from '@/app/components/operators/OperatorsTable'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
 import type { OperatorRow } from '@/app/actions/operators'
 import type { TablePageSize } from '@/app/lib/table-pagination'
@@ -13,6 +12,7 @@ import type { TablePageSize } from '@/app/lib/table-pagination'
 type Props = {
   operators: OperatorRow[]
   params: {
+    page?: string
     search?: string
     email?: string
     phone?: string
@@ -30,99 +30,193 @@ function buildHref(params: Record<string, string | undefined>) {
   return qs ? `/operators?${qs}` : '/operators'
 }
 
+function SearchIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  )
+}
+
+function SlidersIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h7m4 0h5M4 17h5m4 0h7M11 7a2 2 0 104 0 2 2 0 00-4 0zM9 17a2 2 0 104 0 2 2 0 00-4 0z" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+    </svg>
+  )
+}
+
 export default function OperatorsClientSection({ operators, params, pageSize }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [isFiltering, setIsFiltering] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [search, setSearch] = useState(params.search ?? '')
   const [email, setEmail] = useState(params.email ?? '')
   const [phone, setPhone] = useState(params.phone ?? '')
+  const tableRef = useRef<OperatorsTableHandle>(null)
+  const searchParamsString = searchParams.toString()
+  const processing = isFiltering || isPending
+  const hasActiveFilter = searchParams.has('email') || searchParams.has('phone')
 
-  function applyFilters(event: FormEvent<HTMLFormElement>) {
+  function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextHref = buildHref({
-      search: params.search,
       pageSize: params.pageSize,
-      email,
-      phone,
+      search: search.trim(),
+      email: params.email,
+      phone: params.phone,
     })
-    const currentHref = buildHref({
-      search: searchParams.get('search') ?? undefined,
-      pageSize: searchParams.get('pageSize') ?? undefined,
-      email: searchParams.get('email') ?? undefined,
-      phone: searchParams.get('phone') ?? undefined,
-    })
+    const currentHref = searchParamsString ? `/operators?${searchParamsString}` : '/operators'
     if (nextHref === currentHref) return
 
     setIsFiltering(true)
     startTransition(() => {
-      router.push(nextHref)
+      router.push(nextHref, { scroll: false })
     })
   }
 
-  const processing = isFiltering || isPending
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const nextHref = buildHref({
+      pageSize: params.pageSize,
+      search: params.search,
+      email: email.trim(),
+      phone: phone.trim(),
+    })
+    const currentHref = searchParamsString ? `/operators?${searchParamsString}` : '/operators'
+    if (nextHref === currentHref) {
+      setIsFilterOpen(false)
+      return
+    }
+
+    setIsFilterOpen(false)
+    setIsFiltering(true)
+    startTransition(() => {
+      router.push(nextHref, { scroll: false })
+    })
+  }
 
   return (
     <>
-      <form onSubmit={applyFilters} className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
-        <input
-          type="search"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          disabled={processing}
-          placeholder="Email..."
-          className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-        />
-        <input
-          type="search"
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-          disabled={processing}
-          placeholder="Nomor telp..."
-          className="rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
-        />
-        <div className="flex items-center gap-3 sm:col-span-2">
-          <button
-            type="submit"
-            disabled={processing}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-          >
-            {processing ? (
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-90" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
-              </svg>
-            ) : (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4.5h18M6.75 12h10.5M10.5 19.5h3" />
-              </svg>
-            )}
-            {processing ? 'Memproses...' : 'Filter'}
-          </button>
-          <Link
-            href="/operators"
-            className="inline-flex ui-button rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
-            Reset
-          </Link>
-        </div>
-      </form>
+      {/* <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => tableRef.current?.openAttach()}
+          className="inline-flex ui-button gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Tambah Operator
+        </button>
+      </div> */}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TablePageSizeSelect value={pageSize} />
-        <TableSearchForm
-          action="/operators"
-          defaultValue={params.search}
-          placeholder="Cari nama..."
-          hiddenParams={{
-            pageSize: params.pageSize,
-            email,
-            phone,
-          }}
-        />
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+          <TablePageSizeSelect value={pageSize} />
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <form onSubmit={applySearch} className="flex w-full items-center gap-2 sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500 dark:text-neutral-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  disabled={processing}
+                  placeholder="Search..."
+                  className="ui-search-with-icon h-10 w-full rounded-xl border border-neutral-300 bg-white py-2 pl-11 pr-4 text-sm text-neutral-900 transition placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:placeholder:text-neutral-500 dark:focus:ring-white"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={processing}
+                className="inline-flex flex-none items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              >
+                {processing ? <SpinnerIcon /> : <SearchIcon className="h-4 w-4" />}
+                {processing ? 'Memproses...' : 'Cari'}
+              </button>
+            </form>
+            <button
+              type="button"
+              aria-expanded={isFilterOpen}
+              aria-controls="operators-filter"
+              onClick={() => setIsFilterOpen((open) => !open)}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+                isFilterOpen || hasActiveFilter
+                  ? 'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700 dark:border-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100'
+                  : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-800'
+              }`}
+            >
+              <SlidersIcon />
+              Filter
+            </button>
+          </div>
+        </div>
+
+        {isFilterOpen && (
+          <form
+            id="operators-filter"
+            onSubmit={applyFilters}
+            className="grid grid-cols-1 items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900"
+          >
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Email</span>
+              <input
+                type="search"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={processing}
+                placeholder="Cari email..."
+                className="h-10 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Nomor Telp</span>
+              <input
+                type="search"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                disabled={processing}
+                placeholder="Cari nomor telp..."
+                className="h-10 rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:ring-white"
+              />
+            </label>
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <button
+                type="submit"
+                disabled={processing}
+                className="inline-flex ui-button-sm gap-2 rounded-xl bg-neutral-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+              >
+                {processing ? <SpinnerIcon /> : (
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {processing ? 'Memproses...' : 'Apply'}
+              </button>
+              <Link
+                href="/operators"
+                className="inline-flex ui-button-sm gap-2 rounded-xl border border-neutral-300 px-3.5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                Reset
+              </Link>
+            </div>
+          </form>
+        )}
       </div>
 
-      <OperatorsTable operators={operators} isLoading={processing} />
+      <OperatorsTable ref={tableRef} operators={operators} isLoading={processing} />
     </>
   )
 }

@@ -13,6 +13,7 @@ type SearchParams = Promise<{
   pageSize?: string
   search?: string
   eventType?: string
+  status?: string
   country?: string
   path?: string
   dateFrom?: string
@@ -46,6 +47,7 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
       pageSize,
       search: params.search,
       eventType: params.eventType,
+      status: params.status,
       country: params.country,
       path: params.path,
       dateFrom: params.dateFrom,
@@ -58,26 +60,25 @@ export default async function LogsPage({ searchParams }: { searchParams: SearchP
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-5 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
-            <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Logs</h1>
-            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              Riwayat akses aplikasi, login, dan request yang diblokir.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-3 pt-1">
-            <LogsTruncateButton />
-            <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
-            <span className={`text-sm font-medium ${logsEnabled ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500'}`}>
-              {logsEnabled ? 'Aktif' : 'Nonaktif'}
-            </span>
-            <LogsToggle enabled={logsEnabled} />
-          </div>
+        <div>
+          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">Settings</p>
+          <h1 className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">Logs</h1>
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+            Riwayat akses aplikasi, login, dan request yang diblokir.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <LogsTruncateButton />
+          <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+          <span className={`text-sm font-medium ${logsEnabled ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500'}`}>
+            {logsEnabled ? 'Aktif' : 'Nonaktif'}
+          </span>
+          <LogsToggle enabled={logsEnabled} />
         </div>
 
         <LogsClientSection
-          key={`${params.search ?? ''}-${params.eventType ?? ''}-${params.country ?? ''}-${params.path ?? ''}-${params.dateFrom ?? ''}-${params.dateTo ?? ''}-${params.pageSize ?? ''}`}
+          key={`${params.page ?? ''}-${params.search ?? ''}-${params.eventType ?? ''}-${params.status ?? ''}-${params.country ?? ''}-${params.path ?? ''}-${params.dateFrom ?? ''}-${params.dateTo ?? ''}-${params.pageSize ?? ''}`}
           logs={rows}
           params={params}
           pageSize={pageSize}

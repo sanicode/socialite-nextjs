@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useTransition } from 'react'
+import Link from 'next/link'
 import { logout } from '@/app/actions/auth'
 
 type Props = {
@@ -76,6 +77,16 @@ export default function UserMenu({ name, email, role, tenantName }: Props) {
           </div>
 
           <div className="py-1">
+            <Link
+              href="/myprofile"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-700 transition hover:bg-neutral-50 active:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:active:bg-neutral-800"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0" />
+              </svg>
+              Profil Saya
+            </Link>
             <button
               type="button"
               onClick={handleLogout}

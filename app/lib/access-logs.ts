@@ -157,6 +157,7 @@ export async function getAccessLogs(params: {
   pageSize?: TablePageSize
   search?: string
   eventType?: string
+  status?: string
   country?: string
   path?: string
   dateFrom?: string
@@ -179,6 +180,12 @@ export async function getAccessLogs(params: {
   if (params.eventType) {
     conditions.push(`event_type = $${index}`)
     values.push(params.eventType)
+    index++
+  }
+
+  if (params.status) {
+    conditions.push(`status = $${index}`)
+    values.push(params.status)
     index++
   }
 

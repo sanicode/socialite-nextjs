@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition, useRef, useState, useEffect } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useTransition } from 'react'
 import {
   detachOperator,
   attachOperator,
@@ -13,6 +13,10 @@ import { useToast } from '@/app/components/ToastContext'
 type Props = {
   operators: OperatorRow[]
   isLoading?: boolean
+}
+
+export type OperatorsTableHandle = {
+  openAttach: () => void
 }
 
 function AttachDialog({ onClose }: { onClose: () => void }) {
@@ -143,12 +147,16 @@ function AttachDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function OperatorsTable({ operators, isLoading = false }: Props) {
+const OperatorsTable = forwardRef<OperatorsTableHandle, Props>(function OperatorsTable({ operators, isLoading = false }, ref) {
   const [pending, startTransition] = useTransition()
   const { showToast } = useToast()
   const confirmRef = useRef<HTMLDialogElement>(null)
   const [detachTarget, setDetachTarget] = useState<OperatorRow | null>(null)
   const [showAttach, setShowAttach] = useState(false)
+
+  useImperativeHandle(ref, () => ({
+    openAttach: () => setShowAttach(true),
+  }))
 
   function openDetach(op: OperatorRow) {
     setDetachTarget(op)
@@ -213,21 +221,10 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
 
       {/* Table card */}
       <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        {/* Table header row with Add button */}
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
           <span className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
             Daftar Operator
           </span>
-          <button
-            type="button"
-            onClick={() => setShowAttach(true)}
-            className="inline-flex ui-button-sm gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Tambah Operator
-          </button>
         </div>
 
         {isLoading ? (
@@ -238,7 +235,7 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Nama</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">No. Telp</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Aksi</th>
+                  {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Aksi</th> */}
                 </tr>
               </thead>
               <tbody>
@@ -272,9 +269,9 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                     No. Telp
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                     Aksi
-                  </th>
+                  </th> */}
                 </tr>
               </thead>
               <tbody>
@@ -288,7 +285,7 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
                       {op.phone_number ?? <span className="text-neutral-400 dark:text-neutral-600">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    {/* <td className="px-4 py-3 text-right">
                       <button
                         type="button"
                         onClick={() => openDetach(op)}
@@ -296,7 +293,7 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
                       >
                         Lepas
                       </button>
-                    </td>
+                    </td> */}
                   </tr>
                 ))}
               </tbody>
@@ -306,4 +303,6 @@ export default function OperatorsTable({ operators, isLoading = false }: Props) 
       </div>
     </>
   )
-}
+})
+
+export default OperatorsTable

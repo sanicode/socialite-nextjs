@@ -15,25 +15,25 @@ export default function OperatorsLoading() {
           <Skeleton className="h-4 w-64" />
         </div>
 
-        {/* Filter */}
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 dark:border-neutral-800 dark:bg-neutral-900">
-          <Skeleton className="h-10 rounded-lg" />
-          <Skeleton className="h-10 rounded-lg" />
-          <div className="flex gap-3 sm:col-span-2">
-            <Skeleton className="h-10 w-20 rounded-lg" />
-            <Skeleton className="h-10 w-20 rounded-lg" />
-          </div>
+        {/* Primary action */}
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-36 rounded-xl" />
         </div>
 
-        <div className="flex justify-end">
-          <Skeleton className="h-10 w-full rounded-lg sm:max-w-xs" />
+        {/* Filter toolbar */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900">
+          <Skeleton className="h-10 w-40 rounded-lg" />
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Skeleton className="h-10 flex-1 rounded-xl sm:w-64" />
+            <Skeleton className="h-10 w-20 rounded-xl" />
+            <Skeleton className="h-10 w-24 rounded-xl" />
+          </div>
         </div>
 
         {/* Table */}
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
             <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-8 w-36 rounded-lg" />
           </div>
           <div className="grid grid-cols-4 gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-800/50">
             {['w-16', 'w-16', 'w-20', 'w-10'].map((w, i) => (

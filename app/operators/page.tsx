@@ -56,7 +56,7 @@ export default async function OperatorsPage({ searchParams }: { searchParams: Se
         </div>
 
         <OperatorsClientSection
-          key={`${params.search ?? ''}-${params.email ?? ''}-${params.phone ?? ''}-${params.pageSize ?? ''}`}
+          key={`${params.page ?? ''}-${params.search ?? ''}-${params.email ?? ''}-${params.phone ?? ''}-${params.pageSize ?? ''}`}
           operators={operators}
           params={params}
           pageSize={pageSize}
