@@ -3,23 +3,33 @@ import { prisma } from '@/app/lib/prisma'
 const MODEL_TYPE_USER = 'App\\Models\\User'
 const MODEL_TYPE_TENANT_USER = 'App\\Models\\TenantUser'
 
-export async function getUserRoles(userId: string): Promise<string[]> {
+export type UserAccessContext = {
+  roles: string[]
+  hasTenantMembership: boolean
+}
+
+export function canUserLogin(access: UserAccessContext): boolean {
+  return access.hasTenantMembership || access.roles.length > 0
+}
+
+export async function getUserAccessContext(userId: string): Promise<UserAccessContext> {
   const bigId = BigInt(userId)
 
   // Roles assigned directly to the User model (e.g. admin)
-  const userEntries = await prisma.model_has_roles.findMany({
-    where: {
-      model_type: MODEL_TYPE_USER,
-      model_id: bigId,
-    },
-    include: { roles: true },
-  })
-
-  // Roles assigned via TenantUser model (e.g. manager, operator)
-  const tenantUserRecords = await prisma.tenant_user.findMany({
-    where: { user_id: bigId },
-    select: { id: true },
-  })
+  const [userEntries, tenantUserRecords] = await Promise.all([
+    prisma.model_has_roles.findMany({
+      where: {
+        model_type: MODEL_TYPE_USER,
+        model_id: bigId,
+      },
+      include: { roles: true },
+    }),
+    // Roles assigned via TenantUser model (e.g. manager, operator)
+    prisma.tenant_user.findMany({
+      where: { user_id: bigId },
+      select: { id: true },
+    }),
+  ])
   const tenantUserIds = tenantUserRecords.map((tu) => tu.id)
 
   const tenantUserEntries = tenantUserIds.length
@@ -37,7 +47,15 @@ export async function getUserRoles(userId: string): Promise<string[]> {
     ...tenantUserEntries.map((e) => e.roles.name),
   ])
 
-  return Array.from(allRoles)
+  return {
+    roles: Array.from(allRoles),
+    hasTenantMembership: tenantUserRecords.length > 0,
+  }
+}
+
+export async function getUserRoles(userId: string): Promise<string[]> {
+  const access = await getUserAccessContext(userId)
+  return access.roles
 }
 
 export async function hasRole(userId: string, role: string): Promise<boolean> {

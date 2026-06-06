@@ -8,6 +8,7 @@ import { logEvent } from '@/app/lib/logger'
 import { getRequestSecurityDecision } from '@/app/lib/request-security'
 import { writeAccessLog } from '@/app/lib/access-logs'
 import { isCaptchaEnabled, verifyCaptchaToken } from '@/app/lib/captcha'
+import { canUserLogin, getUserAccessContext } from '@/app/lib/permissions'
 import {
   getLoginIp,
   checkRateLimit,
@@ -153,6 +154,28 @@ export async function login(
     })
     return {
       message: 'Email atau password salah.',
+      requireCaptcha: nextCaptchaRequired,
+    }
+  }
+
+  const access = await getUserAccessContext(user.id.toString())
+  if (!canUserLogin(access)) {
+    await recordLoginFailure(email, ip)
+    const nextCaptchaRequired = isCaptchaEnabled() && await shouldRequireLoginCaptcha(ip)
+
+    logEvent('warn', 'auth.login.missing_access', {
+      email,
+      userId: user.id.toString(),
+    })
+    await writeAccessLog({
+      eventType: 'login_failed',
+      status: 'blocked',
+      userId: user.id.toString(),
+      userEmail: email,
+      details: { reason: 'tenant_and_role_missing' },
+    })
+    return {
+      message: 'Akun Anda tidak terhubung ke tenant dan tidak memiliki role. Hubungi administrator.',
       requireCaptcha: nextCaptchaRequired,
     }
   }

@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSessionUserId } from '@/app/lib/session'
-import { getUserRoles } from '@/app/lib/permissions'
+import { getSessionUser } from '@/app/lib/session'
 import { prisma } from '@/app/lib/prisma'
 import ShellClient from './ShellClient'
 import { getSecuritySettings, redirectIfRequestBlocked } from '@/app/lib/request-security'
@@ -8,24 +7,18 @@ import { getRequestMetadata, writeAccessLog } from '@/app/lib/access-logs'
 import { isDatabaseConnectionError, isDatabaseSchemaError } from '@/app/lib/database-errors'
 import DatabaseUnavailableScreen from '@/app/components/DatabaseUnavailableScreen'
 
-async function getSessionUser() {
-  const userId = await getSessionUserId()
-  if (!userId) return null
-  const user = await prisma.users.findUnique({
-    where: { id: BigInt(userId) },
-    select: { id: true, name: true, email: true },
-  })
+async function getShellUser() {
+  const user = await getSessionUser()
   if (!user) return null
-  const roles = await getUserRoles(userId)
-  const isAdmin = roles.includes('admin')
-  const isManager = roles.includes('manager')
-  const isOperator = roles.includes('operator')
-  const role = roles[0] ?? 'operator'
+  const isAdmin = user.roles.includes('admin')
+  const isManager = user.roles.includes('manager')
+  const isOperator = user.roles.includes('operator')
+  const role = user.roles[0]
 
   // Fetch tenant name
   let tenantName: string | null = null
   const tu = await prisma.tenant_user.findFirst({
-    where: { user_id: BigInt(userId) },
+    where: { user_id: BigInt(user.id) },
     select: { tenant_id: true },
   })
   if (tu) {
@@ -44,7 +37,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   try {
     await redirectIfRequestBlocked()
-    const user = await getSessionUser()
+    const user = await getShellUser()
 
     if (!user) {
       redirect('/login')

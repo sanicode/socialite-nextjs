@@ -3,7 +3,7 @@ import { getRequestSecurityDecision } from '@/app/lib/request-security'
 import { headers } from 'next/headers'
 import { verifyJwt } from '@/app/lib/jwt'
 import { prisma } from '@/app/lib/prisma'
-import { getUserRoles } from '@/app/lib/permissions'
+import { canUserLogin, getUserAccessContext } from '@/app/lib/permissions'
 
 async function getBearerSessionUser(): Promise<SessionUser | null> {
   const headerStore = await headers()
@@ -18,13 +18,15 @@ async function getBearerSessionUser(): Promise<SessionUser | null> {
   })
   if (!user || user.is_blocked) return null
 
-  const roles = await getUserRoles(payload.sub)
+  const access = await getUserAccessContext(payload.sub)
+  if (!canUserLogin(access)) return null
+
   return {
     id: user.id.toString(),
     name: user.name,
     email: user.email,
     is_admin: user.is_admin,
-    roles,
+    roles: access.roles,
   }
 }
 

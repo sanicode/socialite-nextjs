@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 import { prisma } from '@/app/lib/prisma'
-import { getUserRoles } from '@/app/lib/permissions'
+import { canUserLogin, getUserAccessContext } from '@/app/lib/permissions'
 import { getSessionSecret } from '@/app/lib/env'
 
 const COOKIE_NAME = 'sid'
@@ -63,13 +63,14 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   })
   if (!user || user.is_blocked) return null
 
-  const roles = await getUserRoles(userId)
+  const access = await getUserAccessContext(userId)
+  if (!canUserLogin(access)) return null
 
   return {
     id: user.id.toString(),
     name: user.name,
     email: user.email,
     is_admin: user.is_admin,
-    roles,
+    roles: access.roles,
   }
 }

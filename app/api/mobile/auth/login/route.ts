@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/app/lib/prisma'
 import { signJwt } from '@/app/lib/jwt'
 import { apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
-import { getUserRoles } from '@/app/lib/permissions'
+import { canUserLogin, getUserAccessContext } from '@/app/lib/permissions'
 import { getRequestSecurityDecision } from '@/app/lib/request-security'
 import { writeAccessLog } from '@/app/lib/access-logs'
 import { logEvent } from '@/app/lib/logger'
@@ -96,8 +96,25 @@ export async function POST(request: Request) {
       throw new ApiError(401, 'Email atau password salah')
     }
 
+    const access = await getUserAccessContext(user.id.toString())
+    if (!canUserLogin(access)) {
+      await recordLoginFailure(normalizedEmail, ip)
+      logEvent('warn', 'mobile.auth.login.missing_access', {
+        email: user.email,
+        userId: user.id.toString(),
+      })
+      await writeAccessLog({
+        eventType: 'login_failed',
+        status: 'blocked',
+        userId: user.id.toString(),
+        userEmail: user.email,
+        details: { channel: 'mobile', reason: 'tenant_and_role_missing' },
+      })
+      throw new ApiError(403, 'Akun Anda tidak terhubung ke tenant dan tidak memiliki role. Hubungi administrator.')
+    }
+
     await clearLoginFailures(normalizedEmail, ip)
-    const roles = await getUserRoles(user.id.toString())
+    const { roles } = access
 
     const token = signJwt({
       sub: user.id.toString(),

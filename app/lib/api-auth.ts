@@ -1,7 +1,7 @@
 import { verifyJwt, type JwtPayload } from './jwt'
 import { getSecuritySettings } from './request-security'
 import { prisma } from '@/app/lib/prisma'
-import { getUserRoles } from '@/app/lib/permissions'
+import { canUserLogin, getUserAccessContext } from '@/app/lib/permissions'
 import {
   getDatabaseConnectionErrorMessage,
   getDatabaseSchemaErrorMessage,
@@ -27,11 +27,15 @@ export async function requireJwt(request: Request): Promise<JwtPayload> {
   })
   if (!user || user.is_blocked) throw new ApiError(401, 'Token tidak valid atau sudah kadaluarsa')
 
-  const roles = await getUserRoles(payload.sub)
+  const access = await getUserAccessContext(payload.sub)
+  if (!canUserLogin(access)) {
+    throw new ApiError(401, 'Token tidak valid atau sudah kadaluarsa')
+  }
+
   return {
     ...payload,
     email: user.email,
-    roles,
+    roles: access.roles,
   }
 }
 
