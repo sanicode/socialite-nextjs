@@ -2,7 +2,6 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useTransition } from 'react'
 import {
-  detachOperator,
   attachOperator,
   searchUsersForOperator,
   type OperatorRow,
@@ -148,76 +147,16 @@ function AttachDialog({ onClose }: { onClose: () => void }) {
 }
 
 const OperatorsTable = forwardRef<OperatorsTableHandle, Props>(function OperatorsTable({ operators, isLoading = false }, ref) {
-  const [pending, startTransition] = useTransition()
-  const { showToast } = useToast()
-  const confirmRef = useRef<HTMLDialogElement>(null)
-  const [detachTarget, setDetachTarget] = useState<OperatorRow | null>(null)
   const [showAttach, setShowAttach] = useState(false)
 
   useImperativeHandle(ref, () => ({
     openAttach: () => setShowAttach(true),
   }))
 
-  function openDetach(op: OperatorRow) {
-    setDetachTarget(op)
-    confirmRef.current?.showModal()
-  }
-
-  function closeConfirm() {
-    setDetachTarget(null)
-    confirmRef.current?.close()
-  }
-
-  function handleDetach() {
-    if (!detachTarget) return
-    startTransition(async () => {
-      try {
-        await detachOperator(detachTarget.tenant_user_id)
-        showToast('success', `${detachTarget.name} berhasil dilepas dari tenant.`)
-        closeConfirm()
-      } catch (e) {
-        showToast('error', e instanceof Error ? e.message : 'Gagal melepas operator.')
-        closeConfirm()
-      }
-    })
-  }
-
   return (
     <>
       {/* Attach dialog */}
       {showAttach && <AttachDialog onClose={() => setShowAttach(false)} />}
-
-      {/* Detach confirm dialog */}
-      <dialog
-        ref={confirmRef}
-        onClose={closeConfirm}
-        className="fixed top-1/2 left-1/2 m-0 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-black/40 dark:border-neutral-700 dark:bg-neutral-900"
-      >
-        <div className="p-5">
-          <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Lepas Operator?</h3>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            <strong className="text-neutral-900 dark:text-white">{detachTarget?.name}</strong> akan dilepas
-            dari tenant. Tindakan ini tidak dapat dibatalkan.
-          </p>
-        </div>
-        <div className="flex justify-end gap-3 border-t border-neutral-200 px-5 py-4 dark:border-neutral-700">
-          <button
-            type="button"
-            onClick={closeConfirm}
-            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={handleDetach}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-          >
-            {pending ? 'Melepas...' : 'Ya, Lepas'}
-          </button>
-        </div>
-      </dialog>
 
       {/* Table card */}
       <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -235,15 +174,14 @@ const OperatorsTable = forwardRef<OperatorsTableHandle, Props>(function Operator
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Nama</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">No. Telp</th>
-                  {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Aksi</th> */}
                 </tr>
               </thead>
               <tbody>
                 {Array.from({ length: 6 }).map((_, rowIndex) => (
                   <tr key={`operator-skeleton-${rowIndex}`} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800/60">
-                    {[0, 1, 2, 3].map((colIndex) => (
+                    {[0, 1, 2].map((colIndex) => (
                       <td key={`operator-skeleton-${rowIndex}-${colIndex}`} className="px-4 py-3">
-                        <div className={`animate-pulse rounded bg-neutral-200 dark:bg-neutral-700 ${colIndex === 3 ? 'ml-auto h-8 w-16' : 'h-4 w-28'}`} />
+                        <div className="h-4 w-28 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
                       </td>
                     ))}
                   </tr>
@@ -269,9 +207,6 @@ const OperatorsTable = forwardRef<OperatorsTableHandle, Props>(function Operator
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                     No. Telp
                   </th>
-                  {/* <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                    Aksi
-                  </th> */}
                 </tr>
               </thead>
               <tbody>
@@ -285,15 +220,6 @@ const OperatorsTable = forwardRef<OperatorsTableHandle, Props>(function Operator
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
                       {op.phone_number ?? <span className="text-neutral-400 dark:text-neutral-600">—</span>}
                     </td>
-                    {/* <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openDetach(op)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                      >
-                        Lepas
-                      </button>
-                    </td> */}
                   </tr>
                 ))}
               </tbody>
