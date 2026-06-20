@@ -147,6 +147,7 @@ export default async function UserPostsByStatusPage({
     status: post.status as PostStatus,
     is_trending: post.is_trending,
     blog_post_categories: post.blog_post_categories ? { name: post.blog_post_categories.name } : null,
+    seen_at: post.seen_at?.toISOString() ?? null,
   }))
   const serializedMediaByPostId = Object.fromEntries(
     Object.entries(mediaByPostId).map(([id, media]) => [
@@ -212,6 +213,7 @@ export default async function UserPostsByStatusPage({
             mediaByPostId={serializedMediaByPostId}
             userData={serializedUserData}
             status={status}
+            canMarkSeen={user.roles.includes('manager')}
             validationEnabled={user.roles.includes('admin')}
             validationDisabledMessage="Validasi manager dilakukan dari halaman View operator."
             actionsDisabled={reportingWindowClosed}

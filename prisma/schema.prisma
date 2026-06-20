@@ -74,6 +74,7 @@ model blog_posts {
   deleted_at                        DateTime?             @db.Timestamp(0)
   social_otp_id                     BigInt?
   source_url                        String?
+  seen_at                           DateTime?             @db.Timestamp(0)
   users_blog_posts_author_idTousers users?                @relation("blog_posts_author_idTousers", fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "blog_posts_author_id_foreign")
   blog_post_categories              blog_post_categories? @relation(fields: [blog_post_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "blog_posts_blog_post_category_id_foreign")
   social_otps                       social_otps?          @relation(fields: [social_otp_id], references: [id], map: "blog_posts_telegram_social_otp_id_foreign")

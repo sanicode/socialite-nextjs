@@ -1,0 +1,18 @@
+diff --git a/node_modules/next/dist/client/dev/debug-channel.js b/node_modules/next/dist/client/dev/debug-channel.js
+index b4f67e7..72ac8c8 100644
+--- a/node_modules/next/dist/client/dev/debug-channel.js
++++ b/node_modules/next/dist/client/dev/debug-channel.js
+@@ -59,7 +59,12 @@ function wasServedFromCache() {
+     try {
+         // There is exactly one PerformanceNavigationTiming entry per page load.
+         const entry = performance.getEntriesByType('navigation')[0];
+-        return entry?.transferSize === 0;
++        if (!entry) return false;
++        // Firefox reports transferSize===0 during streaming, causing false positives.
++        // Use two signals that only fire on a real cache restore:
++        // - type==='back_forward' for browser-history navigation
++        // - responseStart===0 && responseEnd>0 for Safari tab duplication
++        return entry.type === 'back_forward' || (entry.responseStart === 0 && entry.responseEnd > 0);
+     } catch  {
+         return false;
+     }

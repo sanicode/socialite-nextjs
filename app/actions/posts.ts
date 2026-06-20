@@ -293,6 +293,7 @@ export type SerializedPost = {
   city: string | null
   source_url: string | null
   tenant_id: string | null
+  seen_at: string | null
 }
 
 export type SerializedCategory = {
@@ -578,6 +579,7 @@ export async function getPosts(params: {
         province: address?.city_id ? provinceMap.get(cityMap.get(address.city_id)?.province_id ?? 0) ?? null : null,
         city: address?.city_id ? cityMap.get(address.city_id)?.name ?? null : null,
         tenant_id: p.tenant_id?.toString() ?? null,
+        seen_at: p.seen_at?.toISOString() ?? null,
       }
     }),
     total,
@@ -1109,6 +1111,30 @@ export async function updateStatus(id: string, status: 'pending' | 'valid' | 'in
     status,
   })
   revalidatePosts()
+}
+
+export async function markAmplifikasiPostSeen(postId: string): Promise<{ success: boolean }> {
+  const sessionUser = await requireManagerOrAdmin().catch(redirectToLoginIfUnauthorized)
+  if (!sessionUser.roles.includes('manager')) return { success: false }
+  if (!/^\d+$/.test(postId)) return { success: false }
+
+  const post = await prisma.blog_posts.findUnique({
+    where: { id: BigInt(postId) },
+    select: { source_url: true, user_id: true, tenant_id: true },
+  })
+  if (!post || !['upload', 'amplifikasi'].includes(post.source_url ?? '')) return { success: false }
+
+  const canValidate = await canActorValidatePost(sessionUser, {
+    userId: post.user_id.toString(),
+    tenantId: post.tenant_id?.toString() ?? null,
+  })
+  if (!canValidate) return { success: false }
+
+  await prisma.blog_posts.update({
+    where: { id: BigInt(postId) },
+    data: { seen_at: new Date() },
+  })
+  return { success: true }
 }
 
 export async function updateTrending(id: string, isTrending: boolean): Promise<void> {

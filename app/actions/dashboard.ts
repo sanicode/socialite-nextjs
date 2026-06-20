@@ -73,6 +73,16 @@ export type TrendingReportRow = {
   link: string | null
 }
 
+export type ManagerPerformanceRow = {
+  managerId: string
+  managerName: string
+  provinsi: string | null
+  kabKota: string | null
+  totalLaporan: number
+  dilihat: number
+  divalidasi: number
+}
+
 const BLOG_POST_JAKARTA_DATE_SQL = `date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`
 
 function buildBlogPostReportFilters(filters: DashboardFilters) {
@@ -715,6 +725,138 @@ export async function getTrendingReportData(filters: DashboardFilters): Promise<
     kabupatenKota: row.kabupaten_kota,
     jenisMedsos: row.jenis_medsos,
     link: row.link && !/^https?:\/\//i.test(row.link) ? getMediaUrl(row.link) : row.link,
+  }))
+}
+
+export async function getManagerPerformanceData(filters: DashboardFilters): Promise<ManagerPerformanceRow[]> {
+  const user = await requireManagerOrAdmin()
+  const isAdmin = user.roles.includes('admin')
+
+  const managerConditions: string[] = [
+    `mhr_m.model_type = 'App\\Models\\TenantUser'`,
+    `mhr_m.model_id = mtu.id`,
+    `r_m.name = 'manager'`,
+    `COALESCE(m.is_blocked, false) = false`,
+  ]
+  const postConditions: string[] = [
+    `bp.source_url IN ('upload', 'amplifikasi')`,
+  ]
+  const params: unknown[] = []
+  let idx = 1
+
+  if (!isAdmin) {
+    managerConditions.push(`m.id = $${idx}::bigint`)
+    params.push(user.id)
+    idx++
+  }
+
+  if (filters.tenantId) {
+    managerConditions.push(`mtu.tenant_id = $${idx}::bigint`)
+    params.push(filters.tenantId)
+    idx++
+  }
+
+  if (filters.provinceId) {
+    managerConditions.push(`rc.province_id = $${idx}::int`)
+    params.push(filters.provinceId)
+    idx++
+  }
+
+  if (filters.cityId) {
+    managerConditions.push(`addr.city_id = $${idx}::int`)
+    params.push(filters.cityId)
+    idx++
+  }
+
+  if (filters.dateFrom) {
+    postConditions.push(`date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') >= $${idx}::date`)
+    params.push(filters.dateFrom)
+    idx++
+  }
+
+  if (filters.dateTo) {
+    postConditions.push(`date((bp.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta') <= $${idx}::date`)
+    params.push(filters.dateTo)
+    idx++
+  }
+
+  const managerWhereClause = `WHERE ${managerConditions.join(' AND ')}`
+  const postWhereClause = `WHERE ${postConditions.join(' AND ')}`
+
+  const result = await prisma.$queryRawUnsafe<{
+    manager_user_id: bigint
+    manager_name: string
+    provinsi: string | null
+    kab_kota: string | null
+    total_laporan: bigint
+    dilihat: bigint
+    divalidasi: bigint
+  }[]>(
+    `
+    WITH manager_scope AS (
+      SELECT
+        m.id AS manager_user_id,
+        m.name AS manager_name,
+        mtu.tenant_id,
+        rp.name AS provinsi,
+        rc.name AS kab_kota
+      FROM users m
+      INNER JOIN tenant_user mtu ON mtu.user_id = m.id
+      INNER JOIN model_has_roles mhr_m ON mhr_m.model_id = mtu.id
+      INNER JOIN roles r_m ON r_m.id = mhr_m.role_id
+      LEFT JOIN LATERAL (
+        SELECT a.city_id
+        FROM addresses a
+        WHERE a.tenant_id = mtu.tenant_id
+        ORDER BY a.id ASC
+        LIMIT 1
+      ) addr ON true
+      LEFT JOIN reg_cities rc ON rc.id = addr.city_id
+      LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
+      ${managerWhereClause}
+    ),
+    operator_posts AS (
+      SELECT
+        bp.id,
+        bp.tenant_id,
+        bp.seen_at,
+        bp.status
+      FROM blog_posts bp
+      INNER JOIN tenant_user tu ON tu.user_id = bp.user_id AND tu.tenant_id = bp.tenant_id
+      INNER JOIN model_has_roles mhr_op ON mhr_op.model_id = tu.id
+      INNER JOIN roles r_op ON r_op.id = mhr_op.role_id
+      ${postWhereClause}
+        AND mhr_op.model_type = 'App\\Models\\TenantUser'
+        AND r_op.name = 'operator'
+    )
+    SELECT
+      ms.manager_user_id,
+      ms.manager_name,
+      MIN(ms.provinsi) AS provinsi,
+      MIN(ms.kab_kota) AS kab_kota,
+      COUNT(DISTINCT op.id) AS total_laporan,
+      COUNT(DISTINCT op.id) FILTER (WHERE op.seen_at IS NOT NULL) AS dilihat,
+      COUNT(DISTINCT op.id) FILTER (WHERE op.status IN ('valid', 'invalid')) AS divalidasi
+    FROM manager_scope ms
+    LEFT JOIN operator_posts op ON op.tenant_id = ms.tenant_id
+    GROUP BY ms.manager_user_id, ms.manager_name
+    ORDER BY
+      (COUNT(DISTINCT op.id) FILTER (WHERE op.seen_at IS NOT NULL)
+       + COUNT(DISTINCT op.id) FILTER (WHERE op.status IN ('valid', 'invalid')))
+      / NULLIF(COUNT(DISTINCT op.id) * 2.0, 0) DESC NULLS LAST,
+      ms.manager_name ASC
+    `,
+    ...params
+  )
+
+  return result.map((row) => ({
+    managerId: row.manager_user_id.toString(),
+    managerName: row.manager_name,
+    provinsi: row.provinsi,
+    kabKota: row.kab_kota,
+    totalLaporan: Number(row.total_laporan),
+    dilihat: Number(row.dilihat),
+    divalidasi: Number(row.divalidasi),
   }))
 }
 

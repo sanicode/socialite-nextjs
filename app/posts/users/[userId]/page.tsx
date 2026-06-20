@@ -152,6 +152,7 @@ export default async function UserPostsReviewPage({
     status: post.status as PostStatus,
     is_trending: post.is_trending,
     blog_post_categories: post.blog_post_categories ? { name: post.blog_post_categories.name } : null,
+    seen_at: post.seen_at?.toISOString() ?? null,
   }))
 
   return (
@@ -206,6 +207,7 @@ export default async function UserPostsReviewPage({
             posts={serializedPosts}
             mediaByPostId={mediaByPostId}
             userData={{ name: targetUser.name }}
+            canMarkSeen={actor.roles.includes('manager')}
             status=""
             validationEnabled={validationReady}
             validationDisabledMessage={getOperatorReportValidationDisabledMessage(requiredCategoryCount)}

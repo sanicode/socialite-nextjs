@@ -10,6 +10,7 @@ import {
   getReportData,
   getTrendingReportData,
   getPostsByDate,
+  getManagerPerformanceData,
 } from '@/app/actions/dashboard'
 import DashboardFilters from '@/app/components/dashboard/DashboardFilters'
 import StatCards from '@/app/components/dashboard/StatCards'
@@ -18,6 +19,7 @@ import CityBarChart from '@/app/components/dashboard/CityBarChart'
 import DailyPostsChart from '@/app/components/dashboard/DailyPostsChart'
 import ReportTable from '@/app/components/dashboard/ReportTable'
 import TrendingReportTable from '@/app/components/dashboard/TrendingReportTable'
+import ManagerPerformanceTable from '@/app/components/dashboard/ManagerPerformanceTable'
 import OperatorDailyChecklist, {
   type OperatorChecklistRow,
   type OperatorChecklistStatus,
@@ -250,7 +252,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const canSeeRecap = isAdmin || isManager
 
-  const [provinces, operatorReportSummary, provinceData, cityData, trendingReportData, reportData, dailyData] = await Promise.all([
+  const [provinces, operatorReportSummary, provinceData, cityData, trendingReportData, reportData, dailyData, managerPerformanceData] = await Promise.all([
     getProvinces(),
     getOperatorReportSummary(filters),
     isAdmin ? getProvinceChartData(filters) : Promise.resolve([]),
@@ -258,6 +260,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     canSeeRecap ? getTrendingReportData(filters) : Promise.resolve([]),
     canSeeRecap ? getReportData(filters) : Promise.resolve([]),
     getPostsByDate(filters),
+    canSeeRecap ? getManagerPerformanceData(filters) : Promise.resolve([]),
   ])
 
   return (
@@ -290,6 +293,8 @@ export default async function DashboardPage({ searchParams }: Props) {
         )}
 
         <DailyPostsChart data={dailyData} />
+
+        {canSeeRecap && <ManagerPerformanceTable data={managerPerformanceData} dateFrom={rawFrom} dateTo={clampedTo} />}
 
         {canSeeRecap && <TrendingReportTable data={trendingReportData} />}
 

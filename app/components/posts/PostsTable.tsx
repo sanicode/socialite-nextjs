@@ -6,7 +6,7 @@ import type { FormEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { SerializedPost, SerializedCategory } from '@/app/actions/posts'
-import { deletePost, updateStatus, bulkDeletePosts, updateTrending } from '@/app/actions/posts'
+import { deletePost, markAmplifikasiPostSeen, updateStatus, bulkDeletePosts, updateTrending } from '@/app/actions/posts'
 import { getCities } from '@/app/actions/dashboard'
 import { useToast } from '@/app/components/ToastContext'
 import TablePageSizeSelect from '@/app/components/TablePageSizeSelect'
@@ -22,6 +22,7 @@ type Props = {
   page: number
   isAdmin: boolean
   canVerify: boolean
+  canMarkSeen?: boolean
   canEdit?: boolean
   basePath?: string
   variant?: 'default' | 'upload' | 'amplifikasi'
@@ -90,6 +91,7 @@ export default function PostsTable({
   page,
   isAdmin,
   canVerify,
+  canMarkSeen = false,
   canEdit = canVerify,
   basePath = '/posts',
   variant = 'default',
@@ -110,6 +112,7 @@ export default function PostsTable({
   const showTrendingColumn = canManageTrending
   const showReadOnlyStatus = !canVerify
   const showActions = canEdit || canVerify
+  const showSeenAt = true
   const columnCount =
     (isAdmin ? 1 : 0) +
     1 +
@@ -122,8 +125,11 @@ export default function PostsTable({
     (canVerify ? 1 : 0) +
     (isAdmin ? 2 : 0) +
     (canVerify || showReadOnlyStatus ? 1 : 0) +
+    (showSeenAt ? 1 : 0) +
     (showActions ? 1 : 0)
   const router = useRouter()
+  const routerRef = useRef(router)
+  useEffect(() => { routerRef.current = router }, [router])
   const searchParams = useSearchParams()
   const { showToast } = useToast()
   const [isPending, startTransition] = useTransition()
@@ -134,6 +140,9 @@ export default function PostsTable({
     Object.fromEntries(posts.map((post) => [post.id, post.is_trending]))
   )
   const [updatingTrendingIds, setUpdatingTrendingIds] = useState<Set<string>>(new Set())
+  const [seenAtByPostId, setSeenAtByPostId] = useState<Record<string, string>>(() =>
+    Object.fromEntries(posts.filter((p) => p.seen_at).map((p) => [p.id, p.seen_at!]))
+  )
   const [modal, setModal] = useState<{ type: 'image' | 'link'; url: string; title: string } | null>(null)
   const [searchValue, setSearchValue] = useState(searchParams.get('search') ?? '')
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? defaultDateFrom)
@@ -224,8 +233,8 @@ export default function PostsTable({
     const params = new URLSearchParams(searchParams.toString())
     params.delete('success')
     const nextQuery = params.toString()
-    router.replace(nextQuery ? `${basePath}?${nextQuery}` : basePath)
-  }, [basePath, router, searchParams, showToast])
+    routerRef.current.replace(nextQuery ? `${basePath}?${nextQuery}` : basePath)
+  }, [basePath, searchParams, showToast])
 
   const currentSort = searchParams.get('sort') ?? 'desc'
 
@@ -235,6 +244,7 @@ export default function PostsTable({
 
   useEffect(() => {
     setTrendingByPostId(Object.fromEntries(posts.map((post) => [post.id, post.is_trending])))
+    setSeenAtByPostId(Object.fromEntries(posts.filter((p) => p.seen_at).map((p) => [p.id, p.seen_at!])))
   }, [posts])
 
   function toggleSelect(id: string) {
@@ -332,6 +342,11 @@ export default function PostsTable({
         })
       }
     })
+  }
+
+  function handleMarkSeenInTable(postId: string) {
+    setSeenAtByPostId((prev) => ({ ...prev, [postId]: new Date().toISOString() }))
+    void markAmplifikasiPostSeen(postId)
   }
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
@@ -648,7 +663,13 @@ export default function PostsTable({
                     )}
                   </button>
                 </th>
-                
+
+                {showSeenAt && (
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-32">
+                    Dilihat
+                  </th>
+                )}
+
                 {showScreenshot && (
                   <th className="text-left px-4 py-3 font-medium text-neutral-600 dark:text-neutral-400 w-16">
                     Screenshot
@@ -776,13 +797,29 @@ export default function PostsTable({
                       : '—'}
                   </td>
 
+                  {/* Dilihat */}
+                  {showSeenAt && (
+                    <td className="px-4 py-3">
+                      {(post.source_url === 'upload' || post.source_url === 'amplifikasi') && seenAtByPostId[post.id] ? (
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {new Date(seenAtByPostId[post.id]).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-300 dark:text-neutral-600">—</span>
+                      )}
+                    </td>
+                  )}
+
                   {/* Thumbnail */}
                   {showScreenshot && (
                     <td className="px-4 py-3">
                       {post.thumbnail ? (
                         <button
                           type="button"
-                          onClick={() => setModal({ type: 'image', url: post.thumbnail!.url, title: post.title ?? '' })}
+                          onClick={() => {
+                            setModal({ type: 'image', url: post.thumbnail!.url, title: post.title ?? '' })
+                            if (canMarkSeen && post.source_url === 'amplifikasi') handleMarkSeenInTable(post.id)
+                          }}
                           className="w-12 h-12 rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-800 relative flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-neutral-900 dark:hover:ring-white transition"
                         >
                           <Image
@@ -843,6 +880,7 @@ export default function PostsTable({
                           href={post.title}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => { if (canMarkSeen) handleMarkSeenInTable(post.id) }}
                           className="inline-flex ui-button-sm items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Buka
@@ -850,7 +888,10 @@ export default function PostsTable({
                       ) : post.title ? (
                         <button
                           type="button"
-                          onClick={() => setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })}
+                          onClick={() => {
+                            setModal({ type: 'link', url: post.title ?? '', title: post.title ?? '' })
+                            if (canMarkSeen && post.source_url === 'amplifikasi') handleMarkSeenInTable(post.id)
+                          }}
                           className="ui-button-unstyled line-clamp-1 cursor-pointer text-left font-mono font-medium text-neutral-900 hover:underline dark:text-white"
                         >
                           {post.title}

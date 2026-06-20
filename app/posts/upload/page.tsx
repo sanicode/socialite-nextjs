@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getPosts, getCategories } from '@/app/actions/posts'
 import PostsTable from '@/app/components/posts/PostsTable'
@@ -107,7 +106,6 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
           />
         )}
 
-        <Suspense fallback={<div className="h-64 flex items-center justify-center text-neutral-500">Memuat...</div>}>
           <PostsTable
             posts={posts}
             total={total}
@@ -116,6 +114,7 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
             pageSize={pageSize}
             isAdmin={isAdmin}
             canVerify={canVerify}
+            canMarkSeen={isManager}
             basePath="/posts/upload"
             variant="upload"
             defaultDateFrom={dateFrom}
@@ -126,7 +125,6 @@ export default async function UploadPage({ searchParams }: { searchParams: Searc
             actionsDisabled={reportingWindowClosed}
             actionsDisabledMessage={reportingWindowDecision.message}
           />
-        </Suspense>
       </div>
     </div>
   )

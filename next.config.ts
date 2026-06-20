@@ -21,7 +21,7 @@ function getImageRemotePatterns(): NonNullable<NextConfig['images']>['remotePatt
 }
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ['socialite.test'],
+  allowedDevOrigins: ['socialite.test', 'localhost', '127.0.0.1', '[::1]'],
   experimental: {
     authInterrupts: true,
     serverActions: {

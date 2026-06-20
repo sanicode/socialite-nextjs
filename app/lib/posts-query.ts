@@ -21,6 +21,7 @@ export type QueryPost = {
   city: string | null
   source_url: string | null
   tenant_id: string | null
+  seen_at: string | null
 }
 
 export type QueryPostsParams = {
@@ -277,6 +278,7 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
         province: address?.city_id ? provinceMap.get(cityMap.get(address.city_id)?.province_id ?? 0) ?? null : null,
         city: address?.city_id ? cityMap.get(address.city_id)?.name ?? null : null,
         tenant_id: p.tenant_id?.toString() ?? null,
+        seen_at: p.seen_at?.toISOString() ?? null,
       }
     }),
     total,
@@ -348,5 +350,6 @@ export async function queryPostById(id: string): Promise<QueryPost | null> {
     city: cityName,
     source_url: post.source_url ?? null,
     tenant_id: post.tenant_id?.toString() ?? null,
+    seen_at: post.seen_at?.toISOString() ?? null,
   }
 }

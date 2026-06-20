@@ -2,7 +2,7 @@
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
-import { bulkUpdateOperatorPostStatus, updateOperatorPostStatus, updatePostStatus, updateTrending } from '@/app/actions/posts'
+import { bulkUpdateOperatorPostStatus, markAmplifikasiPostSeen, updateOperatorPostStatus, updatePostStatus, updateTrending } from '@/app/actions/posts'
 import Image from "next/image"
 import { useToast } from '@/app/components/ToastContext'
 import LinkPreviewDescription from '@/app/components/posts/LinkPreviewDescription'
@@ -27,6 +27,7 @@ type SerializedPost = {
   status: PostStatus
   is_trending: boolean
   blog_post_categories?: { name: string } | null
+  seen_at: string | null
 }
 
 type SerializedUser = {
@@ -42,6 +43,7 @@ function getStatusClass(status: PostStatus) {
 export default function UserPostsTableClient({
   posts,
   mediaByPostId,
+  canMarkSeen = false,
   validationEnabled = true,
   validationDisabledMessage,
   validationDateFrom,
@@ -54,6 +56,7 @@ export default function UserPostsTableClient({
   mediaByPostId: Record<string, SerializedMedia>
   userData: SerializedUser
   status: string
+  canMarkSeen?: boolean
   validationEnabled?: boolean
   validationDisabledMessage?: string | null
   validationDateFrom?: string
@@ -69,6 +72,9 @@ export default function UserPostsTableClient({
   const [isPending, startTransition] = useTransition()
   const [modalUrl, setModalUrl] = useState<string | null>(null)
   const [optimisticPosts, setOptimisticPosts] = useState(posts)
+  const [seenAtByPostId, setSeenAtByPostId] = useState<Record<string, string>>(() =>
+    Object.fromEntries(posts.filter((p) => p.seen_at).map((p) => [p.id, p.seen_at!]))
+  )
   const bulkEnabled = Boolean(validationDateFrom && validationDateTo)
   const actionsLocked = actionsDisabled || !validationEnabled || isPending
   const trendingLocked = actionsDisabled || isPending
@@ -76,7 +82,13 @@ export default function UserPostsTableClient({
 
   useEffect(() => {
     setOptimisticPosts(posts)
+    setSeenAtByPostId(Object.fromEntries(posts.filter((p) => p.seen_at).map((p) => [p.id, p.seen_at!])))
   }, [posts])
+
+  function handleMarkSeen(postId: string) {
+    setSeenAtByPostId((prev) => ({ ...prev, [postId]: new Date().toISOString() }))
+    void markAmplifikasiPostSeen(postId)
+  }
 
   function buildEditHref(post: SerializedPost) {
     const params = new URLSearchParams()
@@ -184,6 +196,7 @@ export default function UserPostsTableClient({
           <thead>
             <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800">
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Tanggal</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Dilihat</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Screenshot</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Jenis</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Media Sosial</th>
@@ -197,7 +210,7 @@ export default function UserPostsTableClient({
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {optimisticPosts.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
+                <td colSpan={10} className="text-center py-10 text-neutral-400 dark:text-neutral-500">
                   Tidak ada data
                 </td>
               </tr>
@@ -211,12 +224,20 @@ export default function UserPostsTableClient({
                     <td className="px-4 py-3 text-center text-neutral-500 dark:text-neutral-400">
                       {post.created_at ? new Date(post.created_at).toLocaleDateString('id-ID') : '-'}
                     </td>
+                    <td className="px-4 py-3 text-center text-neutral-500 dark:text-neutral-400">
+                      {seenAtByPostId[post.id]
+                        ? new Date(seenAtByPostId[post.id]).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
+                        : <span className="text-neutral-300 dark:text-neutral-600">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-center align-middle">
                       <div className="flex justify-center">
                         {media ? (
                           <button
                             type="button"
-                            onClick={() => setModalUrl(imageUrl)}
+                            onClick={() => {
+                              setModalUrl(imageUrl)
+                              if (canMarkSeen && post.source_url === 'amplifikasi') handleMarkSeen(post.id)
+                            }}
                             className="focus:outline-none hover:opacity-80 transition"
                           >
                             <Image
@@ -252,11 +273,12 @@ export default function UserPostsTableClient({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-neutral-900 dark:text-white max-w-xs">
-                      {post.source_url === 'upload' && isSafeHttpUrl(post.title) ? (
+                      {(post.source_url === 'upload' || post.source_url === 'amplifikasi') && isSafeHttpUrl(post.title) ? (
                         <a
-                          href={post.title}
+                          href={post.title!}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => { if (canMarkSeen) handleMarkSeen(post.id) }}
                           className="inline-flex ui-button-sm items-center rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           Buka
