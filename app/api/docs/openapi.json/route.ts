@@ -207,7 +207,12 @@ const spec: OpenApiSpec = {
           id: { type: 'string', example: '88' },
           uuid: { type: 'string', nullable: true, example: 'f7d5f5d0-7ac0-4c52-8a57-8d1a9b2d7d8e' },
           fileName: { type: 'string', example: '8f9c1c4c0d8a7d4b.png' },
-          url: { type: 'string', format: 'uri', example: 'https://cdn.example.com/88/blog-images-8f9c1c4c0d8a7d4b.png' },
+          url: {
+            type: 'string',
+            format: 'uri',
+            example: 'https://s3.ap-southeast-3.amazonaws.com/bmi.web.id/reports/2026/06/14/jawa-tengah/semarang/amplifikasi/als-42-1777507200123.png',
+            description: 'URL public object AWS S3 atau DigitalOcean Spaces. Siapa pun yang mengetahui URL dapat mengakses media.',
+          },
         },
       },
       PostUser: {
@@ -605,7 +610,7 @@ const spec: OpenApiSpec = {
       post: {
         tags: ['Upload'],
         summary: 'Upload screenshot ke S3 (JWT)',
-        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post. Server memvalidasi magic bytes file dan menandai media pending dengan pemilik token. Object key baru memakai format `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{post_type|pending}/random.ext`.',
+        description: 'Upload dulu, simpan `id` yang dikembalikan, lalu gunakan sebagai `media_id` saat create/update post. Server memvalidasi magic bytes file dan menandai media pending dengan pemilik token. URL hasil upload menunjuk langsung ke public object AWS S3 atau DigitalOcean Spaces untuk menghindari proxy egress aplikasi. Object key memakai format `reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{post_type|pending}/nama-file.ext`. Khusus `amplifikasi`, nama file memakai `{inisial-operator}-{user-id}-{unix-timestamp-milidetik}.{ekstensi}`, misalnya `Aan Luky Saputra` menjadi `als-42-1777507200123.png`; jenis lain memakai nama acak.',
         requestBody: {
           required: true,
           content: {

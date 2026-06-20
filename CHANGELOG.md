@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-14
+
+- Nama file laporan amplifikasi baru memakai format `{inisial-operator}-{user-id}-{unix-timestamp-milidetik}.{ekstensi}`, misalnya `Aan Luky Saputra` menjadi `als-42-1777507200123.png`.
+- Media laporan dari bucket public sekarang dilayani langsung dari S3; proxy `/api/media/{id}` dihapus untuk menghindari egress tambahan dan beban streaming pada Railway.
+- Konfigurasi object storage kini membedakan AWS S3 dan DigitalOcean Spaces secara otomatis, termasuk signing region, path style, public URL, dan URL provider asal pada setiap record media.
+
 ## 2026-05-01
 
 ### Security

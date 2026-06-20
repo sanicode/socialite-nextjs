@@ -11,7 +11,7 @@ import { detectSocialPlatformFromCategory, getSocialPlatformLabel } from '@/app/
 import { getSecuritySettings } from '@/app/lib/request-security'
 import { getOperatorReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { formatUploadFileSize } from '@/app/lib/upload-size'
-import { buildReportObjectKey, deleteFromS3, uploadToS3 } from '@/app/lib/s3'
+import { buildReportObjectKey, deleteFromS3, getMediaUrl, uploadToS3 } from '@/app/lib/s3'
 import { getReportLocationByUserId } from '@/app/lib/report-location'
 import { randomUUID } from 'crypto'
 
@@ -122,7 +122,6 @@ async function uploadSocialMediaAttachment(
 ): Promise<UploadedSocialMediaAttachment> {
   const location = await getReportLocationByUserId(uploadedBy)
   const { fileName, objectKey } = buildReportObjectKey(media.ext, 'social-media', location)
-  const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
   const mediaRecord = await prisma.media.create({
     data: {
       model_type: 'App\\Models\\BlogPost',
@@ -141,6 +140,7 @@ async function uploadSocialMediaAttachment(
       responsive_images: {},
     },
   })
+  const publicUrl = getMediaUrl(objectKey)
 
   try {
     await uploadToS3(media.buffer, objectKey, media.mime)

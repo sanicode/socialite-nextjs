@@ -4,7 +4,12 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { cache } from 'react'
 import { prisma } from '@/app/lib/prisma'
-import { deleteFromS3, getMediaUrl } from '@/app/lib/s3'
+import {
+  deleteFromS3,
+  getMediaUrl,
+  getStoredMediaObjectKey,
+  getStoredMediaUrl,
+} from '@/app/lib/s3'
 import { assertAdmin, assertNotManagerOnly, requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
 import { logEvent } from '@/app/lib/logger'
 import { canUserEditPost } from '@/app/lib/post-edit-access'
@@ -266,9 +271,7 @@ export type PostFormState =
   | undefined
 
 function getS3Key(media: { file_name: string; custom_properties: unknown }): string {
-  const props = media.custom_properties as Record<string, unknown> | null
-  if (props && typeof props.object_key === 'string') return props.object_key
-  return media.file_name
+  return getStoredMediaObjectKey(media)
 }
 
 export type SerializedPost = {
@@ -566,7 +569,7 @@ export async function getPosts(params: {
               id: media.id.toString(),
               uuid: media.uuid ?? null,
               file_name: media.file_name,
-              url: getMediaUrl(getS3Key(media)),
+              url: getStoredMediaUrl(media),
             }
           : null,
         user: p.users_blog_posts_user_idTousers
@@ -609,6 +612,7 @@ async function uploadScreenshot(
   postId: bigint,
   reportKind: 'default' | 'upload' | 'amplifikasi',
   uploadedBy: string,
+  uploaderName: string,
   location: ReportObjectLocation,
 ): Promise<void> {
   const { randomUUID } = await import('crypto')
@@ -621,7 +625,12 @@ async function uploadScreenshot(
   }
   const uuid = randomUUID()
   const ext = detectedFile.ext
-  const { fileName, objectKey } = buildReportObjectKey(ext, reportKind, location)
+  const { fileName, objectKey } = buildReportObjectKey(
+    ext,
+    reportKind,
+    location,
+    { name: uploaderName, userId: uploadedBy },
+  )
 
   const media = await prisma.media.create({
     data: {
@@ -642,7 +651,7 @@ async function uploadScreenshot(
     },
   })
 
-  const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
+  const publicUrl = getMediaUrl(objectKey)
 
   try {
     await uploadToS3(buffer, objectKey, detectedFile.mime)
@@ -799,7 +808,14 @@ async function processCreate(formData: FormData, opts: PostVariantOpts): Promise
 
   if (opts.requireScreenshot && screenshot && screenshot.size > 0) {
     const location = await getReportLocationByTenantId(post.tenant_id)
-    await uploadScreenshot(screenshot, post.id, opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default', sessionUser.id, location)
+    await uploadScreenshot(
+      screenshot,
+      post.id,
+      opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default',
+      sessionUser.id,
+      sessionUser.name,
+      location,
+    )
   }
 
   logEvent('info', 'posts.create', { postId: post.id.toString(), userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })
@@ -923,7 +939,14 @@ async function processUpdate(formData: FormData, opts: PostVariantOpts): Promise
       await prisma.media.delete({ where: { id: oldMedia.id } })
     }
     const location = await getReportLocationByTenantId(existingPost.tenant_id)
-    await uploadScreenshot(screenshot, BigInt(id), opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default', sessionUser.id, location)
+    await uploadScreenshot(
+      screenshot,
+      BigInt(id),
+      opts.sourceUrl === 'upload' || opts.sourceUrl === 'amplifikasi' ? opts.sourceUrl : 'default',
+      existingPost.user?.id ?? sessionUser.id,
+      existingPost.user?.name ?? sessionUser.name,
+      location,
+    )
   }
 
   logEvent('info', 'posts.update', { postId: id, userId: sessionUser.id, categoryId, sourceUrl: opts.sourceUrl })

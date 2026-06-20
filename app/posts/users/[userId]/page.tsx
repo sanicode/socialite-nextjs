@@ -8,6 +8,7 @@ import { canActorAccessTenant } from '@/app/lib/tenant-access'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import AppAlert from '@/app/components/AppAlert'
 import UserPostsTableClient from './[status]/UserPostsTableClient'
+import { getStoredMediaUrl } from '@/app/lib/s3'
 import {
   getOperatorReportValidationDisabledMessage,
   getOperatorReportValidationPendingMessage,
@@ -127,7 +128,7 @@ export default async function UserPostsReviewPage({
   const mediaByPostId = media.reduce<Record<string, {
     model_id: string
     file_name: string
-    custom_properties: unknown
+    url: string
     order_column?: number | null
   }>>((acc, item) => {
     const id = item.model_id.toString()
@@ -135,7 +136,7 @@ export default async function UserPostsReviewPage({
       acc[id] = {
         model_id: item.model_id.toString(),
         file_name: item.file_name,
-        custom_properties: item.custom_properties,
+        url: getStoredMediaUrl(item),
         order_column: item.order_column,
       }
     }

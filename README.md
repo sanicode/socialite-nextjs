@@ -103,18 +103,28 @@ Kompresi upload web dapat diaktifkan atau dimatikan admin melalui Settings -> Se
 Format object key S3 untuk upload baru:
 
 ```text
-reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/random.ext
+reports/YYYY/MM/DD/{nama-provinsi}/{nama-kota}/{jenis}/{nama-file}.ext
+```
+
+Jenis selain amplifikasi memakai nama acak 32 karakter heksadesimal. Khusus amplifikasi, nama file memakai format:
+
+```text
+{inisial-operator}-{user-id}-{unix-timestamp-milidetik}.{ekstensi}
 ```
 
 Contoh:
 
 ```text
 reports/2026/04/30/jawa-timur/surabaya/upload/a8f3c9d1e2b4.jpg
-reports/2026/04/30/jawa-tengah/semarang/amplifikasi/f91c7a0b3d2e.png
+reports/2026/04/30/jawa-tengah/semarang/amplifikasi/als-42-1777507200123.png
 reports/2026/04/30/dki-jakarta/kota-adm-jakarta-selatan/default/7c1e9b0d42aa.webp
 ```
 
-Nama provinsi/kota diubah menjadi slug aman untuk path S3. Jika data lokasi belum lengkap, aplikasi memakai fallback `unknown-province/unknown-city`. Upload pending melalui `/api/upload` dan `/api/mobile/upload` memakai folder `pending` jika request belum mengirim `post_type`/`postType`. Path final disimpan di `media.custom_properties.object_key`, sehingga file lama dengan format lama tetap bisa dibaca dan dihapus.
+Nama provinsi/kota diubah menjadi slug aman untuk path object storage. Jika data lokasi belum lengkap, aplikasi memakai fallback `unknown-province/unknown-city`. Upload pending melalui `/api/upload` dan `/api/mobile/upload` memakai folder `pending` jika request belum mengirim `post_type`/`postType`. Path final disimpan di `media.custom_properties.object_key`, sedangkan URL provider asal disimpan di `media.custom_properties.source_url`.
+
+Object pada prefix `reports/` sengaja dibuat public dan URL media diarahkan langsung ke AWS S3 atau DigitalOcean Spaces. Aplikasi tidak mem-proxy file melalui Next.js agar satu file tidak menimbulkan egress object storage ke aplikasi lalu egress kedua dari aplikasi ke pengguna. Konsekuensinya, siapa pun yang mengetahui URL object dapat membuka file tersebut.
+
+Aplikasi dapat memakai AWS untuk local development dan DigitalOcean Spaces untuk production. URL absolut yang tersimpan pada setiap record dipakai lebih dulu, sehingga media tetap dibaca dari provider tempat file tersebut diunggah. Namun, gunakan database dev dan production yang terpisah: proses update/delete hanya memiliki credential provider pada environment aktif dan tidak dapat menghapus object milik provider lain.
 
 ### Verifikasi Laporan
 
@@ -258,11 +268,32 @@ S3_REGION=
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 S3_BUCKET=
-NEXT_PUBLIC_S3_PUBLIC_URL=
+NEXT_PUBLIC_S3_PUBLIC_URL=  # opsional; fallback AWS: https://s3.{region}.amazonaws.com/{bucket}
+S3_FORCE_PATH_STYLE=        # opsional; true/false, biasanya tidak perlu diisi
 SENTRY_DSN=                  # opsional
 CAPTCHA_SITE_KEY=            # opsional, Cloudflare Turnstile login web
 CAPTCHA_SECRET_KEY=          # opsional, Cloudflare Turnstile login web
 ```
+
+Contoh local development dengan AWS S3:
+
+```env
+S3_ENDPOINT=
+S3_REGION=ap-southeast-3
+S3_BUCKET=nama-bucket-aws
+NEXT_PUBLIC_S3_PUBLIC_URL=
+```
+
+Contoh production dengan DigitalOcean Spaces:
+
+```env
+S3_ENDPOINT=https://sgp1.digitaloceanspaces.com
+S3_REGION=auto
+S3_BUCKET=nama-space
+NEXT_PUBLIC_S3_PUBLIC_URL=https://nama-space.sgp1.digitaloceanspaces.com
+```
+
+Untuk Spaces, aplikasi otomatis memakai signing region `us-east-1` dan virtual-hosted style sesuai konfigurasi AWS SDK yang direkomendasikan DigitalOcean. `S3_REGION=auto` boleh dipertahankan untuk kompatibilitas environment lama karena region datacenter Spaces diambil dari `S3_ENDPOINT`.
 
 Backup database harian ke server lain didokumentasikan di `docs/database-backup.md`.
 

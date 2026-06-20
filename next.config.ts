@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
+import { getPublicMediaBaseUrl } from "./app/lib/env";
 
 function getImageRemotePatterns(): NonNullable<NextConfig['images']>['remotePatterns'] {
-  const publicUrl = process.env.NEXT_PUBLIC_S3_PUBLIC_URL?.trim()
-  if (!publicUrl) return []
-
   try {
-    const url = new URL(publicUrl)
+    const url = new URL(getPublicMediaBaseUrl())
     const pathname = url.pathname.replace(/\/+$/, '')
 
     return [
@@ -17,7 +15,7 @@ function getImageRemotePatterns(): NonNullable<NextConfig['images']>['remotePatt
       },
     ]
   } catch {
-    console.warn('Invalid NEXT_PUBLIC_S3_PUBLIC_URL; external images will remain disabled.')
+    console.warn('Invalid public media configuration; external image optimization will remain disabled.')
     return []
   }
 }

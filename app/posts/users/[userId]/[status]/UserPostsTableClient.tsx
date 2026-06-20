@@ -14,7 +14,7 @@ type PostStatus = 'pending' | 'valid' | 'invalid'
 type SerializedMedia = {
   model_id: string
   file_name: string
-  custom_properties: unknown
+  url: string
   order_column?: number | null
 }
 
@@ -204,18 +204,7 @@ export default function UserPostsTableClient({
             ) : (
               optimisticPosts.map((post) => {
                 const media = mediaByPostId[post.id]
-                let imageUrl = ""
-                if (media) {
-                  try {
-                    const rawCustomProps = media.custom_properties
-                    const customProps = rawCustomProps && typeof rawCustomProps === 'object'
-                      ? rawCustomProps as { source_url?: string }
-                      : JSON.parse(String(rawCustomProps ?? '{}')) as { source_url?: string }
-                    imageUrl = customProps.source_url || `https://softlink.sgp1.digitaloceanspaces.com/${media.model_id}/${media.file_name}`
-                  } catch {
-                    imageUrl = `https://softlink.sgp1.digitaloceanspaces.com/${media.model_id}/${media.file_name}`
-                  }
-                }
+                const imageUrl = media?.url ?? ''
 
                 return (
                   <tr key={post.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
@@ -236,6 +225,7 @@ export default function UserPostsTableClient({
                               width={56}
                               height={56}
                               className="rounded object-cover w-14 h-14 border border-neutral-200 dark:border-neutral-700"
+                              unoptimized
                             />
                           </button>
                         ) : (

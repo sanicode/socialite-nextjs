@@ -1,5 +1,5 @@
 import { prisma } from '@/app/lib/prisma'
-import { getMediaUrl } from '@/app/lib/s3'
+import { getStoredMediaUrl } from '@/app/lib/s3'
 import type { TablePageSize } from '@/app/lib/table-pagination'
 
 export type QueryPost = {
@@ -39,12 +39,6 @@ export type QueryPostsParams = {
   isTrending?: boolean
   provinceId?: string
   cityId?: string
-}
-
-function getS3Key(media: { file_name: string; custom_properties: unknown }): string {
-  const props = media.custom_properties as Record<string, unknown> | null
-  if (props && typeof props.object_key === 'string') return props.object_key
-  return media.file_name
 }
 
 function getJakartaDateBounds(dateString: string, endOfDay: boolean) {
@@ -274,7 +268,7 @@ export async function queryPosts(params: QueryPostsParams): Promise<{ posts: Que
               id: media.id.toString(),
               uuid: media.uuid ?? null,
               file_name: media.file_name,
-              url: getMediaUrl(getS3Key(media)),
+              url: getStoredMediaUrl(media),
             }
           : null,
         user: p.users_blog_posts_user_idTousers
@@ -344,7 +338,7 @@ export async function queryPostById(id: string): Promise<QueryPost | null> {
           id: media.id.toString(),
           uuid: media.uuid ?? null,
           file_name: media.file_name,
-          url: getMediaUrl(getS3Key(media)),
+          url: getStoredMediaUrl(media),
         }
       : null,
     user: post.users_blog_posts_user_idTousers

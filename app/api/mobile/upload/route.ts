@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { buildReportObjectKey, type ReportObjectKeyKind, uploadToS3 } from '@/app/lib/s3'
+import { buildReportObjectKey, getMediaUrl, type ReportObjectKeyKind, uploadToS3 } from '@/app/lib/s3'
 import { prisma } from '@/app/lib/prisma'
 import { requireJwt, apiError, ApiError, requireApiEnabled } from '@/app/lib/api-auth'
 import { getSecuritySettings } from '@/app/lib/request-security'
@@ -69,9 +69,20 @@ export async function POST(request: NextRequest) {
     })
 
     const ext = detectedFile.ext
-    const location = await getReportLocationByUserId(payload.sub)
-    const { fileName, objectKey } = buildReportObjectKey(ext, reportKind, location)
-    const publicUrl = `${process.env.NEXT_PUBLIC_S3_PUBLIC_URL}/${objectKey}`
+    const [location, uploader] = await Promise.all([
+      getReportLocationByUserId(payload.sub),
+      prisma.users.findUnique({
+        where: { id: BigInt(payload.sub) },
+        select: { name: true },
+      }),
+    ])
+    const { fileName, objectKey } = buildReportObjectKey(
+      ext,
+      reportKind,
+      location,
+      { name: uploader?.name, userId: payload.sub },
+    )
+    const publicUrl = getMediaUrl(objectKey)
 
     try {
       await uploadToS3(buffer, objectKey, detectedFile.mime)

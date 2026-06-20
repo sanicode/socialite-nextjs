@@ -10,6 +10,7 @@ Every server action (`'use server'`) and every non-public page (`page.tsx`) MUST
 Documented public exception:
 - `/statistik?id=bmi` is a public dashboard and MUST NOT redirect to `/login`.
 - `/api/statistik` is the public companion endpoint for that dashboard. It MUST remain protected by the short-lived statistik Bearer token from `app/lib/statistik-token.ts`, bound to `id=bmi` and the request fingerprint, and responses MUST be stripped of PII with `stripDashboardPii`.
+- Report media objects under the S3-compatible `reports/` prefix are intentionally public and are served directly from AWS S3 or DigitalOcean Spaces to avoid duplicate object-storage-to-app and app-to-client egress. Only the binary media object is public; database records and report metadata remain authenticated. Object keys must use sanitized path segments and must not contain full operator names.
 - Do not add new public pages/endpoints without documenting the exception here and applying equivalent data-minimization controls.
 
 ## Required pattern for every server action

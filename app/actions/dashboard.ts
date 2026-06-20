@@ -5,6 +5,7 @@ import { prisma } from '@/app/lib/prisma'
 import { requireManagerOrAdmin, requireUser } from '@/app/lib/authorization'
 import type { SessionUser } from '@/app/lib/session'
 import { getUserTenantIds } from '@/app/lib/tenant-access'
+import { getMediaUrl } from '@/app/lib/s3'
 
 export type DashboardFilters = {
   dateFrom?: string
@@ -553,7 +554,10 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
         bp.source_url,
         bp.created_at,
         lower(COALESCE(c.name, '')) AS category_name,
-        m.custom_properties ->> 'source_url' AS media_url
+        COALESCE(
+          NULLIF(m.custom_properties ->> 'source_url', ''),
+          m.custom_properties ->> 'object_key'
+        ) AS media_reference
       FROM blog_posts bp
       INNER JOIN users u ON u.id = bp.user_id
       INNER JOIN tenant_user tu
@@ -606,11 +610,11 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%facebook%') AS facebook_link,
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%youtube%') AS youtube_link,
       MAX(title) FILTER (WHERE source_url = 'upload' AND category_name LIKE '%threads%') AS threads_link,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 1) AS amplifikasi_1,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 2) AS amplifikasi_2,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 3) AS amplifikasi_3,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4,
-      MAX(media_url) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 5) AS amplifikasi_5
+      MAX(media_reference) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 1) AS amplifikasi_1,
+      MAX(media_reference) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 2) AS amplifikasi_2,
+      MAX(media_reference) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 3) AS amplifikasi_3,
+      MAX(media_reference) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 4) AS amplifikasi_4,
+      MAX(media_reference) FILTER (WHERE source_url = 'amplifikasi' AND amplifikasi_index = 5) AS amplifikasi_5
     FROM numbered
     GROUP BY tanggal_pelaporan, email, nama_operator, no_hp, propinsi, kabupaten_kota
     HAVING COUNT(*) FILTER (WHERE source_url = 'upload') > 0
@@ -625,7 +629,12 @@ export async function getReportData(filters: DashboardFilters): Promise<ReportRo
     const serialized: ReportRow = {}
     for (const [key, value] of Object.entries(row)) {
       if (key === 'tenant_id') continue
-      serialized[key] = typeof value === 'bigint' ? value.toString() : value
+      const serializedValue = typeof value === 'bigint' ? value.toString() : value
+      serialized[key] = key.startsWith('amplifikasi_')
+        && typeof serializedValue === 'string'
+        && !/^https?:\/\//i.test(serializedValue)
+        ? getMediaUrl(serializedValue)
+        : serializedValue
     }
     return serialized
   })
@@ -655,7 +664,7 @@ export async function getTrendingReportData(filters: DashboardFilters): Promise<
       c.name AS jenis_medsos,
       CASE
         WHEN bp.source_url = 'upload' THEN NULLIF(bp.title, '-')
-        ELSE COALESCE(NULLIF(bp.title, '-'), media.source_url)
+        ELSE COALESCE(NULLIF(bp.title, '-'), media.media_reference)
       END AS link
     FROM blog_posts bp
     INNER JOIN users u ON u.id = bp.user_id
@@ -679,7 +688,10 @@ export async function getTrendingReportData(filters: DashboardFilters): Promise<
     LEFT JOIN reg_provinces rp ON rp.id = rc.province_id
     LEFT JOIN blog_post_categories c ON c.id = bp.blog_post_category_id
     LEFT JOIN LATERAL (
-      SELECT m.custom_properties ->> 'source_url' AS source_url
+      SELECT COALESCE(
+        NULLIF(m.custom_properties ->> 'source_url', ''),
+        m.custom_properties ->> 'object_key'
+      ) AS media_reference
       FROM media m
       WHERE m.model_type = 'App\\Models\\BlogPost'
         AND m.model_id = bp.id
@@ -702,7 +714,7 @@ export async function getTrendingReportData(filters: DashboardFilters): Promise<
     provinsi: row.provinsi,
     kabupatenKota: row.kabupaten_kota,
     jenisMedsos: row.jenis_medsos,
-    link: row.link,
+    link: row.link && !/^https?:\/\//i.test(row.link) ? getMediaUrl(row.link) : row.link,
   }))
 }
 

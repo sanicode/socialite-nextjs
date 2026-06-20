@@ -324,6 +324,24 @@ Setiap perubahan aplikasi harus dicatat di file ini, terutama perubahan yang men
 - Tetap memakai `<wbr />` untuk token panjang, tetapi tinggi metadata kembali mengikuti isi teks yang sudah dipendekkan.
 - **File terdampak:** `app/components/posts/LinkPreviewDescription.tsx`, `docs/laporan-pekerjaan.md`.
 
+#### 14.21 Optimasi Egress Media Laporan
+- Mengarahkan media laporan langsung ke public object S3 dan menghapus proxy `/api/media/{id}`.
+- Menghindari transfer berantai AWS S3 -> Railway -> pengguna; browser mengambil media langsung dari AWS S3.
+- Menambahkan `Cache-Control: public, max-age=31536000, immutable` pada upload baru karena setiap object key bersifat unik.
+- Memigrasikan dua URL media amplifikasi yang sempat tersimpan sebagai `/api/media/{id}` menjadi URL public S3.
+- Mendokumentasikan public media exception di `AGENTS.md`, README, OpenAPI, dan changelog.
+- **File terdampak:** `AGENTS.md`, `app/lib/env.ts`, `app/lib/s3.ts`, `app/lib/posts-query.ts`, `app/actions/posts.ts`, `app/actions/dashboard.ts`, `app/actions/social-media-posts.ts`, `app/api/upload/route.ts`, `app/api/mobile/upload/route.ts`, `app/api/docs/openapi.json/route.ts`, `README.md`, `CHANGELOG.md`, `docs/laporan-pekerjaan.md`.
+- **Verifikasi:** S3 bucket policy public, object media merespons `200 image/jpeg`, tidak ada URL `/api/media/%` atau `undefined/%` tersisa, ESLint dan TypeScript sukses.
+
+#### 14.22 Kompatibilitas AWS S3 dan DigitalOcean Spaces
+- Membedakan konfigurasi AWS S3 dan DigitalOcean Spaces dari hostname `S3_ENDPOINT`.
+- DigitalOcean Spaces memakai signing region `us-east-1` dan virtual-hosted style; AWS tanpa custom endpoint tetap memakai region AWS yang dikonfigurasi.
+- Mengabaikan `S3_ENDPOINT` kosong agar AWS SDK memakai endpoint native AWS.
+- Memakai `media.custom_properties.source_url` absolut sebagai URL utama dan `object_key` sebagai fallback, sehingga record media tetap menunjuk ke provider tempat file diunggah.
+- Menghapus fallback hostname DigitalOcean yang hard-coded dari tabel validasi operator.
+- Mendokumentasikan pemisahan database dev dan production karena credential pada satu environment hanya dapat mengelola object provider environment tersebut.
+- **File terdampak:** `AGENTS.md`, `app/lib/env.ts`, `app/lib/s3.ts`, `app/lib/posts-query.ts`, `app/actions/posts.ts`, `app/actions/dashboard.ts`, `app/posts/users/[userId]/page.tsx`, `app/posts/users/[userId]/[status]/page.tsx`, `app/posts/users/[userId]/[status]/UserPostsTableClient.tsx`, `next.config.ts`, `README.md`, `CHANGELOG.md`, `app/api/docs/openapi.json/route.ts`, `docs/laporan-pekerjaan.md`.
+
 ---
 
 ## Ringkasan Statistik

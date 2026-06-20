@@ -9,6 +9,7 @@ import UserPostsFilterClient from './UserPostsFilterClient'
 import AppAlert from '@/app/components/AppAlert'
 import { getNonAdminReportingWindowDecision } from '@/app/lib/operator-reporting-window'
 import { canActorAccessTenant } from '@/app/lib/tenant-access'
+import { getStoredMediaUrl } from '@/app/lib/s3'
 import type { Prisma } from '@/app/generated/prisma/client'
 
 type SearchParams = Promise<{
@@ -153,7 +154,7 @@ export default async function UserPostsByStatusPage({
       {
         model_id: media.model_id.toString(),
         file_name: media.file_name,
-        custom_properties: media.custom_properties,
+        url: getStoredMediaUrl(media),
         order_column: media.order_column,
       },
     ])
